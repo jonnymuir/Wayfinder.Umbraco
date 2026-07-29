@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using UmbracoPrism.Core.Services;
+using Wayfinder.Umbraco.Services;
 
-namespace UmbracoPrism.Core.Controllers;
+namespace Wayfinder.Umbraco.Controllers;
 
 /// <summary>
 /// Lightweight API endpoint for polling workflow state changes.
@@ -11,7 +11,7 @@ namespace UmbracoPrism.Core.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/prism/workflow")]
-[Authorize(AuthenticationSchemes = "PrismMemberCookie")]
+[Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling)]
 public class ServiceRequestPollController : ControllerBase
 {
     private readonly IBusinessAppProcessManagerClient _processManagerClient;

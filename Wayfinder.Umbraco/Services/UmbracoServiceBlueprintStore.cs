@@ -1,11 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Umbraco.Cms.Infrastructure.Persistence;
-using UmbracoPrism.Core.Persistence;
+using Wayfinder.Umbraco.Persistence;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IServiceBlueprintSourceStore"/> for backoffice-authored CMS Service Blueprint
@@ -14,7 +14,7 @@ namespace UmbracoPrism.Core.Services.ServiceDesign;
 /// <paramref name="engine"/> so the live engine reflects it immediately, matching the promise
 /// the AI-authoring surface already makes.
 /// </summary>
-public sealed class UmbracoCmsServiceBlueprintStore(
+public sealed class UmbracoServiceBlueprintStore(
     IUmbracoDatabaseFactory databaseFactory,
     IProcessManager engine) : IServiceBlueprintSourceStore
 {

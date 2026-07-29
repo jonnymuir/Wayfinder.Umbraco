@@ -1,7 +1,7 @@
-@using UmbracoPrism.Core.Models.ServiceDesign
-@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<UmbracoPrism.Core.Models.ServiceDesign.PrismServiceRequestViewModel>
+@using Wayfinder.Umbraco.Models
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Wayfinder.Umbraco.Models.PrismServiceRequestViewModel>
 @inject Microsoft.AspNetCore.Mvc.ViewEngines.ICompositeViewEngine _viewEngine
-@addTagHelper *, UmbracoPrism.Core
+@addTagHelper *, Wayfinder.Umbraco
 @{
     Layout = "~/Views/Shared/Master.cshtml";
     ViewBag.Title = Model.HasError ? "Service Request Error" : Model.StateDisplayName;

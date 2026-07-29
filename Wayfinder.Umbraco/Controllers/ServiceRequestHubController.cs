@@ -6,25 +6,26 @@ using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.Common.Controllers;
-using UmbracoPrism.Core.Models;
-using UmbracoPrism.Core.Services;
+using Wayfinder.Umbraco.Models;
+using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Controllers;
+namespace Wayfinder.Umbraco.Controllers;
 
 /// <summary>
 /// Umbraco route-hijacking controller for the <c>serviceRequestHub</c> document type — a single "My
 /// Workflows" surface across both workflow implementations a host may have running: the
 /// business-app one (<see cref="IBusinessAppProcessManagerClient"/>'s default, unkeyed registration,
-/// talking to a remote business app) and Prism CMS Workflow (the keyed <c>"cms"</c>
-/// registration, in-process). Displays all workflow instances for the authenticated member from
+/// talking to a remote business app) and an optional keyed <c>"cms"</c> registration (e.g. Prism CMS
+/// Workflow, in-process). Displays all workflow instances for the authenticated member from
 /// both, merged into one list — a member shouldn't need to know or care which implementation
-/// authored a given journey.
+/// authored a given journey. The keyed client is genuinely optional: a host that hasn't
+/// registered one under key <c>"cms"</c> at all just sees the unkeyed client's instances.
 /// </summary>
 public class ServiceRequestHubController : RenderController
 {
     private readonly IBusinessAppProcessManagerClient _processManagerClient;
-    private readonly IBusinessAppProcessManagerClient _cmsProcessManagerClient;
+    private readonly IBusinessAppProcessManagerClient? _cmsProcessManagerClient;
     private readonly IPublishedValueFallback _publishedValueFallback;
     private readonly IPublishedContentQuery _publishedContentQuery;
     private readonly ILogger<ServiceRequestHubController> _logger;
@@ -34,14 +35,14 @@ public class ServiceRequestHubController : RenderController
         ICompositeViewEngine compositeViewEngine,
         IUmbracoContextAccessor umbracoContextAccessor,
         IBusinessAppProcessManagerClient workflowClient,
-        [FromKeyedServices("cms")] IBusinessAppProcessManagerClient cmsProcessManagerClient,
+        IServiceProvider serviceProvider,
         IPublishedValueFallback publishedValueFallback,
         IPublishedContentQuery publishedContentQuery)
         : base(logger, compositeViewEngine, umbracoContextAccessor)
     {
         _logger = logger;
         _processManagerClient = workflowClient;
-        _cmsProcessManagerClient = cmsProcessManagerClient;
+        _cmsProcessManagerClient = serviceProvider.GetKeyedService<IBusinessAppProcessManagerClient>("cms");
         _publishedValueFallback = publishedValueFallback;
         _publishedContentQuery = publishedContentQuery;
     }
@@ -59,9 +60,11 @@ public class ServiceRequestHubController : RenderController
     private async Task<IActionResult> IndexAsync()
     {
         var businessAppEnvelope = await _processManagerClient.GetInstancesAsync();
-        var cmsEnvelope = await _cmsProcessManagerClient.GetInstancesAsync();
+        var cmsInstances = _cmsProcessManagerClient is null
+            ? []
+            : (await _cmsProcessManagerClient.GetInstancesAsync()).Instances;
         var allInstances = businessAppEnvelope.Instances
-            .Concat(cmsEnvelope.Instances)
+            .Concat(cmsInstances)
             .OrderByDescending(i => i.LastUpdatedAt)
             .ToList();
 

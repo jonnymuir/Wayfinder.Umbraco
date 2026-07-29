@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Stores and retrieves files uploaded against a workflow's <c>file-upload</c> fields. The

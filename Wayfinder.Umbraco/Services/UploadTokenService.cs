@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
-using UmbracoPrism.Core.Configuration;
+using Wayfinder.Umbraco.Configuration;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IUploadTokenService"/> backed by <see cref="IDistributedCache"/> — same mechanism

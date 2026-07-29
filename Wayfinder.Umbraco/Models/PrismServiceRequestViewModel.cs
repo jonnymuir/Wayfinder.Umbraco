@@ -1,7 +1,7 @@
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Models.ServiceDesign;
+namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
 /// Base view model for Prism workflow pages.
@@ -11,7 +11,7 @@ namespace UmbracoPrism.Core.Models.ServiceDesign;
 /// <remarks>
 /// <para>
 /// This view model bridges the gap between the Business App workflow engine and Umbraco's rendering pipeline.
-/// It is populated by <see cref="PrismServiceRequestPageController{TViewModel}"/> during GET requests (rendering)
+/// It is populated by <see cref="ServiceRequestPageController{TViewModel}"/> during GET requests (rendering)
 /// and receives validation errors and form values from POST round-trips (PRG pattern).
 /// </para>
 /// <para>

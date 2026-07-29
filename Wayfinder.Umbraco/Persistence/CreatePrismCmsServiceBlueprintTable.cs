@@ -1,6 +1,6 @@
 using Umbraco.Cms.Infrastructure.Migrations;
 
-namespace UmbracoPrism.Core.Persistence;
+namespace Wayfinder.Umbraco.Persistence;
 
 /// <summary>
 /// Migration that creates the prismCmsServiceBlueprint table backing the backoffice-hosted

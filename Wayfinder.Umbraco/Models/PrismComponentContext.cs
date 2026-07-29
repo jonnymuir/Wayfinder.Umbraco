@@ -1,6 +1,6 @@
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Models.ServiceDesign;
+namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
 /// Pre-computed view model passed to PrismComponent partials.

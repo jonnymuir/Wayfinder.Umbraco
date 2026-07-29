@@ -1,7 +1,7 @@
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Models;
+namespace Wayfinder.Umbraco.Models;
 
 public class ServiceRequestHubViewModel : PublishedContentWrapped
 {

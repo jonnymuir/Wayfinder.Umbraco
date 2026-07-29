@@ -1,7 +1,7 @@
 using NPoco;
 using Umbraco.Cms.Infrastructure.Persistence.DatabaseAnnotations;
 
-namespace UmbracoPrism.Core.Persistence;
+namespace Wayfinder.Umbraco.Persistence;
 
 /// <summary>
 /// Database schema for the prismCmsServiceBlueprint table — the authoritative, uSync-portable

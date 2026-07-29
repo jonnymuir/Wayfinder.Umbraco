@@ -1,9 +1,9 @@
 using System.Net.Mail;
 using System.Text.RegularExpressions;
-using UmbracoPrism.Core.Models.ServiceDesign;
+using Wayfinder.Umbraco.Models;
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Validates a workflow form submission against its authoritative field definitions.

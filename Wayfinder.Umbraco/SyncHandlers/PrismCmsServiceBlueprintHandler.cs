@@ -10,9 +10,9 @@ using uSync.BackOffice.SyncHandlers.Interfaces;
 using uSync.BackOffice.SyncHandlers.Models;
 using BackOfficeConsts = global::uSync.BackOffice.uSyncConstants;
 using ISyncItemFactory = global::uSync.Core.ISyncItemFactory;
-using UmbracoPrism.Core.Persistence;
+using Wayfinder.Umbraco.Persistence;
 
-namespace UmbracoPrism.uSync.SyncHandlers;
+namespace Wayfinder.Umbraco.SyncHandlers;
 
 /// <summary>
 /// uSync handler for backoffice-authored CMS Service Blueprint definitions — mirrors

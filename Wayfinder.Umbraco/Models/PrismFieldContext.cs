@@ -1,6 +1,6 @@
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Models.ServiceDesign;
+namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
 /// View model passed to each <c>_Component-{Type}.cshtml</c> field partial.

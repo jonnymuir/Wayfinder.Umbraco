@@ -1,6 +1,6 @@
 using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Models.ServiceDesign;
+namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
 /// Resolves the workflow render shell from the component tree, with legacy <c>stepType</c> fallback.
