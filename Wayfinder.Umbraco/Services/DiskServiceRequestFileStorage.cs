@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Default <see cref="IServiceRequestFileStorage"/> — writes uploaded files to disk under

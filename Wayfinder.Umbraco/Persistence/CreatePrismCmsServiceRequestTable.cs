@@ -1,6 +1,6 @@
 using Umbraco.Cms.Infrastructure.Migrations;
 
-namespace UmbracoPrism.Core.Persistence;
+namespace Wayfinder.Umbraco.Persistence;
 
 /// <summary>
 /// Migration that creates the prismCmsServiceRequest table backing the durable,

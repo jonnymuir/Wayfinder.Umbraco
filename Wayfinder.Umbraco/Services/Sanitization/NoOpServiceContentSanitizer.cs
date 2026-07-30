@@ -1,6 +1,6 @@
-using UmbracoPrism.Shared.Services.Sanitization;
+using Wayfinder.Services.Sanitization;
 
-namespace UmbracoPrism.Core.Services.Sanitization;
+namespace Wayfinder.Umbraco.Services.Sanitization;
 
 /// <summary>
 /// Identity sanitizer that returns input unchanged. Retained as a test fixture only —

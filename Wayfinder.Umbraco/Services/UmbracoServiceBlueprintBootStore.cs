@@ -1,20 +1,20 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Infrastructure.Persistence;
-using UmbracoPrism.Core.Persistence;
-using UmbracoPrism.ProcessManager.Abstractions;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Umbraco.Persistence;
+using Wayfinder.Engine.Abstractions;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// Boot-time <see cref="IServiceBlueprintStore"/> that seeds <c>CmsProcessManager</c> from the
+/// Boot-time <see cref="IServiceBlueprintStore"/> that seeds <c>UmbracoProcessManagerEngine</c> from the
 /// prismCmsServiceBlueprint table at startup. Deliberately has no dependency on
-/// <c>IProcessManager</c> — unlike <see cref="UmbracoCmsServiceBlueprintStore"/> (the
+/// <c>IProcessManager</c> — unlike <see cref="UmbracoServiceBlueprintStore"/> (the
 /// authoring-side store), which pushes saves back into the live engine and therefore must depend
 /// on it. Depending on the engine here would create a DI cycle at construction time.
 /// </summary>
-public sealed class UmbracoCmsServiceBlueprintBootStore(IUmbracoDatabaseFactory databaseFactory)
+public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory databaseFactory)
     : IServiceBlueprintStore
 {
     private static readonly JsonSerializerOptions ReadOptions = new()

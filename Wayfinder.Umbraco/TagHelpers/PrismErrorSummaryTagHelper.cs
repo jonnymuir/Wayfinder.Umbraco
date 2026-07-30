@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.TagHelpers;
+namespace Wayfinder.Umbraco.TagHelpers;
 
 [HtmlTargetElement("prism-error-summary")]
 public class PrismErrorSummaryTagHelper : TagHelper

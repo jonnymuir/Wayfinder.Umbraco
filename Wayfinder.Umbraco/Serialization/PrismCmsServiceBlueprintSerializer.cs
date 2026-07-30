@@ -7,17 +7,17 @@ using Umbraco.Cms.Infrastructure.Persistence;
 using uSync.Core;
 using uSync.Core.Models;
 using uSync.Core.Serialization;
-using UmbracoPrism.Core.Persistence;
-using UmbracoPrism.Shared.Models.ServiceDesign;
-using UmbracoPrism.ProcessManager.Abstractions;
+using Wayfinder.Umbraco.Persistence;
+using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Engine.Abstractions;
 
-namespace UmbracoPrism.uSync.Serialization;
+namespace Wayfinder.Umbraco.Serialization;
 
 /// <summary>
 /// Serializes CMS Service Blueprint definitions to/from uSync's XML export format — mirrors
 /// <see cref="PrismTenantSerializer"/>'s shape. A successful import also pushes the
 /// definition into the live engine, the same promise a backoffice save already makes
-/// (see <c>UmbracoCmsServiceBlueprintStore</c>), so an import into a running site takes
+/// (see <c>UmbracoServiceBlueprintStore</c>), so an import into a running site takes
 /// effect immediately rather than requiring a restart.
 /// </summary>
 [SyncSerializer("7a2e4f18-9c3b-4d67-a1e5-8f6b2c9d4a71", "Prism CMS Service Blueprint Serializer", "PrismCmsServiceBlueprint")]

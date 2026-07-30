@@ -1,4 +1,4 @@
-namespace UmbracoPrism.Core.Models.ServiceDesign;
+namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
 /// Result of server-side structural validation of a service request's form submission.

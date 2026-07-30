@@ -1,4 +1,4 @@
-namespace UmbracoPrism.Core.Configuration;
+namespace Wayfinder.Umbraco.Configuration;
 
 /// <summary>
 /// Configuration options for the Prism Workflow Engine.

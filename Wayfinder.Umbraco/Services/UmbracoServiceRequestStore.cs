@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Umbraco.Cms.Infrastructure.Persistence;
-using UmbracoPrism.Core.Persistence;
-using UmbracoPrism.ProcessManager.Abstractions;
-using UmbracoPrism.ProcessManager.Models;
+using Wayfinder.Umbraco.Persistence;
+using Wayfinder.Engine.Abstractions;
+using Wayfinder.Engine.Models;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IServiceRequestStore"/> backed by the prismCmsServiceRequest table — durable
@@ -14,7 +14,7 @@ namespace UmbracoPrism.Core.Services.ServiceDesign;
 /// instead, so signing in and coming back next week finds it exactly where it was left — see
 /// "My Requests" (<c>ServiceRequestHubController</c>).
 /// </summary>
-public sealed class UmbracoCmsServiceRequestStore(
+public sealed class UmbracoServiceRequestStore(
     IUmbracoDatabaseFactory databaseFactory,
     TimeSpan? slidingExpiration = null) : IServiceRequestStore
 {

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
-using UmbracoPrism.Core.Configuration;
-using UmbracoPrism.Core.Models.ServiceDesign;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Umbraco.Configuration;
+using Wayfinder.Umbraco.Models;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Generates and validates workflow step nonces using IDistributedCache.

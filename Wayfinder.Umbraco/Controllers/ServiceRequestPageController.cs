@@ -7,12 +7,11 @@ using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.Common.Controllers;
 using Umbraco.Extensions;
-using UmbracoPrism.Core.Models.ServiceDesign;
-using UmbracoPrism.Core.Services;
-using UmbracoPrism.Core.Services.ServiceDesign;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Umbraco.Models;
+using Wayfinder.Umbraco.Services;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Controllers;
+namespace Wayfinder.Umbraco.Controllers;
 
 /// <summary>
 /// Abstract base controller for Prism workflow pages.
@@ -38,7 +37,7 @@ namespace UmbracoPrism.Core.Controllers;
 /// <item><see cref="CreateViewModel"/> to use a custom ViewModel derived from <see cref="PrismServiceRequestViewModel"/>.</item>
 /// </list>
 /// </remarks>
-public abstract class PrismServiceRequestPageController<TViewModel> : RenderController
+public abstract class ServiceRequestPageController<TViewModel> : RenderController
     where TViewModel : PrismServiceRequestViewModel
 {
     /// <summary>Fallback max upload size for a <c>file-upload</c> field with no <c>MaxSizeBytes</c> of its own.</summary>
@@ -54,7 +53,7 @@ public abstract class PrismServiceRequestPageController<TViewModel> : RenderCont
     private readonly IUploadTokenService _uploadTokenService;
 
     /// <summary>
-    /// Initializes a new instance of the PrismServiceRequestPageController class.
+    /// Initializes a new instance of the ServiceRequestPageController class.
     /// </summary>
     /// <param name="logger">Logger for workflow request diagnostics and warnings.</param>
     /// <param name="compositeViewEngine">Umbraco's view engine for rendering templates.</param>
@@ -66,7 +65,7 @@ public abstract class PrismServiceRequestPageController<TViewModel> : RenderCont
     /// <param name="fieldValidator">Service for validating submitted field values against their server-side definitions.</param>
     /// <param name="fileStorage">Service for persisting files posted against <c>file-upload</c> fields.</param>
     /// <param name="uploadTokenService">Resolves a field that was already uploaded asynchronously ahead of this submission.</param>
-    protected PrismServiceRequestPageController(
+    protected ServiceRequestPageController(
         ILogger<RenderController> logger,
         ICompositeViewEngine compositeViewEngine,
         IUmbracoContextAccessor umbracoContextAccessor,

@@ -3,16 +3,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Infrastructure.Persistence;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Periodically deletes expired rows from prismCmsWorkflowInstance. <see cref="UmbracoCmsWorkflowInstanceStore"/>
 /// already treats an expired row as a miss on read (lazy expiry), so this sweep exists purely to
 /// stop the table growing unbounded from sessions that never come back to expire naturally.
 /// </summary>
-public sealed class PrismCmsServiceRequestSweepService(
+public sealed class ServiceRequestSweepService(
     IServiceScopeFactory scopeFactory,
-    ILogger<PrismCmsServiceRequestSweepService> logger) : BackgroundService
+    ILogger<ServiceRequestSweepService> logger) : BackgroundService
 {
     private static readonly TimeSpan SweepInterval = TimeSpan.FromHours(1);
 

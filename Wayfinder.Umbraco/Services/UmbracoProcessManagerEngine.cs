@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using UmbracoPrism.Shared.Models.ServiceDesign;
-using UmbracoPrism.Shared.Services.Sanitization;
-using UmbracoPrism.ProcessManager.Abstractions;
-using UmbracoPrism.ProcessManager.Models;
-using UmbracoPrism.ProcessManager.Services;
+using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Services.Sanitization;
+using Wayfinder.Engine.Abstractions;
+using Wayfinder.Engine.Models;
+using Wayfinder.Engine.Services;
 
-namespace UmbracoPrism.Core.Services.ServiceDesign;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// The CMS Workflow implementation's own <see cref="IProcessManager"/> — a distinctly
@@ -17,8 +17,8 @@ namespace UmbracoPrism.Core.Services.ServiceDesign;
 /// is supplied as a plain delegate at registration time, so a demo host (e.g. TestSite's
 /// juggling-society membership lookup) needs no subclass of its own.
 /// </summary>
-public sealed class CmsProcessManager(
-    ILogger<CmsProcessManager> logger,
+public sealed class UmbracoProcessManagerEngine(
+    ILogger<UmbracoProcessManagerEngine> logger,
     IServiceBlueprintStore definitionStore,
     IServiceContentSanitizer sanitizer,
     IServiceRequestStore instanceStore,

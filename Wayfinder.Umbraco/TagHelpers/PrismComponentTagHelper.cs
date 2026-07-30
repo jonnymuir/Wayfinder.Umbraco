@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc.ViewEngines;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Net;
-using UmbracoPrism.Core.Models.ServiceDesign;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Umbraco.Models;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.TagHelpers;
+namespace Wayfinder.Umbraco.TagHelpers;
 
 /// <summary>
 /// Renders a Prism workflow component (container) or field (input) by dispatching to a

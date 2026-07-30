@@ -1,7 +1,7 @@
-using UmbracoPrism.Core.Models.ServiceDesign;
-using UmbracoPrism.Shared.Models.ServiceDesign;
+using Wayfinder.Umbraco.Models;
+using Wayfinder.Models.ServiceDesign;
 
-namespace UmbracoPrism.Core.Services;
+namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Generates and validates workflow step nonces used to bind form submissions
