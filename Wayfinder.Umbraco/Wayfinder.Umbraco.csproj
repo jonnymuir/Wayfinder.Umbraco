@@ -7,6 +7,10 @@
     <OutputType>Library</OutputType>
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <!-- wwwroot/dist is gitignored (npm build output) but the default Content glob still picks
+         it up here regardless, colliding with the explicit item below (NETSDK1022) — same fix
+         as Wayfinder.Editor.csproj: explicit items only, not the SDK's implicit discovery. -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
     <PackageId>Wayfinder.Umbraco</PackageId>
     <Title>Wayfinder for Umbraco</Title>
     <Version>0.1.1</Version>
@@ -20,24 +24,51 @@
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageIcon>assets/logo-vertical-lockup.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Umbraco's backoffice package-manifest discovery scans App_Plugins/{name}/umbraco-package.json
+         specifically (a legacy convention still honored alongside the new extension-manifest
+         system) — see UmbracoPrism.Core.csproj's own override for the precedent this mirrors. -->
+    <StaticWebAssetBasePath>App_Plugins/Wayfinder</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="uSync.BackOffice" Version="17.3.5" />
-    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" PrivateAssets="all" />
+    <!-- Match whatever Umbraco.Cms.Api.Management ($(UmbracoVersion)) itself references — a
+         higher version here wins the assembly-conflict resolution at build time but isn't
+         actually present at runtime in a host app, since Umbraco's own dependency is what's
+         really on disk (confirmed live: 2.7.5 here throws FileNotFoundException at startup
+         against a real Umbraco 17.5.3 host, which ships 2.4.1). -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.4.1" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" PrivateAssets="all" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="$(UmbracoVersion)" />
-    <PackageReference Include="Wayfinder" Version="0.1.2" />
-    <PackageReference Include="Wayfinder.Engine" Version="0.1.2" />
+    <PackageReference Include="Wayfinder" Version="0.1.5" />
+    <PackageReference Include="Wayfinder.Editor" Version="0.1.2" />
+    <PackageReference Include="Wayfinder.Engine" Version="0.1.5" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath="/" />
     <None Include="../LICENSE" Pack="true" PackagePath="/" />
     <None Include="../assets/logo-vertical-lockup.png" Pack="true" PackagePath="assets/" />
+  </ItemGroup>
+
+  <!-- EnableDefaultContentItems is off (see above), so wwwroot's static web assets need
+       explicit items — the manifest Umbraco's backoffice discovers, plus the npm build output
+       it points at. -->
+  <ItemGroup>
+    <Content Include="wwwroot/umbraco-package.json">
+      <Pack>true</Pack>
+      <PackagePath>staticwebassets/umbraco-package.json</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot/dist/**" Exclude="wwwroot/dist/**/*.map">
+      <Pack>true</Pack>
+      <PackagePath>staticwebassets/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

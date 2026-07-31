@@ -1,20 +1,33 @@
+using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
+using Wayfinder.Umbraco.Extensions;
 
 namespace Wayfinder.Umbraco;
 
 /// <summary>
-/// Always-on composition for the Wayfinder.Umbraco package itself — just the migration that
-/// creates its own tables. Everything else (the engine, stores, generic stage-rendering
-/// infrastructure) is opt-in via <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/>,
-/// since a host that references this package for uSync/authoring alone shouldn't get a
-/// background sweep service and DI registrations it never asked for.
+/// Always-on composition for the Wayfinder.Umbraco package: the migration that creates its own
+/// tables, the engine/store/generic stage-rendering infrastructure (see
+/// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/>), and
+/// the backoffice authoring API's Swagger group — all so that a bare package reference gives a
+/// working "Wayfinder" backoffice section with no host <c>Program.cs</c> wiring at all, the same
+/// composability bar a Prism host already gets for free.
 /// </summary>
+/// <remarks>
+/// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/> is
+/// also called explicitly by Prism's own composition (<c>AddPrismCmsServiceBlueprint</c>) — every
+/// registration inside it is now genuinely safe to run twice (TryAdd* throughout, plus an
+/// explicit guard on the one AddHostedService call that wasn't TryAdd-safe), so calling it here
+/// unconditionally doesn't double-run anything for a Prism host that also calls it itself.
+/// </remarks>
 public class WayfinderUmbracoComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderMigrationHandler>();
+
+        builder.Services.AddWayfinderUmbraco();
+        builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();
     }
 }

@@ -43,6 +43,13 @@ public static class WayfinderUmbracoServiceCollectionExtensions
 
         services.AddPrismServiceBlueprintAuthoring();
 
+        // Wayfinder.Umbraco's own single-queue authoring constraint — see
+        // SingleQueueStructuralValidator's remarks for why this belongs here rather than in a
+        // host's own composition (unlike Prism's CMS Workflow-specific constraints, this one
+        // is a direct consequence of the rendering pipeline this package itself ships).
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IServiceBlueprintStructuralValidator, SingleQueueStructuralValidator>());
+
         // Distributed cache backing the nonce/upload-token services below — works out of the
         // box for single-server dev; a host can replace it with AddStackExchangeRedisCache()
         // or AddDistributedSqlServerCache() for multi-server production.
@@ -66,7 +73,14 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // stage's real POST — same IDistributedCache mechanism as the nonce service.
         services.TryAddSingleton<IUploadTokenService, UploadTokenService>();
 
-        services.AddHostedService<ServiceRequestSweepService>();
+        // AddHostedService isn't itself TryAdd-safe (each call appends another IHostedService
+        // registration, and the host starts every one) — guard it explicitly so the "call this
+        // more than once is safe" promise above actually holds for every registration in this
+        // method, not just the ones that happen to use TryAdd*.
+        if (!services.Any(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ServiceRequestSweepService)))
+        {
+            services.AddHostedService<ServiceRequestSweepService>();
+        }
 
         return services;
     }
