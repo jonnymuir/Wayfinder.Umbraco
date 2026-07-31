@@ -67,7 +67,7 @@ export class UmbServiceBlueprintDetailServerDataSource implements UmbDetailDataS
       queues: [{ key: 'front-stage', displayName: 'Visitor touchpoints' }],
       stages: [
         {
-          stateKey: 'start',
+          stageKey: 'start',
           displayName: model.displayName || model.definitionKey,
           stageType: 'Question',
           queueKey: 'front-stage',

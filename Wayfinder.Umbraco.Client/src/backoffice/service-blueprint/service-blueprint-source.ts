@@ -73,8 +73,8 @@ function readStructuredDetails(
       entry && typeof entry === 'object' && 'path' in entry
         ? stageKeyFromDiagnosticPath((entry as { path?: unknown }).path)
         : undefined;
-    const stages = Array.isArray(serviceBlueprint?.stages) ? (serviceBlueprint!.stages as Array<{ stateKey: string; displayName: string }>) : [];
-    const stage = rawStageKey ? stages.find((s) => s.stateKey === rawStageKey) : undefined;
+    const stages = Array.isArray(serviceBlueprint?.stages) ? (serviceBlueprint!.stages as Array<{ stageKey: string; displayName: string }>) : [];
+    const stage = rawStageKey ? stages.find((s) => s.stageKey === rawStageKey) : undefined;
 
     // Only offer a jump when the stage actually resolves — a dangling/renamed key isn't
     // navigable, and showing a dead "jump" affordance would be worse than showing none.
