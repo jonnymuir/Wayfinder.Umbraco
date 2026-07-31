@@ -21,6 +21,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Wayfinder.Umbraco.Client/package-lock.json
+
+      # Wayfinder.Umbraco packs its backoffice bundles (tab + manifests) as static web assets
+      # (wwwroot/dist), so they must exist on disk before dotnet build/pack run against them —
+      # same pattern as the Wayfinder repo's Wayfinder.Editor, and the same bug class found
+      # live there this session when this step was missing from a release workflow (an empty
+      # wwwroot/dist silently packs zero static web assets, not an error).
+      - name: Install backoffice client dependencies
+        working-directory: Wayfinder.Umbraco.Client
+        run: npm ci
+
+      - name: Build backoffice client bundles
+        working-directory: Wayfinder.Umbraco.Client
+        run: npm run build
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

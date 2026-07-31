@@ -33,6 +33,25 @@ jobs:
             exit 1
           fi
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Wayfinder.Umbraco.Client/package-lock.json
+
+      # Same static-web-asset build step as ci.yml — required here too, independently, since
+      # this workflow packs+pushes to nuget.org on its own path. Confirmed live this session
+      # (in the Wayfinder repo) that skipping this silently ships an empty wwwroot/dist rather
+      # than failing the build.
+      - name: Install backoffice client dependencies
+        working-directory: Wayfinder.Umbraco.Client
+        run: npm ci
+
+      - name: Build backoffice client bundles
+        working-directory: Wayfinder.Umbraco.Client
+        run: npm run build
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
