@@ -1,0 +1,68 @@
+name: Package Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      # Needed to restore Wayfinder/Wayfinder.Engine — once those are also on nuget.org
+      # at a matching version, NuGet resolves them from there instead and this stops
+      # being load-bearing, but it's harmless to keep as a fallback source.
+      WAYFINDER_PACKAGES_TOKEN: ${{ secrets.WAYFINDER_PACKAGES_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify package version matches release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${{ github.ref_name }}"
+          TAG_VERSION="${TAG#v}"
+
+          VERSION=$(grep -oE '<Version>[^<]+</Version>' Wayfinder.Umbraco/Wayfinder.Umbraco.csproj | head -1 | sed -E 's#</?Version>##g')
+          echo "Wayfinder.Umbraco.csproj version: $VERSION"
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag ${TAG} does not match Wayfinder.Umbraco.csproj <Version>${VERSION}</Version>. Bump the csproj before tagging, since a mismatch would silently try to re-push an already-published version to NuGet."
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Wayfinder.Umbraco.slnx
+
+      - name: Build
+        run: dotnet build Wayfinder.Umbraco.slnx -c Release --no-restore
+
+      - name: Pack
+        run: dotnet pack Wayfinder.Umbraco.slnx -c Release --no-build -o artifacts
+
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wayfinder-umbraco-nuget
+          path: artifacts/*.nupkg
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: artifacts/*.nupkg
+
+      - name: Publish to NuGet.org (optional)
+        if: ${{ env.NUGET_API_KEY != '' }}
+        run: dotnet nuget push "artifacts/*.nupkg" -k "$NUGET_API_KEY" -s https://api.nuget.org/v3/index.json --skip-duplicate
