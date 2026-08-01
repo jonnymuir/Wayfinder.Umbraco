@@ -1,4 +1,4 @@
-@model Wayfinder.Umbraco.Models.PrismServiceRequestViewModel
+@model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
 @{
     var token = Html.AntiForgeryToken();
 }
@@ -9,7 +9,7 @@
 
         @foreach (var component in Model.Components)
         {
-            <prism-component component="@component"
+            <wayfinder-component component="@component"
                              errors="@Model.FieldErrors"
                              values="@Model.FormValues"
                              return-url="@Model.ReturnUrl"

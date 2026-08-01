@@ -1,0 +1,96 @@
+@using System.Text.Json
+@model Wayfinder.Umbraco.Models.ComponentContext
+@{
+    // Renders the declarative chart component server-side (works without JavaScript);
+    // the wayfinder-live-form runtime rebuilds the plot from the same embedded config as
+    // inputs change. Currently supports kind "stacked-bar".
+    var chartJson = Model.Component.ChartJson ?? "null";
+    using var doc = JsonDocument.Parse(chartJson);
+    var chart = doc.RootElement;
+
+    // Categorical palette validated with the dataviz six-checks script (light surface).
+    var palette = new[] { "#4f46e5", "#0d9488", "#b45309", "#6d28d9" };
+
+    var bands = chart.TryGetProperty("bands", out var bandsElement)
+        ? bandsElement.EnumerateArray().Select((band, index) => new
+        {
+            Key = band.GetProperty("key").GetString() ?? "",
+            Label = band.GetProperty("label").GetString() ?? "",
+            Color = band.TryGetProperty("color", out var color) && color.ValueKind == JsonValueKind.String
+                ? color.GetString()!
+                : palette[index % palette.Length]
+        }).ToArray()
+        : [];
+
+    var xKey = chart.TryGetProperty("x", out var xElement) ? xElement.GetString() ?? "" : "";
+    var xLabelEvery = chart.TryGetProperty("xLabelEvery", out var everyElement) ? everyElement.GetInt32() : 5;
+
+    var rows = chart.TryGetProperty("rows", out var rowsElement)
+        ? rowsElement.EnumerateArray().Select(row => new
+        {
+            X = row.GetProperty(xKey).GetDecimal(),
+            Values = bands.Select(band => row.GetProperty(band.Key).GetDecimal()).ToArray()
+        }).ToArray()
+        : [];
+
+    var maxTotal = rows.Length == 0 ? 1m : Math.Max(1m, rows.Max(r => r.Values.Sum()));
+    const int plotHeight = 160;
+    var safeConfig = chartJson.Replace("</", "<\\/");
+}
+
+<figure class="wayfinder-chart" data-wayfinder-chart>
+    <script type="application/json" data-wayfinder-chart-config>@Html.Raw(safeConfig)</script>
+    @if (!string.IsNullOrEmpty(Model.Component.Heading))
+    {
+        <figcaption class="wayfinder-chart__title">@Model.Component.Heading</figcaption>
+    }
+    <div class="wayfinder-chart__legend">
+        @foreach (var band in bands)
+        {
+            <span class="wayfinder-chart__legend-item">
+                <span class="wayfinder-chart__swatch" style="background:@band.Color"></span>@band.Label
+            </span>
+        }
+    </div>
+    <div class="wayfinder-chart__plot" data-wayfinder-chart-plot aria-hidden="true">
+        @foreach (var row in rows)
+        {
+            <div class="wayfinder-chart__bar" title="@xKey @row.X: @row.Values.Sum().ToString("N0")">
+                @for (var i = 0; i < bands.Length; i++)
+                {
+                    <div style="height:@(Math.Round(row.Values[i] / maxTotal * plotHeight, 1).ToString(System.Globalization.CultureInfo.InvariantCulture))px;background:@bands[i].Color"></div>
+                }
+            </div>
+        }
+    </div>
+    <div class="wayfinder-chart__labels" data-wayfinder-chart-labels aria-hidden="true">
+        @foreach (var row in rows)
+        {
+            <span>@(row.X % xLabelEvery == 0 ? row.X.ToString("0") : "")</span>
+        }
+    </div>
+    <table class="wayfinder-visually-hidden" data-wayfinder-chart-table>
+        <caption>@(Model.Component.Heading ?? "Chart data")</caption>
+        <thead>
+            <tr>
+                <th scope="col">@xKey</th>
+                @foreach (var band in bands)
+                {
+                    <th scope="col">@band.Label</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in rows.Where(r => r.X % xLabelEvery == 0 || r == rows.First()))
+            {
+                <tr>
+                    <th scope="row">@row.X.ToString("0")</th>
+                    @foreach (var value in row.Values)
+                    {
+                        <td>@value.ToString("N0")</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</figure>

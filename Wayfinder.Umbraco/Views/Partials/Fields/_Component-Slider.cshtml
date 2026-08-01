@@ -1,0 +1,26 @@
+@model Wayfinder.Umbraco.Models.FieldContext
+@{
+    var min = Model.Field.Min ?? 0;
+    var max = Model.Field.Max ?? 100;
+    var value = string.IsNullOrEmpty(Model.DisplayValue) ? min.ToString() : Model.DisplayValue;
+    var prefix = Model.Field.Prefix ?? string.Empty;
+    var suffix = Model.Field.Suffix ?? string.Empty;
+}
+<div class="@Model.WrapperClass"@Html.Raw(Model.WrapperAttrs) data-wayfinder-slider>
+    @await Html.PartialAsync("~/Views/Partials/Fields/_ComponentLabel.cshtml", Model)
+    <div class="wayfinder-slider__row">
+        <input class="wayfinder-slider__input@(Model.HasFieldError ? " wayfinder-slider__input--error" : "")"
+               type="range"
+               id="@Model.Field.FieldKey"
+               name="fields[@Model.Field.FieldKey]"
+               value="@value"
+               data-label="@Model.Field.Label"
+               data-wayfinder-slider-input@Html.Raw(Model.DescribedBy)@Html.Raw(Model.RequiredAttr)@Html.Raw(Model.AriaRequired)@Html.Raw(Model.AriaInvalid)@Html.Raw(Model.MinAttr)@Html.Raw(Model.MaxAttr)@Html.Raw(Model.StepAttr) />
+        <span class="wayfinder-slider__value" data-wayfinder-slider-value
+              data-prefix="@prefix" data-suffix="@suffix" aria-hidden="true">@prefix@value@suffix</span>
+    </div>
+    <div class="wayfinder-slider__bounds" aria-hidden="true">
+        <span>@prefix@min@suffix</span>
+        <span>@prefix@max@suffix</span>
+    </div>
+</div>

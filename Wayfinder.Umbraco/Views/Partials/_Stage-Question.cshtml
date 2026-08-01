@@ -1,16 +1,16 @@
-@model Wayfinder.Umbraco.Models.PrismServiceRequestViewModel
+@model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
 
-<prism-stage-form instance-id="@Model.InstanceId"
+<wayfinder-stage-form instance-id="@Model.InstanceId"
                      state-version="@Model.StateVersion"
                      blueprint-key="@Model.BlueprintKey"
                      return-url="@Model.ReturnUrl"
                      nonce="@Model.Nonce">
 
-    <prism-error-summary problems="@Model.Problems" />
+    <wayfinder-error-summary problems="@Model.Problems" />
 
     @foreach (var component in Model.Components)
     {
-        <prism-component component="@component"
+        <wayfinder-component component="@component"
                          errors="@Model.FieldErrors"
                          values="@Model.FormValues"
                          return-url="@Model.ReturnUrl"
@@ -23,7 +23,7 @@
     @if (!string.IsNullOrEmpty(Model.LiveModelJson))
     {
         <script type="module" src="/App_Plugins/UmbracoPrism/dist/prism-live-form.js"></script>
-        <script type="application/json" data-prism-live-model>@Html.Raw(Model.LiveModelJson!.Replace("</", "<\\/"))</script>
+        <script type="application/json" data-wayfinder-live-model>@Html.Raw(Model.LiveModelJson!.Replace("</", "<\\/"))</script>
     }
 
     @if (Model.HasFileUploadField)
@@ -46,4 +46,4 @@
         }
     </div>
 
-</prism-stage-form>
+</wayfinder-stage-form>

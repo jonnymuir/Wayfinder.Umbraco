@@ -15,7 +15,7 @@ public class WayfinderMigrationPlan : PackageMigrationPlan
 
     protected override void DefinePlan()
     {
-        To<CreatePrismCmsServiceBlueprintTable>("initial-state")
-            .To<CreatePrismCmsServiceRequestTable>("add-cms-service-requests");
+        To<CreateServiceBlueprintTable>("initial-state")
+            .To<CreateServiceRequestTable>("add-cms-service-requests");
     }
 }

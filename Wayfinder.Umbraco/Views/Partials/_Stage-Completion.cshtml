@@ -1,11 +1,11 @@
-@model Wayfinder.Umbraco.Models.PrismServiceRequestViewModel
+@model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
 
 <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
 
         @foreach (var component in Model.Components)
         {
-            <prism-component component="@component"
+            <wayfinder-component component="@component"
                              errors="@Model.FieldErrors"
                              values="@Model.FormValues"
                              return-url="@Model.ReturnUrl"
@@ -33,7 +33,7 @@
                     <a href="/" class="govuk-button govuk-button--secondary" data-module="govuk-button">@action.Label</a>
                 }
             }
-            <a href="@startAgainUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button" data-prism-start-again>Start again</a>
+            <a href="@startAgainUrl" class="govuk-button govuk-button--secondary" data-module="govuk-button" data-wayfinder-start-again>Start again</a>
             <a href="/" class="govuk-link">Return to home</a>
         </div>
 

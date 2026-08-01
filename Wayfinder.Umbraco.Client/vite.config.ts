@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Vite's modulepreload polyfill hardcodes preload URLs against `base` (default site root),
+  // not against import.meta.url — these bundles are actually served from
+  // /App_Plugins/Wayfinder/dist/, so an absolute-root base produced 404s the moment any chunk
+  // needed preloading. A relative base makes the polyfill resolve chunk URLs relative to each
+  // module's own location instead, which works under any deployment path.
+  base: './',
   build: {
     // Sends compiled JS directly to Wayfinder.Umbraco's own static web assets.
     outDir: '../Wayfinder.Umbraco/wwwroot/dist',

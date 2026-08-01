@@ -3,13 +3,13 @@
 The Umbraco-hosted implementation of [Wayfinder](https://github.com/jonnymuir/Wayfinder) —
 a GDS-style service blueprint / service-design engine. This package provides:
 
-- A DB-backed, uSync-portable service blueprint store (`prismCmsServiceBlueprint` table,
+- A DB-backed, uSync-portable service blueprint store (`wayfinderServiceBlueprint` table,
   its own `PackageMigrationPlan`).
 - The generic in-process engine wiring (`AddWayfinderUmbraco()`).
 - A generic business-app HTTP client (`IBusinessAppProcessManagerClient`) for hosts that
   run their own remote engine instead.
-- Service-request controllers, stage/hub Razor views, and the `PrismComponents`/
-  `PrismFields` partials that turn a rendered stage into GOV.UK-styled markup.
+- Service-request controllers, stage/hub Razor views, and the `Components`/
+  `Fields` partials that turn a rendered stage into GOV.UK-styled markup.
 - Nonce, file-upload, and field-validation infrastructure.
 
 It has **no multi-tenancy or auth opinion of its own** — a host wires its own identity/tenant

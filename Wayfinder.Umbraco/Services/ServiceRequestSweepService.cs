@@ -6,7 +6,7 @@ using Umbraco.Cms.Infrastructure.Persistence;
 namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// Periodically deletes expired rows from prismCmsWorkflowInstance. <see cref="UmbracoCmsWorkflowInstanceStore"/>
+/// Periodically deletes expired rows from wayfinderServiceRequest. <see cref="UmbracoServiceRequestStore"/>
 /// already treats an expired row as a miss on read (lazy expiry), so this sweep exists purely to
 /// stop the table growing unbounded from sessions that never come back to expire naturally.
 /// </summary>
@@ -32,16 +32,16 @@ public sealed class ServiceRequestSweepService(
                 using var db = databaseFactory.CreateDatabase();
 
                 var deleted = db.Execute(
-                    "DELETE FROM prismCmsWorkflowInstance WHERE ExpiresUtc < @0", DateTime.UtcNow);
+                    "DELETE FROM wayfinderServiceRequest WHERE ExpiresUtc < @0", DateTime.UtcNow);
 
                 if (deleted > 0)
                 {
-                    logger.LogInformation("CMS Workflow instance sweep removed {Count} expired instance(s).", deleted);
+                    logger.LogInformation("Service request sweep removed {Count} expired instance(s).", deleted);
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "CMS Workflow instance sweep failed; will retry next interval.");
+                logger.LogWarning(ex, "Service request sweep failed; will retry next interval.");
             }
         }
     }

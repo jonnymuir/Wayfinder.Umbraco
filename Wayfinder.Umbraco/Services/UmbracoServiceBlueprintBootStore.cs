@@ -9,7 +9,7 @@ namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// Boot-time <see cref="IServiceBlueprintStore"/> that seeds <c>UmbracoProcessManagerEngine</c> from the
-/// prismCmsServiceBlueprint table at startup. Deliberately has no dependency on
+/// wayfinderServiceBlueprint table at startup. Deliberately has no dependency on
 /// <c>IProcessManager</c> — unlike <see cref="UmbracoServiceBlueprintStore"/> (the
 /// authoring-side store), which pushes saves back into the live engine and therefore must depend
 /// on it. Depending on the engine here would create a DI cycle at construction time.
@@ -26,7 +26,7 @@ public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory dat
     public IReadOnlyDictionary<string, ServiceBlueprint> LoadDefinitions(ILogger logger)
     {
         using var db = databaseFactory.CreateDatabase();
-        var rows = db.Fetch<PrismCmsServiceBlueprintSchema>("SELECT * FROM prismCmsServiceBlueprint");
+        var rows = db.Fetch<ServiceBlueprintSchema>("SELECT * FROM wayfinderServiceBlueprint");
 
         var definitions = new Dictionary<string, ServiceBlueprint>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)

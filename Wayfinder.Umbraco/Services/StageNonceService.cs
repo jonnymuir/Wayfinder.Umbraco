@@ -15,7 +15,7 @@ namespace Wayfinder.Umbraco.Services;
 public class StageNonceService : IStageNonceService
 {
     private readonly IDistributedCache _cache;
-    private readonly PrismServiceDesignOptions _options;
+    private readonly WayfinderServiceDesignOptions _options;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,7 +25,7 @@ public class StageNonceService : IStageNonceService
 
     public StageNonceService(
         IDistributedCache cache,
-        IOptions<PrismServiceDesignOptions> options)
+        IOptions<WayfinderServiceDesignOptions> options)
     {
         _cache = cache;
         _options = options.Value;
@@ -37,7 +37,7 @@ public class StageNonceService : IStageNonceService
     public async Task<string> CreateAsync(IReadOnlyList<FieldRenderPayload> fields, CancellationToken ct = default)
     {
         var nonce = Guid.NewGuid().ToString("N");
-        var cacheKey = $"prism:workflow:nonce:{nonce}";
+        var cacheKey = $"wayfinder:workflow:nonce:{nonce}";
 
         var json = JsonSerializer.SerializeToUtf8Bytes(fields, JsonOptions);
 
@@ -57,7 +57,7 @@ public class StageNonceService : IStageNonceService
     /// </summary>
     public async Task<IReadOnlyList<FieldRenderPayload>?> ResolveAsync(string nonce, CancellationToken ct = default)
     {
-        var cacheKey = $"prism:workflow:nonce:{nonce}";
+        var cacheKey = $"wayfinder:workflow:nonce:{nonce}";
 
         var json = await _cache.GetAsync(cacheKey, ct);
 

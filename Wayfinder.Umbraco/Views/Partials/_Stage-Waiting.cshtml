@@ -1,4 +1,4 @@
-@model Wayfinder.Umbraco.Models.PrismServiceRequestViewModel
+@model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
 @using System.Reflection
 @{
     static string? ReadString(object? source, string propertyName)
@@ -82,9 +82,9 @@
         {
             if (string.Equals(component.Type, "waiting", StringComparison.OrdinalIgnoreCase))
             {
-                <div class="govuk-notification-banner" role="region" aria-labelledby="prism-waiting-message" data-component-type="waiting">
+                <div class="govuk-notification-banner" role="region" aria-labelledby="wayfinder-waiting-message" data-component-type="waiting">
                     <div class="govuk-notification-banner__header">
-                        <h2 class="govuk-notification-banner__title" id="prism-waiting-message">Information</h2>
+                        <h2 class="govuk-notification-banner__title" id="wayfinder-waiting-message">Information</h2>
                     </div>
                     <div class="govuk-notification-banner__content">
                         <p class="govuk-body">@message</p>
@@ -97,7 +97,7 @@
             }
             else
             {
-                <prism-component component="@component"
+                <wayfinder-component component="@component"
                                  errors="@Model.FieldErrors"
                                  values="@Model.FormValues"
                                  return-url="@Model.ReturnUrl"
@@ -110,9 +110,9 @@
 
         @if (hasWaitingUi && waitingComponent is null)
         {
-            <div class="govuk-notification-banner" role="region" aria-labelledby="prism-waiting-message">
+            <div class="govuk-notification-banner" role="region" aria-labelledby="wayfinder-waiting-message">
                 <div class="govuk-notification-banner__header">
-                    <h2 class="govuk-notification-banner__title" id="prism-waiting-message">Information</h2>
+                    <h2 class="govuk-notification-banner__title" id="wayfinder-waiting-message">Information</h2>
                 </div>
                 <div class="govuk-notification-banner__content">
                     <p class="govuk-body">@message</p>
@@ -126,9 +126,9 @@
 
         @if (hasWaitingUi)
         {
-            <div role="status" aria-live="polite" aria-atomic="true" id="prism-poll-status" class="govuk-visually-hidden"></div>
+            <div role="status" aria-live="polite" aria-atomic="true" id="wayfinder-poll-status" class="govuk-visually-hidden"></div>
 
-            <div id="prism-waiting-data"
+            <div id="wayfinder-waiting-data"
                  data-blueprint-key="@Model.BlueprintKey"
                  data-instance-id="@Model.InstanceId"
                  data-state-version="@Model.StateVersion"
@@ -158,14 +158,14 @@
 {
     <script>
     (function() {
-        var el = document.getElementById('prism-waiting-data');
+        var el = document.getElementById('wayfinder-waiting-data');
         if (!el) return;
 
         var blueprintKey = el.dataset.blueprintKey;
         var instanceId = el.dataset.instanceId;
         var stateVersion = parseInt(el.dataset.stateVersion, 10);
         var intervalMs = parseInt(el.dataset.pollIntervalMs, 10) || 5000;
-        var statusEl = document.getElementById('prism-poll-status');
+        var statusEl = document.getElementById('wayfinder-poll-status');
         var retryCount = 0;
         var maxRetries = 100;
         var pollTimeout;
@@ -184,7 +184,7 @@
                 return;
             }
             retryCount++;
-            var url = '/api/prism/workflow/poll?blueprintKey=' + encodeURIComponent(blueprintKey)
+            var url = '/api/wayfinder/workflow/poll?blueprintKey=' + encodeURIComponent(blueprintKey)
                 + '&instanceId=' + encodeURIComponent(instanceId)
                 + '&knownStateVersion=' + stateVersion;
 

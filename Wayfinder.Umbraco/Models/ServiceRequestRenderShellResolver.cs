@@ -8,12 +8,12 @@ namespace Wayfinder.Umbraco.Models;
 public static class ServiceRequestRenderShellResolver
 {
     public static string ResolveShell(
-        IReadOnlyList<PrismComponentRenderPayload>? components,
+        IReadOnlyList<ComponentRenderPayload>? components,
         string? legacyStepType,
         bool hasWaitingConfig,
         bool hasAvailableActions)
     {
-        var items = components ?? Array.Empty<PrismComponentRenderPayload>();
+        var items = components ?? Array.Empty<ComponentRenderPayload>();
 
         if (hasWaitingConfig || HasComponentType(items, "waiting"))
         {
@@ -45,7 +45,7 @@ public static class ServiceRequestRenderShellResolver
         return NormalizeShell(legacyStepType) ?? "question";
     }
 
-    private static bool AllDataCarryingComponentsAreSummaryLists(IReadOnlyList<PrismComponentRenderPayload> components)
+    private static bool AllDataCarryingComponentsAreSummaryLists(IReadOnlyList<ComponentRenderPayload> components)
     {
         var dataCarryingTypes = components
             .Where(ComponentCarriesFieldData)
@@ -56,10 +56,10 @@ public static class ServiceRequestRenderShellResolver
             && dataCarryingTypes.All(type => string.Equals(type, "summary-list", StringComparison.Ordinal));
     }
 
-    private static bool ComponentCarriesFieldData(PrismComponentRenderPayload component) =>
+    private static bool ComponentCarriesFieldData(ComponentRenderPayload component) =>
         component.Fields.Any() || (component.AccordionSections?.Any(section => section.Fields.Any()) ?? false);
 
-    private static bool ComponentHasInteractiveInputs(PrismComponentRenderPayload component)
+    private static bool ComponentHasInteractiveInputs(ComponentRenderPayload component)
     {
         if (component.Fields.Any(field => !IsContentOnlyFieldType(field.FieldType)))
         {
@@ -76,7 +76,7 @@ public static class ServiceRequestRenderShellResolver
         _ => false
     };
 
-    private static bool HasComponentType(IReadOnlyList<PrismComponentRenderPayload> components, string expectedType) =>
+    private static bool HasComponentType(IReadOnlyList<ComponentRenderPayload> components, string expectedType) =>
         components.Any(component => string.Equals(
             NormalizeType(component.Type),
             expectedType,

@@ -7,7 +7,7 @@ using Wayfinder.Engine.Models;
 namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// <see cref="IServiceRequestStore"/> backed by the prismCmsServiceRequest table — durable
+/// <see cref="IServiceRequestStore"/> backed by the wayfinderServiceRequest table — durable
 /// across an app-pool recycle. An anonymous visitor's row carries a sliding <c>ExpiresUtc</c>
 /// so it still dies with their session; an authenticated member's row
 /// (<see cref="ServiceRequest.IsAuthenticated"/>) is stamped with <see cref="NeverExpires"/>
@@ -36,8 +36,8 @@ public sealed class UmbracoServiceRequestStore(
     public bool TryGet(string instanceId, out ServiceRequest instance)
     {
         using var db = databaseFactory.CreateDatabase();
-        var row = db.FirstOrDefault<PrismCmsServiceRequestSchema>(
-            "SELECT * FROM prismCmsServiceRequest WHERE InstanceId = @0", instanceId);
+        var row = db.FirstOrDefault<ServiceRequestSchema>(
+            "SELECT * FROM wayfinderServiceRequest WHERE InstanceId = @0", instanceId);
 
         if (row is null || row.ExpiresUtc < DateTime.UtcNow)
         {
@@ -58,7 +58,7 @@ public sealed class UmbracoServiceRequestStore(
         if (!state.IsAuthenticated)
         {
             db.Execute(
-                "UPDATE prismCmsServiceRequest SET ExpiresUtc = @0 WHERE InstanceId = @1",
+                "UPDATE wayfinderServiceRequest SET ExpiresUtc = @0 WHERE InstanceId = @1",
                 DateTime.UtcNow.Add(_slidingExpiration), instanceId);
         }
 
@@ -73,14 +73,14 @@ public sealed class UmbracoServiceRequestStore(
         var json = JsonSerializer.Serialize(instance, JsonOptions);
 
         var rowsAffected = db.Execute(
-            "UPDATE prismCmsServiceRequest SET BlueprintKey = @0, TenantId = @1, UserId = @2, " +
+            "UPDATE wayfinderServiceRequest SET BlueprintKey = @0, TenantId = @1, UserId = @2, " +
             "StateJson = @3, ExpiresUtc = @4, UpdatedUtc = @5 WHERE InstanceId = @6",
             instance.BlueprintKey, instance.TenantId, instance.UserId, json, expiresUtc, DateTime.UtcNow,
             instance.InstanceId);
 
         if (rowsAffected == 0)
         {
-            db.Insert(new PrismCmsServiceRequestSchema
+            db.Insert(new ServiceRequestSchema
             {
                 InstanceId = instance.InstanceId,
                 BlueprintKey = instance.BlueprintKey,
@@ -97,14 +97,14 @@ public sealed class UmbracoServiceRequestStore(
     {
         using var db = databaseFactory.CreateDatabase();
         var rowsAffected = db.Execute(
-            "DELETE FROM prismCmsServiceRequest WHERE InstanceId = @0", instanceId);
+            "DELETE FROM wayfinderServiceRequest WHERE InstanceId = @0", instanceId);
         return rowsAffected > 0;
     }
 
     public void Clear()
     {
         using var db = databaseFactory.CreateDatabase();
-        db.Execute("DELETE FROM prismCmsServiceRequest");
+        db.Execute("DELETE FROM wayfinderServiceRequest");
     }
 
     public IEnumerable<ServiceRequest> GetAll()
@@ -114,8 +114,8 @@ public sealed class UmbracoServiceRequestStore(
         // acceptable for a single CMS Service Blueprint's expected visitor volume; expired rows
         // are excluded so a stale, not-yet-swept row never resurfaces as "latest".
         using var db = databaseFactory.CreateDatabase();
-        var rows = db.Fetch<PrismCmsServiceRequestSchema>(
-            "SELECT * FROM prismCmsServiceRequest WHERE ExpiresUtc >= @0", DateTime.UtcNow);
+        var rows = db.Fetch<ServiceRequestSchema>(
+            "SELECT * FROM wayfinderServiceRequest WHERE ExpiresUtc >= @0", DateTime.UtcNow);
 
         return rows
             .Select(row => JsonSerializer.Deserialize<ServiceRequest>(row.StateJson, JsonOptions))

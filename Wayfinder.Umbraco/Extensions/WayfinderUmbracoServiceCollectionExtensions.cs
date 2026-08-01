@@ -41,7 +41,7 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // UmbracoServiceBlueprintStore's own remarks).
         services.TryAddSingleton<IServiceBlueprintSourceStore, UmbracoServiceBlueprintStore>();
 
-        services.AddPrismServiceBlueprintAuthoring();
+        services.AddServiceBlueprintAuthoring();
 
         // Wayfinder.Umbraco's own single-queue authoring constraint — see
         // SingleQueueStructuralValidator's remarks for why this belongs here rather than in a
@@ -55,7 +55,7 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // or AddDistributedSqlServerCache() for multi-server production.
         services.AddDistributedMemoryCache();
 
-        services.AddOptions<PrismServiceDesignOptions>().BindConfiguration("Prism:Workflow");
+        services.AddOptions<WayfinderServiceDesignOptions>().BindConfiguration("Wayfinder");
 
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
         services.TryAddTransient<IServiceRequestFieldValidator, ServiceRequestFieldValidator>();

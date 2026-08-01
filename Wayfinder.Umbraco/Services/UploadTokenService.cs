@@ -8,13 +8,13 @@ namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IUploadTokenService"/> backed by <see cref="IDistributedCache"/> — same mechanism
-/// and TTL (<see cref="PrismServiceDesignOptions.NonceExpiry"/>) as <see cref="StageNonceService"/>,
+/// and TTL (<see cref="WayfinderServiceDesignOptions.NonceExpiry"/>) as <see cref="StageNonceService"/>,
 /// since an uploaded-but-not-yet-submitted file is scoped to the same single stage visit a nonce is.
 /// </summary>
 public class UploadTokenService : IUploadTokenService
 {
     private readonly IDistributedCache _cache;
-    private readonly PrismServiceDesignOptions _options;
+    private readonly WayfinderServiceDesignOptions _options;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -22,7 +22,7 @@ public class UploadTokenService : IUploadTokenService
         WriteIndented = false
     };
 
-    public UploadTokenService(IDistributedCache cache, IOptions<PrismServiceDesignOptions> options)
+    public UploadTokenService(IDistributedCache cache, IOptions<WayfinderServiceDesignOptions> options)
     {
         _cache = cache;
         _options = options.Value;
@@ -31,7 +31,7 @@ public class UploadTokenService : IUploadTokenService
     public async Task<string> CreateAsync(string instanceId, string fieldKey, ServiceRequestFileReference reference, CancellationToken ct = default)
     {
         var token = Guid.NewGuid().ToString("N");
-        var cacheKey = $"prism:workflow:upload-token:{token}";
+        var cacheKey = $"wayfinder:workflow:upload-token:{token}";
 
         var binding = new UploadTokenBinding { InstanceId = instanceId, FieldKey = fieldKey, Reference = reference };
         var json = JsonSerializer.SerializeToUtf8Bytes(binding, JsonOptions);
@@ -48,7 +48,7 @@ public class UploadTokenService : IUploadTokenService
 
     public async Task<UploadTokenBinding?> ResolveAsync(string token, CancellationToken ct = default)
     {
-        var cacheKey = $"prism:workflow:upload-token:{token}";
+        var cacheKey = $"wayfinder:workflow:upload-token:{token}";
 
         var json = await _cache.GetAsync(cacheKey, ct);
 

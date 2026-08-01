@@ -14,13 +14,13 @@ using Wayfinder.Models.ServiceDesign;
 namespace Wayfinder.Umbraco.Controllers;
 
 /// <summary>
-/// Abstract base controller for Prism workflow pages.
+/// Abstract base controller for Wayfinder service request pages.
 /// Provides all the boilerplate for GET/POST handling, antiforgery, nonce validation, and PRG pattern.
 /// Integrators can extend this to create their own workflow page controllers with minimal code.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This controller implements the full Prism workflow pattern:
+/// This controller implements the full Wayfinder service request pattern:
 /// </para>
 /// <list type="bullet">
 /// <item>Handles Umbraco route-hijacking for workflow document types via Index() dispatch.</item>
@@ -34,11 +34,11 @@ namespace Wayfinder.Umbraco.Controllers;
 /// </para>
 /// <list type="bullet">
 /// <item><see cref="PrePopulateFields"/> to customize field pre-population (e.g., from authenticated user claims).</item>
-/// <item><see cref="CreateViewModel"/> to use a custom ViewModel derived from <see cref="PrismServiceRequestViewModel"/>.</item>
+/// <item><see cref="CreateViewModel"/> to use a custom ViewModel derived from <see cref="ServiceRequestPageViewModel"/>.</item>
 /// </list>
 /// </remarks>
 public abstract class ServiceRequestPageController<TViewModel> : RenderController
-    where TViewModel : PrismServiceRequestViewModel
+    where TViewModel : ServiceRequestPageViewModel
 {
     /// <summary>Fallback max upload size for a <c>file-upload</c> field with no <c>MaxSizeBytes</c> of its own.</summary>
     public const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
@@ -398,7 +398,7 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
     }
 
     /// <summary>
-    /// Override this method to use a custom ViewModel derived from <see cref="PrismServiceRequestViewModel"/>.
+    /// Override this method to use a custom ViewModel derived from <see cref="ServiceRequestPageViewModel"/>.
     /// </summary>
     /// <param name="envelope">The <see cref="ServiceRequestResponseEnvelope"/> from the Business App containing the current workflow state.</param>
     /// <param name="blueprintKey">The workflow definition key read from the Umbraco page property.</param>
@@ -406,14 +406,14 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
     /// <param name="formValues">Pre-filled form values to repopulate the form after validation failure, or null if no prior submission.</param>
     /// <returns>
     /// A new instance of <typeparamref name="TViewModel"/> initialized with all properties from the envelope and parameters.
-    /// Default implementation creates a base <see cref="PrismServiceRequestViewModel"/> instance.
+    /// Default implementation creates a base <see cref="ServiceRequestPageViewModel"/> instance.
     /// </returns>
     /// <exception cref="InvalidOperationException">Thrown when the ViewModel instance cannot be created via reflection.</exception>
     /// <remarks>
     /// This is called on every GET request and on form validation failures before rendering.
     /// Custom implementations should populate additional domain-specific properties 
     /// (e.g., user profile data, localized labels, feature flags) 
-    /// by deriving from <see cref="PrismServiceRequestViewModel"/> and reading from the protected CurrentPage context.
+    /// by deriving from <see cref="ServiceRequestPageViewModel"/> and reading from the protected CurrentPage context.
     /// </remarks>
     protected virtual TViewModel CreateViewModel(
         ServiceRequestResponseEnvelope envelope,
@@ -431,7 +431,7 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
         vm.ReturnUrl = HttpContext.Request.PathBase + HttpContext.Request.Path;
         vm.StepType = render?.StepType ?? string.Empty;
         vm.StateDisplayName = render?.StateDisplayName ?? string.Empty;
-        vm.Components = render?.Components ?? Array.Empty<PrismComponentRenderPayload>();
+        vm.Components = render?.Components ?? Array.Empty<ComponentRenderPayload>();
         vm.AvailableActions = render?.AvailableActions ?? Array.Empty<ServiceRequestAction>();
         vm.Problems = problems ?? Array.Empty<ServiceRequestProblem>();
         vm.FormValues = formValues ?? new Dictionary<string, string>();
@@ -446,7 +446,7 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
     /// </summary>
     /// <param name="blueprintKey">The workflow definition key that failed to load.</param>
     /// <param name="message">A developer-friendly error message explaining what went wrong (e.g., definition not found, Business App unreachable).</param>
-    /// <returns>A ViewModel with <see cref="PrismServiceRequestViewModel.HasError"/> set to true and the error message populated.</returns>
+    /// <returns>A ViewModel with <see cref="ServiceRequestPageViewModel.HasError"/> set to true and the error message populated.</returns>
     private TViewModel ErrorViewModel(string blueprintKey, string message)
     {
         var vm = Activator.CreateInstance(typeof(TViewModel), CurrentPage!, _publishedValueFallback) as TViewModel

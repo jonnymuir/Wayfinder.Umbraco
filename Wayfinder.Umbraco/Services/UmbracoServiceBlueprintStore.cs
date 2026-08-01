@@ -9,7 +9,7 @@ namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IServiceBlueprintSourceStore"/> for backoffice-authored CMS Service Blueprint
-/// definitions — persists to the prismCmsServiceBlueprint table (uSync-portable) rather than
+/// definitions — persists to the wayfinderServiceBlueprint table (uSync-portable) rather than
 /// MockBusinessApp's memory-only reference store. A successful save is pushed straight into
 /// <paramref name="engine"/> so the live engine reflects it immediately, matching the promise
 /// the AI-authoring surface already makes.
@@ -21,7 +21,7 @@ public sealed class UmbracoServiceBlueprintStore(
     private static readonly JsonSerializerOptions ReadOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        // PrismComponent is a [JsonPolymorphic] type; not every blueprint's components have
+        // Component is a [JsonPolymorphic] type; not every blueprint's components have
         // "type" written first, so this must be relaxed — matches FilesystemServiceBlueprintSourceStore.
         AllowOutOfOrderMetadataProperties = true
     };
@@ -36,8 +36,8 @@ public sealed class UmbracoServiceBlueprintStore(
     public Task<IReadOnlyList<ServiceBlueprintSourceSummary>> ListAsync(CancellationToken ct = default)
     {
         using var db = databaseFactory.CreateDatabase();
-        var rows = db.Fetch<PrismCmsServiceBlueprintSchema>(
-            "SELECT DefinitionKey, DisplayName FROM prismCmsServiceBlueprint ORDER BY DefinitionKey");
+        var rows = db.Fetch<ServiceBlueprintSchema>(
+            "SELECT DefinitionKey, DisplayName FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
 
         IReadOnlyList<ServiceBlueprintSourceSummary> summaries = rows
             .Select(row => new ServiceBlueprintSourceSummary(row.DefinitionKey, row.DisplayName))
@@ -49,8 +49,8 @@ public sealed class UmbracoServiceBlueprintStore(
     public Task<ServiceBlueprint?> LoadAsync(string definitionKey, CancellationToken ct = default)
     {
         using var db = databaseFactory.CreateDatabase();
-        var row = db.FirstOrDefault<PrismCmsServiceBlueprintSchema>(
-            "SELECT * FROM prismCmsServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
+        var row = db.FirstOrDefault<ServiceBlueprintSchema>(
+            "SELECT * FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
 
         if (row is null)
         {
@@ -66,17 +66,17 @@ public sealed class UmbracoServiceBlueprintStore(
     {
         using var db = databaseFactory.CreateDatabase();
 
-        var existing = db.FirstOrDefault<PrismCmsServiceBlueprintSchema>(
-            "SELECT * FROM prismCmsServiceBlueprint WHERE DefinitionKey = @0", blueprint.DefinitionKey);
+        var existing = db.FirstOrDefault<ServiceBlueprintSchema>(
+            "SELECT * FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", blueprint.DefinitionKey);
 
         if (existing is null)
         {
             if (expectedVersion != 0)
             {
-                return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: 0, Location: "prismCmsServiceBlueprint"));
+                return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: 0, Location: "wayfinderServiceBlueprint"));
             }
 
-            var newRow = new PrismCmsServiceBlueprintSchema
+            var newRow = new ServiceBlueprintSchema
             {
                 DefinitionKey = blueprint.DefinitionKey,
                 DisplayName = blueprint.DisplayName,
@@ -87,12 +87,12 @@ public sealed class UmbracoServiceBlueprintStore(
             db.Insert(newRow);
 
             engine.UpdateDefinition(blueprint.DefinitionKey, blueprint with { Version = 1 });
-            return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: 1, Location: "prismCmsServiceBlueprint"));
+            return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: 1, Location: "wayfinderServiceBlueprint"));
         }
 
         if (existing.Version != expectedVersion)
         {
-            return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: existing.Version, Location: "prismCmsServiceBlueprint"));
+            return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: existing.Version, Location: "wayfinderServiceBlueprint"));
         }
 
         var newVersion = expectedVersion + 1;
@@ -100,7 +100,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
         // Atomic compare-and-swap: only the writer that still sees `expectedVersion` wins the race.
         var rowsAffected = db.Execute(
-            "UPDATE prismCmsServiceBlueprint SET DisplayName = @0, Json = @1, Version = @2, UpdatedUtc = @3 " +
+            "UPDATE wayfinderServiceBlueprint SET DisplayName = @0, Json = @1, Version = @2, UpdatedUtc = @3 " +
             "WHERE DefinitionKey = @4 AND Version = @5",
             blueprint.DisplayName,
             JsonSerializer.Serialize(toSave, WriteOptions),
@@ -111,21 +111,21 @@ public sealed class UmbracoServiceBlueprintStore(
 
         if (rowsAffected == 0)
         {
-            var current = db.FirstOrDefault<PrismCmsServiceBlueprintSchema>(
-                "SELECT * FROM prismCmsServiceBlueprint WHERE DefinitionKey = @0", blueprint.DefinitionKey);
+            var current = db.FirstOrDefault<ServiceBlueprintSchema>(
+                "SELECT * FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", blueprint.DefinitionKey);
             return Task.FromResult(new ServiceBlueprintSaveResult(
-                Saved: false, CurrentVersion: current?.Version ?? existing.Version, Location: "prismCmsServiceBlueprint"));
+                Saved: false, CurrentVersion: current?.Version ?? existing.Version, Location: "wayfinderServiceBlueprint"));
         }
 
         engine.UpdateDefinition(blueprint.DefinitionKey, toSave);
-        return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: newVersion, Location: "prismCmsServiceBlueprint"));
+        return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: newVersion, Location: "wayfinderServiceBlueprint"));
     }
 
     public Task<bool> DeleteAsync(string definitionKey, CancellationToken ct = default)
     {
         using var db = databaseFactory.CreateDatabase();
         var rowsAffected = db.Execute(
-            "DELETE FROM prismCmsServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
+            "DELETE FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
 
         if (rowsAffected > 0)
         {

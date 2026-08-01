@@ -10,7 +10,7 @@ namespace Wayfinder.Umbraco.Controllers;
 /// without requiring a full page reload on every check.
 /// </summary>
 [ApiController]
-[Route("api/prism/workflow")]
+[Route("api/wayfinder/workflow")]
 [Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling)]
 public class ServiceRequestPollController : ControllerBase
 {

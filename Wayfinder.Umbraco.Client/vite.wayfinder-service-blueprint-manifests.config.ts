@@ -13,6 +13,8 @@ import { defineConfig } from 'vite';
 // `preserveEntrySignatures: 'strict'` fixes it — but set globally, it re-chunks every entry, so
 // this one entry gets its own build step instead of forcing that setting onto the tab entry too.
 export default defineConfig({
+  // See vite.config.ts's own `base` comment — same fix needed here, this entry preloads chunks too.
+  base: './',
   build: {
     outDir: '../Wayfinder.Umbraco/wwwroot/dist',
     // Never wipe the directory here — vite.config.ts's own build already populated it with the

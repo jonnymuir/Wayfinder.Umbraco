@@ -1,18 +1,18 @@
 @using Wayfinder.Umbraco.Models
 @model IReadOnlyList<ServiceRequestViewModel>
 
-<ul class="prism-instance-list" role="list">
+<ul class="wayfinder-instance-list" role="list">
     @foreach (var instance in Model)
     {
-        <li class="prism-instance-card"
+        <li class="wayfinder-instance-card"
             data-blueprint-key="@instance.Summary.BlueprintKey"
             data-current-state="@instance.Summary.CurrentStateKey">
-            <div class="prism-instance-card__body">
-                <h3 class="prism-instance-card__title">@instance.Summary.BlueprintDisplayName</h3>
-                <p class="prism-instance-card__status">
-                    <span class="prism-instance-card__state-badge">@instance.Summary.CurrentStateDisplayName</span>
+            <div class="wayfinder-instance-card__body">
+                <h3 class="wayfinder-instance-card__title">@instance.Summary.BlueprintDisplayName</h3>
+                <p class="wayfinder-instance-card__status">
+                    <span class="wayfinder-instance-card__state-badge">@instance.Summary.CurrentStateDisplayName</span>
                 </p>
-                <p class="prism-instance-card__meta">
+                <p class="wayfinder-instance-card__meta">
                     Started <time datetime="@instance.Summary.CreatedAt.ToString("yyyy-MM-dd")">
                         @instance.Summary.CreatedAt.ToString("d MMM yyyy")
                     </time>
@@ -24,9 +24,9 @@
                     }
                 </p>
             </div>
-            <div class="prism-instance-card__actions">
+            <div class="wayfinder-instance-card__actions">
                 <a href="@instance.ResumeUrl"
-                   class="prism-button @(instance.Summary.CanContinue ? "prism-button--primary" : "prism-button--secondary")">
+                   class="wayfinder-button @(instance.Summary.CanContinue ? "wayfinder-button--primary" : "wayfinder-button--secondary")">
                     @(instance.Summary.CanContinue ? "Continue" : "View")
                 </a>
             </div>
