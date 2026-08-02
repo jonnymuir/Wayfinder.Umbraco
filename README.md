@@ -41,16 +41,11 @@ service-design opinion at all.
 - [`Wayfinder`](https://github.com/jonnymuir/Wayfinder) — domain models, calculation engine
 - [`Wayfinder.Engine`](https://github.com/jonnymuir/Wayfinder) — the state-machine engine
 
-Both are published to the same GitHub Packages feed this package itself publishes to.
+Both are published to nuget.org, the only source this package restores or publishes against.
 
 ## Building
 
-Restoring requires read access to `https://nuget.pkg.github.com/jonnymuir/index.json` (see
-`NuGet.config`) — set a `WAYFINDER_PACKAGES_TOKEN` environment variable to a GitHub PAT with
-`read:packages` scope.
-
 ```bash
-export WAYFINDER_PACKAGES_TOKEN=<your PAT>
 dotnet build Wayfinder.Umbraco.slnx
 dotnet pack Wayfinder.Umbraco.slnx
 ```

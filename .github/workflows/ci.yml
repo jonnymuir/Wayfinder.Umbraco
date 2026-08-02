@@ -11,13 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-    env:
-      # Needed to restore Wayfinder/Wayfinder.Engine from the Wayfinder repo's GitHub
-      # Packages feed — a repo's own GITHUB_TOKEN doesn't read another repo's packages
-      # under a personal account, so this must be a classic PAT with read:packages,
-      # stored as a repository secret.
-      WAYFINDER_PACKAGES_TOKEN: ${{ secrets.WAYFINDER_PACKAGES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,13 +48,8 @@ jobs:
       - name: Test
         run: dotnet test Wayfinder.Umbraco.slnx -c Release --no-build
 
+      # Validates packing still succeeds on every push — the real publish only happens from
+      # package-release.yml on a version tag, straight to nuget.org (Trusted Publishing). No
+      # GitHub Packages feed: nuget.org is the only publish target.
       - name: Pack
         run: dotnet pack Wayfinder.Umbraco.slnx -c Release --no-build -o ./artifacts
-
-      - name: Publish to GitHub Packages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          dotnet nuget push "./artifacts/*.nupkg" \
-            --source "https://nuget.pkg.github.com/jonnymuir/index.json" \
-            --api-key "${{ secrets.GITHUB_TOKEN }}" \
-            --skip-duplicate

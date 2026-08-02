@@ -12,11 +12,6 @@ jobs:
     permissions:
       contents: write
       id-token: write  # required for NuGet Trusted Publishing (OIDC token exchange)
-    env:
-      # Needed to restore Wayfinder/Wayfinder.Engine — once those are also on nuget.org
-      # at a matching version, NuGet resolves them from there instead and this stops
-      # being load-bearing, but it's harmless to keep as a fallback source.
-      WAYFINDER_PACKAGES_TOKEN: ${{ secrets.WAYFINDER_PACKAGES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
