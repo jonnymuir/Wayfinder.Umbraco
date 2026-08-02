@@ -5,10 +5,10 @@
     {
       "type": "section",
       "alias": "Wayfinder.Section",
-      "name": "Wayfinder",
+      "name": "Blueprints",
       "meta": {
-        "label": "Wayfinder",
-        "pathname": "wayfinder",
+        "label": "Blueprints",
+        "pathname": "blueprints",
         "icon": "icon-diagram"
       }
     },

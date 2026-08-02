@@ -26,4 +26,15 @@ public class WayfinderServiceDesignOptions
     /// the convention this package's own reference host (UmbracoPrism.TestSite) uses.
     /// </summary>
     public string FileEndpointBasePath { get; set; } = "/service-request";
+
+    /// <summary>
+    /// User group aliases automatically granted access to the "Blueprints" backoffice section on
+    /// startup (see <see cref="WayfinderSectionAccessSeeder"/>) — installing an Umbraco extension
+    /// manifest never grants a custom section's visibility to any user group automatically, not
+    /// even Administrators, so without this the section would be invisible to everyone regardless
+    /// of role. Defaults to just the built-in Administrators group
+    /// (<c>Umbraco.Cms.Core.Constants.Security.AdminGroupAlias</c>) — a host adds its own group
+    /// aliases here if editors/other roles should also see it.
+    /// </summary>
+    public string[] AdminGroupAliases { get; set; } = [global::Umbraco.Cms.Core.Constants.Security.AdminGroupAlias];
 }

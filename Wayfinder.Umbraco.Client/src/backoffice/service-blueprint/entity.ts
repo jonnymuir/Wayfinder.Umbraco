@@ -10,7 +10,7 @@ export const UMB_SERVICE_BLUEPRINT_WORKSPACE_ALIAS = 'Wayfinder.Workspace.Servic
 
 export const UMB_SERVICE_BLUEPRINT_COLLECTION_ALIAS = 'Wayfinder.Collection.ServiceBlueprint';
 
-export const UMB_SERVICE_BLUEPRINT_EDIT_PATH_PREFIX = 'section/wayfinder/workspace/wayfinder-service-blueprint/edit/';
+export const UMB_SERVICE_BLUEPRINT_EDIT_PATH_PREFIX = 'section/blueprints/workspace/wayfinder-service-blueprint/edit/';
 
 /**
  * The shape this backoffice screen works with — deliberately NOT the full

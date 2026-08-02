@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Management.Controllers;
 using Umbraco.Cms.Api.Management.Routing;
-using Umbraco.Cms.Web.Common.Authorization;
 using Wayfinder.Engine.Services;
 using Wayfinder.Models.ServiceDesign;
 using Wayfinder.Umbraco.Services;
@@ -26,8 +25,15 @@ namespace Wayfinder.Umbraco.Controllers;
 /// time, and <see cref="GetQueues"/> offers exactly one queue to keep the editor's picker
 /// consistent with it. Multi-queue/back-stage authoring is future Wayfinder work, not a
 /// limitation specific to this controller.
+/// <para>
+/// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> requires membership of a
+/// group listed in <see cref="Configuration.WayfinderServiceDesignOptions.AdminGroupAliases"/> —
+/// without it, an authenticated backoffice user who simply lacks the "Blueprints" section (the
+/// default for every group except Administrators) could still call this API directly, bypassing
+/// the section-visibility gate entirely.
+/// </para>
 /// </remarks>
-[Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
+[Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin)]
 [VersionedApiBackOfficeRoute("wayfinder")]
 [ApiExplorerSettings(GroupName = "Wayfinder")]
 [MapToApi("Wayfinder")]

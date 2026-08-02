@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -26,8 +27,21 @@ public class WayfinderUmbracoComposer : IComposer
     public void Compose(IUmbracoBuilder builder)
     {
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderMigrationHandler>();
+        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderSectionAccessSeeder>();
 
         builder.Services.AddWayfinderUmbraco();
         builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();
+
+        // Self-contained, unlike WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling: a
+        // host needs no wiring for this one (see WayfinderAdminHandler's own remarks).
+        builder.Services.AddSingleton<IAuthorizationHandler, WayfinderAdminHandler>();
+        builder.Services.Configure<AuthorizationOptions>(options =>
+        {
+            options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new WayfinderAdminRequirement());
+            });
+        });
     }
 }

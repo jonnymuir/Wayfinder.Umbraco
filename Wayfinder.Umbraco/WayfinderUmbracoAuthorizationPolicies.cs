@@ -15,4 +15,16 @@ public static class WayfinderUmbracoAuthorizationPolicies
     /// is wired to it.
     /// </summary>
     public const string ServiceRequestPolling = "Wayfinder:ServiceRequestPolling";
+
+    /// <summary>
+    /// Required to call <see cref="Controllers.ServiceBlueprintAuthoringController"/>. Unlike
+    /// <see cref="ServiceRequestPolling"/>, this policy is registered by Wayfinder.Umbraco's own
+    /// composer (<see cref="WayfinderUmbracoComposer"/>) — backoffice group membership is
+    /// something this package already has full information about via
+    /// <c>IBackOfficeSecurityAccessor</c>, so a host needs no wiring for it. Membership is
+    /// checked against <see cref="Configuration.WayfinderServiceDesignOptions.AdminGroupAliases"/>
+    /// — the same list <see cref="WayfinderSectionAccessSeeder"/> grants the "Blueprints" section
+    /// to, so backoffice nav visibility and API enforcement can't silently drift apart.
+    /// </summary>
+    public const string BlueprintsAdmin = "Wayfinder:BlueprintsAdmin";
 }
