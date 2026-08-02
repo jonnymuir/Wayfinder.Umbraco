@@ -1,4 +1,11 @@
-# Wayfinder.Umbraco
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-umbraco-dark.png">
+  <img src="assets/wordmark-umbraco-light.png" alt="Wayfinder for Umbraco" height="70">
+</picture>
+
+[![CI](https://github.com/jonnymuir/Wayfinder.Umbraco/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnymuir/Wayfinder.Umbraco/actions/workflows/ci.yml)
+[![Wayfinder.Umbraco](https://img.shields.io/nuget/v/Wayfinder.Umbraco.svg?label=Wayfinder.Umbraco)](https://www.nuget.org/packages/Wayfinder.Umbraco)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 The Umbraco-hosted implementation of [Wayfinder](https://github.com/jonnymuir/Wayfinder) —
 a GDS-style service blueprint / service-design engine. This package provides:
