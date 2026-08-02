@@ -9,9 +9,12 @@ using Wayfinder.Engine.Services;
 namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// The CMS Workflow implementation's own <see cref="IProcessManager"/> — a distinctly
+/// This package's own in-Umbraco, in-process <see cref="IProcessManager"/> — a distinctly
 /// named singleton so it's discoverable in DI registration/debugging, kept separate from any
-/// business-app-hosted engine a host might also run (registered under the "cms" DI key). No
+/// business-app-hosted engine a host might also run (a host registers an
+/// <c>IBusinessAppProcessManagerClient</c> facade over this one under
+/// <see cref="WayfinderUmbracoServiceKeys.InProcessQueueClient"/> if it wants it to also show
+/// on <see cref="Controllers.ServiceRequestHubController"/>). No
 /// override logic lives here: <c>serviceInputsResolver</c> (the toolkit's existing extension
 /// point for <c>source: "service"</c> calculation fields — see <see cref="ProcessManagerEngine.ResolveServiceInputs"/>)
 /// is supplied as a plain delegate at registration time, so a demo host (e.g. TestSite's

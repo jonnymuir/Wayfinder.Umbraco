@@ -16,11 +16,12 @@ namespace Wayfinder.Umbraco.Controllers;
 /// Umbraco route-hijacking controller for the <c>serviceRequestHub</c> document type — a single "My
 /// Workflows" surface across both workflow implementations a host may have running: the
 /// business-app one (<see cref="IBusinessAppProcessManagerClient"/>'s default, unkeyed registration,
-/// talking to a remote business app) and an optional keyed <c>"cms"</c> registration (e.g. Prism CMS
-/// Workflow, in-process). Displays all workflow instances for the authenticated member from
+/// talking to a remote business app) and an optional keyed registration under
+/// <see cref="WayfinderUmbracoServiceKeys.InProcessQueueClient"/> (e.g. a host's own in-Umbraco
+/// in-process queue). Displays all workflow instances for the authenticated member from
 /// both, merged into one list — a member shouldn't need to know or care which implementation
 /// authored a given journey. The keyed client is genuinely optional: a host that hasn't
-/// registered one under key <c>"cms"</c> at all just sees the unkeyed client's instances.
+/// registered one under that key at all just sees the unkeyed client's instances.
 /// </summary>
 public class ServiceRequestHubController : RenderController
 {
@@ -42,7 +43,7 @@ public class ServiceRequestHubController : RenderController
     {
         _logger = logger;
         _processManagerClient = workflowClient;
-        _cmsProcessManagerClient = serviceProvider.GetKeyedService<IBusinessAppProcessManagerClient>("cms");
+        _cmsProcessManagerClient = serviceProvider.GetKeyedService<IBusinessAppProcessManagerClient>(WayfinderUmbracoServiceKeys.InProcessQueueClient);
         _publishedValueFallback = publishedValueFallback;
         _publishedContentQuery = publishedContentQuery;
     }
