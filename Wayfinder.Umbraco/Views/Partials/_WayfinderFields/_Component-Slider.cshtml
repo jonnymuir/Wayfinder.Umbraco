@@ -7,7 +7,7 @@
     var suffix = Model.Field.Suffix ?? string.Empty;
 }
 <div class="@Model.WrapperClass"@Html.Raw(Model.WrapperAttrs) data-wayfinder-slider>
-    @await Html.PartialAsync("~/Views/Partials/Fields/_ComponentLabel.cshtml", Model)
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderFields/_ComponentLabel.cshtml", Model)
     <div class="wayfinder-slider__row">
         <input class="wayfinder-slider__input@(Model.HasFieldError ? " wayfinder-slider__input--error" : "")"
                type="range"

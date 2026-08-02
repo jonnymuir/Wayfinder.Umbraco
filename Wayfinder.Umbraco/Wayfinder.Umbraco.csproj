@@ -11,9 +11,23 @@
          it up here regardless, colliding with the explicit item below (NETSDK1022) — same fix
          as Wayfinder.Editor.csproj: explicit items only, not the SDK's implicit discovery. -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <!-- Without this, Views/*.cshtml never actually compile into RazorCompiledItems at all —
+         confirmed live: the previous EmbeddedResource-only approach below embedded their raw
+         TEXT as a resource blob, but produced zero RazorCompiledItem entries in the assembly,
+         so a consuming host's view engine could never find them (silently — no error, "no
+         template found"). AddRazorSupportForMvc is what actually makes an Sdk.Web/Sdk.Razor
+         library compile and package its views as a real Razor Class Library, discovered
+         automatically by any consuming host's ApplicationPartManager with zero host wiring.
+         Host overrides of the built-in component/field catalog are handled explicitly by
+         Services/ComponentPartialResolver.cs, not by ASP.NET Core's own precedence — see that
+         class's own remarks for why a same-named host file at the identical virtual path does
+         NOT automatically win, and why the package's own default catalog now lives under
+         Views/Partials/_WayfinderComponents|_WayfinderFields/ instead of the public override
+         convention path. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <PackageId>Wayfinder.Umbraco</PackageId>
     <Title>Wayfinder for Umbraco</Title>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>Jonny Muir</Authors>
     <Company>Wayfinder</Company>
     <Description>Umbraco-hosted implementation of Wayfinder service design — a DB-backed, uSync-portable service blueprint store, backoffice authoring API, and GDS-style stage rendering (controllers, tag helpers, Razor views) for any Umbraco v17+ site. No multi-tenancy or auth opinions of its own; a host wires its own identity/tenant resolution on top.</Description>
@@ -71,14 +85,12 @@
     </Content>
   </ItemGroup>
 
+  <!-- EnableDefaultContentItems is off (see above), so the SDK's own default Content glob that
+       normally picks up Views/**/*.cshtml for Razor compilation needs restoring explicitly too —
+       without this, AddRazorSupportForMvc has nothing to compile (confirmed live: RazorGenerate
+       shows empty and Content shows zero .cshtml entries until this item exists). -->
   <ItemGroup>
-    <EmbeddedResource Include="Views\_ViewImports.cshtml" />
-    <EmbeddedResource Include="Views\Partials\Fields\**\*.cshtml" />
-    <EmbeddedResource Include="Views\Partials\Components\**\*.cshtml" />
-    <EmbeddedResource Include="Views\Partials\_Stage-*.cshtml" />
-    <EmbeddedResource Include="Views\Partials\_ServiceRequestHub-*.cshtml" />
-    <EmbeddedResource Include="Views\stagePage.cshtml" />
-    <EmbeddedResource Include="Views\serviceRequestHub.cshtml" />
+    <Content Include="Views/**/*.cshtml" />
   </ItemGroup>
 
 </Project>

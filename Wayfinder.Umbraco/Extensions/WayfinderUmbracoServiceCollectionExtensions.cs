@@ -60,6 +60,11 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
         services.TryAddTransient<IServiceRequestFieldValidator, ServiceRequestFieldValidator>();
 
+        // Singleton so ComponentTagHelper's partial-resolution cache (see the resolver's own
+        // remarks for why this matters) actually persists across requests instead of being
+        // rebuilt from scratch every time.
+        services.TryAddSingleton<ComponentPartialResolver>();
+
         // Ganss.Xss-backed GDS allowlist. Registered as singleton: HtmlSanitizer is
         // thread-safe for concurrent Sanitize calls when configuration is not mutated after
         // construction.

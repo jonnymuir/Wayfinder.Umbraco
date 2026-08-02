@@ -27,7 +27,7 @@
      data-wayfinder-max-size="@maxSizeBytes"
      data-wayfinder-accept="@acceptList"
      data-wayfinder-label="@Model.Field.Label">
-    @await Html.PartialAsync("~/Views/Partials/Fields/_ComponentLabel.cshtml", Model)
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderFields/_ComponentLabel.cshtml", Model)
 
     @* The filename span and View link always exist in the DOM (even on a page that's never had
        an upload) — wayfinder-file-upload.ts populates both itself the moment a real upload

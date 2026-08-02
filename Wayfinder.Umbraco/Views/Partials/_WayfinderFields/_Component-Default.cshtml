@@ -2,7 +2,7 @@
    create ~/Views/Partials/Fields/_Component-{TypeName}.cshtml with @model FieldContext. *@
 @model Wayfinder.Umbraco.Models.FieldContext
 <div class="@Model.WrapperClass"@Html.Raw(Model.WrapperAttrs)>
-    @await Html.PartialAsync("~/Views/Partials/Fields/_ComponentLabel.cshtml", Model)
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderFields/_ComponentLabel.cshtml", Model)
     <input class="govuk-input@(Model.ReadOnlyCssClass)@(Model.HasFieldError ? " govuk-input--error" : "")"
            type="text"
            id="@Model.Field.FieldKey"

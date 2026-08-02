@@ -1,16 +1,18 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.AspNetCore.Mvc.ViewEngines;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Net;
 using Wayfinder.Umbraco.Models;
+using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
 
 namespace Wayfinder.Umbraco.TagHelpers;
 
 /// <summary>
 /// Renders a service blueprint component (container) or field (input) by dispatching to a
-/// convention-based Razor partial.
+/// convention-based Razor partial — see <see cref="ComponentPartialResolver"/> for exactly how
+/// (and where) a host can override any type, and why the package's own catalog lives at a
+/// different path than the one a host uses.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,15 +25,10 @@ namespace Wayfinder.Umbraco.TagHelpers;
 /// — the standard way a container partial (fieldset, accordion) renders its own fields.
 /// </para>
 /// <para>
-/// For a component with Type = "fieldset", the tag helper looks for
-/// ~/Views/Partials/Components/_Component-Fieldset.cshtml.
-/// If that view does not exist, it falls back to
-/// ~/Views/Partials/Components/_Component-Default.cshtml.
-/// </para>
-/// <para>
-/// For a field with FieldType = "text", the tag helper looks for
-/// ~/Views/Partials/Fields/_Component-Text.cshtml, falling back to
-/// ~/Views/Partials/Fields/_Component-Default.cshtml.
+/// To override rendering for a component with Type = "fieldset", place
+/// ~/Views/Partials/Components/_Component-Fieldset.cshtml in your own app. To override a field
+/// with FieldType = "text", place ~/Views/Partials/Fields/_Component-Text.cshtml. Either folder's
+/// own _Component-Default.cshtml can also be overridden as the catch-all fallback.
 /// </para>
 /// <para>
 /// Type normalisation: kebab-case is converted to PascalCase.
@@ -42,18 +39,13 @@ namespace Wayfinder.Umbraco.TagHelpers;
 [HtmlTargetElement("wayfinder-field")]
 public class ComponentTagHelper : TagHelper
 {
-    private const string ComponentsBase        = "~/Views/Partials/Components/";
-    private const string ComponentsFallback    = $"{ComponentsBase}_Component-Default.cshtml";
-    private const string FieldsBase            = "~/Views/Partials/Fields/";
-    private const string FieldsFallback        = $"{FieldsBase}_Component-Default.cshtml";
+    private readonly IHtmlHelper _htmlHelper;
+    private readonly ComponentPartialResolver _partialResolver;
 
-    private readonly IHtmlHelper          _htmlHelper;
-    private readonly ICompositeViewEngine _viewEngine;
-
-    public ComponentTagHelper(IHtmlHelper htmlHelper, ICompositeViewEngine viewEngine)
+    public ComponentTagHelper(IHtmlHelper htmlHelper, ComponentPartialResolver partialResolver)
     {
-        _htmlHelper  = htmlHelper;
-        _viewEngine  = viewEngine;
+        _htmlHelper = htmlHelper;
+        _partialResolver = partialResolver;
     }
 
     [ViewContext]
@@ -117,7 +109,7 @@ public class ComponentTagHelper : TagHelper
             Nonce        = Nonce
         };
 
-        var partial = ResolveComponentPartial(Component.Type);
+        var partial = _partialResolver.ResolveComponentPartial(Component.Type);
         var content = await _htmlHelper.PartialAsync(partial, ctx);
 
         output.Content.SetHtmlContent(content);
@@ -150,41 +142,10 @@ public class ComponentTagHelper : TagHelper
 
         var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
         var ctx        = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey);
-        var partial    = ResolveFieldPartial(fieldType);
+        var partial    = _partialResolver.ResolveFieldPartial(fieldType);
         var content    = await _htmlHelper.PartialAsync(partial, ctx);
 
         output.Content.SetHtmlContent(content);
-    }
-
-    /// <summary>
-    /// Resolves the partial name for a given component type using the naming convention.
-    /// Falls back to _Component-Default.cshtml if no specific partial exists.
-    /// </summary>
-    private string ResolveComponentPartial(string? componentType)
-    {
-        var typeName  = KebabToPascalCase(componentType ?? "default");
-        var candidate = $"{ComponentsBase}_Component-{typeName}.cshtml";
-        return ViewExists(candidate) ? candidate : ComponentsFallback;
-    }
-
-    /// <summary>
-    /// Resolves the partial name for a given field type using the naming convention.
-    /// Falls back to _Component-Default.cshtml if no specific partial exists.
-    /// </summary>
-    private string ResolveFieldPartial(string fieldType)
-    {
-        var typeName = KebabToPascalCase(fieldType);
-        var candidate = $"{FieldsBase}_Component-{typeName}.cshtml";
-        return ViewExists(candidate) ? candidate : FieldsFallback;
-    }
-
-    private bool ViewExists(string viewPath)
-    {
-        var result = _viewEngine.GetView(
-            executingFilePath: ViewContext.ExecutingFilePath,
-            viewPath:          viewPath,
-            isMainPage:        false);
-        return result.Success;
     }
 
     /// <summary>
@@ -247,17 +208,4 @@ public class ComponentTagHelper : TagHelper
 
     private static string SanitizeIdFragment(string value) =>
         string.Concat(value.Select(c => char.IsLetterOrDigit(c) ? c : '-'));
-
-    /// <summary>
-    /// Converts a kebab-case string to PascalCase.
-    /// "summary-list" → "SummaryList", "fieldset" → "Fieldset".
-    /// </summary>
-    private static string KebabToPascalCase(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return "Default";
-
-        var parts = input.Split('-');
-        return string.Concat(parts.Select(p =>
-            string.IsNullOrEmpty(p) ? "" : char.ToUpperInvariant(p[0]) + p[1..]));
-    }
 }
