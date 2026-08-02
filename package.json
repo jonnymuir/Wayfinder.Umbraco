@@ -1,0 +1,8 @@
+{
+  "name": "wayfinder-umbraco-repo",
+  "private": true,
+  "scripts": {
+    "generate:marketplace": "node scripts/generate-marketplace-readme.mjs",
+    "check:marketplace": "node scripts/generate-marketplace-readme.mjs --check"
+  }
+}

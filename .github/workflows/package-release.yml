@@ -35,6 +35,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: Wayfinder.Umbraco.Client/package-lock.json
 
+      - name: Verify MARKETPLACE.md is current
+        run: npm run check:marketplace
+
       # Same static-web-asset build step as ci.yml — required here too, independently, since
       # this workflow packs+pushes to nuget.org on its own path. Confirmed live this session
       # (in the Wayfinder repo) that skipping this silently ships an empty wwwroot/dist rather

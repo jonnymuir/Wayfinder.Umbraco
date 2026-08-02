@@ -53,3 +53,16 @@ jobs:
       # GitHub Packages feed: nuget.org is the only publish target.
       - name: Pack
         run: dotnet pack Wayfinder.Umbraco.slnx -c Release --no-build -o ./artifacts
+
+  marketplace-description:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify MARKETPLACE.md is current
+        run: npm run check:marketplace
