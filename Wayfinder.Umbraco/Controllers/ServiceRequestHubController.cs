@@ -112,11 +112,17 @@ public class ServiceRequestHubController : RenderController
         if (string.IsNullOrWhiteSpace(summary.BlueprintKey))
             return CurrentPage?.Url() ?? "/";
 
+        // "stagePage" and "publicServiceRequestPage" are host content-type aliases, not a
+        // convention this package defines — a genuine smell (this fallback only works for a
+        // host using exactly these alias names), but rather than guess a config surface for it
+        // under time pressure, it's called out here plainly instead: a host with different
+        // alias names, or a summary that already carries ServiceRequestPageUrl (the primary
+        // path above), isn't affected either way.
         var stagePage = _publishedContentQuery
             .ContentAtRoot()
             .SelectMany(root => root.DescendantsOrSelf())
             .FirstOrDefault(content =>
-                (content.ContentType.Alias == "stagePage" || content.ContentType.Alias == "cmsServiceRequestPage")
+                (content.ContentType.Alias == "stagePage" || content.ContentType.Alias == "publicServiceRequestPage")
                 && string.Equals(content.Value<string>("blueprintKey"), summary.BlueprintKey, StringComparison.OrdinalIgnoreCase));
 
         if (stagePage != null)
