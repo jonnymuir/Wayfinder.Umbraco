@@ -22,7 +22,7 @@
             <dd class="govuk-summary-list__value">
                 @if (field.FieldType == "file-upload" && field.Value is not null)
                 {
-                    var downloadUrl = $"/prism/cms-workflow/files/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(field.FieldKey)}";
+                    var downloadUrl = $"{Model.FileEndpointBasePath}/files/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(field.FieldKey)}";
                     @field.Value<text> — </text><a class="govuk-link" href="@downloadUrl" target="_blank" rel="noopener">View</a>
                 }
                 else

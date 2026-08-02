@@ -20,4 +20,10 @@ public record ComponentContext
     public int StateVersion { get; init; }
     public string BlueprintKey { get; init; } = string.Empty;
     public string Nonce { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Base route for a <c>summary-list</c> file-field "view this document" link — see
+    /// <see cref="Configuration.WayfinderServiceDesignOptions.FileEndpointBasePath"/>.
+    /// </summary>
+    public string FileEndpointBasePath { get; init; } = string.Empty;
 }

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.Options;
 using System.Net;
+using Wayfinder.Umbraco.Configuration;
 using Wayfinder.Umbraco.Models;
 using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
@@ -41,11 +43,16 @@ public class ComponentTagHelper : TagHelper
 {
     private readonly IHtmlHelper _htmlHelper;
     private readonly ComponentPartialResolver _partialResolver;
+    private readonly string _fileEndpointBasePath;
 
-    public ComponentTagHelper(IHtmlHelper htmlHelper, ComponentPartialResolver partialResolver)
+    public ComponentTagHelper(
+        IHtmlHelper htmlHelper,
+        ComponentPartialResolver partialResolver,
+        IOptions<WayfinderServiceDesignOptions> options)
     {
         _htmlHelper = htmlHelper;
         _partialResolver = partialResolver;
+        _fileEndpointBasePath = options.Value.FileEndpointBasePath;
     }
 
     [ViewContext]
@@ -106,7 +113,8 @@ public class ComponentTagHelper : TagHelper
             InstanceId   = InstanceId,
             StateVersion = StateVersion,
             BlueprintKey  = BlueprintKey,
-            Nonce        = Nonce
+            Nonce        = Nonce,
+            FileEndpointBasePath = _fileEndpointBasePath
         };
 
         var partial = _partialResolver.ResolveComponentPartial(Component.Type);
@@ -141,7 +149,7 @@ public class ComponentTagHelper : TagHelper
         }
 
         var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
-        var ctx        = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey);
+        var ctx        = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey, _fileEndpointBasePath);
         var partial    = _partialResolver.ResolveFieldPartial(fieldType);
         var content    = await _htmlHelper.PartialAsync(partial, ctx);
 

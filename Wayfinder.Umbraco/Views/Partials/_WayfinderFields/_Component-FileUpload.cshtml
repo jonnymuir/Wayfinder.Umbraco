@@ -7,13 +7,15 @@
         ? string.Join(",", Model.Field.AcceptedFileTypes)
         : string.Empty;
     // Kept in sync with ServiceRequestPageController.DefaultMaxFileSizeBytes by hand (10MB) —
-    // same tradeoff as CmsServiceRequestFileUploadController's own local copy of this constant.
+    // same tradeoff as a host's own file-upload controller's local copy of this constant.
     var maxSizeBytes = Model.Field.MaxSizeBytes ?? 10 * 1024 * 1024;
     var alreadyUploaded = !string.IsNullOrEmpty(Model.DisplayValue);
+    // FileEndpointBasePath is a host-owned controller (see WayfinderServiceDesignOptions'
+    // own remarks for why this package can't hardcode or own the route itself).
     var downloadUrl = alreadyUploaded && !string.IsNullOrEmpty(Model.InstanceId)
-        ? $"/prism/cms-workflow/files/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(Model.Field.FieldKey)}"
+        ? $"{Model.FileEndpointBasePath}/files/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(Model.Field.FieldKey)}"
         : null;
-    var uploadUrl = $"/prism/cms-workflow/upload/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(Model.Field.FieldKey)}";
+    var uploadUrl = $"{Model.FileEndpointBasePath}/upload/{Uri.EscapeDataString(Model.InstanceId)}/{Uri.EscapeDataString(Model.Field.FieldKey)}";
 }
 @* wayfinder-file-upload.ts progressively enhances this into: choose a file -> real upload with an
    accessible progress bar -> "Uploaded: name — View — Change", all client-side, before the

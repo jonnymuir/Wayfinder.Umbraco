@@ -33,6 +33,12 @@ public record FieldContext
     public string BlueprintKey { get; init; } = string.Empty;
 
     /// <summary>
+    /// Base route for a <c>file-upload</c> field's async-upload/download links — see
+    /// <see cref="Configuration.WayfinderServiceDesignOptions.FileEndpointBasePath"/>.
+    /// </summary>
+    public string FileEndpointBasePath { get; init; } = string.Empty;
+
+    /// <summary>
     /// The value to display in the field — resolved from submitted values,
     /// then DefaultValue, then the engine-provided Value.
     /// </summary>
@@ -87,7 +93,8 @@ public record FieldContext
         IReadOnlyDictionary<string, string>? values,
         string instanceId = "",
         string nonce = "",
-        string blueprintKey = "")
+        string blueprintKey = "",
+        string fileEndpointBasePath = "")
     {
         var submittedValue = values?.GetValueOrDefault(field.FieldKey);
         var displayValue   = !string.IsNullOrWhiteSpace(field.DefaultValue)
@@ -133,6 +140,7 @@ public record FieldContext
             InstanceId   = instanceId,
             Nonce        = nonce,
             BlueprintKey  = blueprintKey,
+            FileEndpointBasePath = fileEndpointBasePath,
         };
     }
 }
