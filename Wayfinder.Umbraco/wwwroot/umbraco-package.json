@@ -3,33 +3,6 @@
   "version": "0.1.0",
   "extensions": [
     {
-      "type": "section",
-      "alias": "Wayfinder.Section",
-      "name": "Blueprints",
-      "meta": {
-        "label": "Blueprints",
-        "pathname": "blueprints",
-        "icon": "icon-diagram"
-      }
-    },
-    {
-      "type": "dashboard",
-      "alias": "Wayfinder.ServiceBlueprint.Dashboard",
-      "name": "Wayfinder Service Blueprint Dashboard",
-      "elementName": "wayfinder-service-blueprint-tab",
-      "js": "/App_Plugins/Wayfinder/dist/wayfinder-service-blueprint-tab.js",
-      "conditions": [
-        {
-          "alias": "Umb.Condition.SectionAlias",
-          "match": "Wayfinder.Section"
-        }
-      ],
-      "meta": {
-        "label": "Service Blueprints",
-        "pathname": "service-blueprints"
-      }
-    },
-    {
       "type": "bundle",
       "alias": "Wayfinder.ServiceBlueprint.Bundle",
       "name": "Wayfinder Service Blueprint Management Bundle",

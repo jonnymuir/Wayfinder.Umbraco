@@ -8,6 +8,7 @@ import { manifests as detailManifests } from './repository/detail/manifests.js';
 import { manifests as collectionManifests } from './collection/manifests.js';
 import { manifests as entityActionManifests } from './entity-actions/manifests.js';
 import { manifests as workspaceManifests } from './workspace/manifests.js';
+import { manifests as rootManifests } from './root/manifests.js';
 import { manifests as createModalManifests } from './create-modal/manifests.js';
 
 export const manifests = [
@@ -16,5 +17,6 @@ export const manifests = [
   ...collectionManifests,
   ...entityActionManifests,
   ...workspaceManifests,
+  ...rootManifests,
   ...createModalManifests,
 ];

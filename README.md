@@ -15,12 +15,13 @@ a GDS-style service blueprint / service-design engine. This package provides:
 - The generic in-process engine wiring (`AddWayfinderUmbraco()`).
 - A generic business-app HTTP client (`IBusinessAppProcessManagerClient`) for hosts that
   run their own remote engine instead.
-- Its own independent "Blueprints" backoffice section — install the package, get a working
-  authoring UI with zero host wiring: `WayfinderSectionAccessSeeder` grants it to the built-in
-  Administrators group automatically on first boot (configurable via
-  `WayfinderServiceDesignOptions.AdminGroupAliases`), and the authoring API itself enforces the
-  same group list (`WayfinderAdminHandler`) — not just nav-visibility — so a backoffice user
-  outside that list can't reach it either way.
+- A "Blueprints" entry under Umbraco's own built-in **Settings** section (Advanced group) —
+  install the package, get a working authoring UI with zero host wiring. No custom section, and
+  nothing to grant on startup: Settings is a section every default install already grants to
+  Administrators, so nav visibility just falls out of Umbraco's own permissions. The authoring
+  API enforces its own separate boundary on top (`WayfinderAdminHandler`, configurable via
+  `WayfinderServiceDesignOptions.AdminGroupAliases`) — an authenticated backoffice user without
+  Settings access can't reach it either way, not just hidden from the nav.
 - Service-request controllers, stage/hub Razor views, and a built-in GOV.UK-styled
   component/field catalog (`Views/Partials/_WayfinderComponents`/`_WayfinderFields`) — a host
   overrides any single type by placing a same-named partial at `Views/Partials/Components`/

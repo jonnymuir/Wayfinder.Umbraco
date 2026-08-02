@@ -7,11 +7,12 @@ namespace Wayfinder.Umbraco;
 
 /// <summary>
 /// Authorizes <see cref="Controllers.ServiceBlueprintAuthoringController"/> requests for backoffice
-/// users belonging to one of <see cref="WayfinderServiceDesignOptions.AdminGroupAliases"/> — the
-/// same group list <see cref="WayfinderSectionAccessSeeder"/> grants the "Blueprints" section to.
-/// Backoffice section visibility alone is only a navigation convenience: without this handler, any
-/// authenticated backoffice user (e.g. a plain Editor with no Blueprints access) could still call
-/// the authoring API directly, bypassing the UI's own access gate entirely.
+/// users belonging to one of <see cref="WayfinderServiceDesignOptions.AdminGroupAliases"/>.
+/// Blueprints lives under Umbraco's built-in Settings section, so nav visibility is governed
+/// entirely by a user group's own <c>AllowedSections</c> — but that's only a navigation
+/// convenience: without this handler, any authenticated backoffice user (e.g. a plain Editor
+/// with no Settings access) could still call the authoring API directly, bypassing the UI's own
+/// access gate entirely.
 /// </summary>
 public class WayfinderAdminHandler(
     IBackOfficeSecurityAccessor securityAccessor,

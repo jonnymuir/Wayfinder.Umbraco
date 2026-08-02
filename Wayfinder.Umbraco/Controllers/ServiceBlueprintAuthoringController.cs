@@ -28,9 +28,8 @@ namespace Wayfinder.Umbraco.Controllers;
 /// <para>
 /// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> requires membership of a
 /// group listed in <see cref="Configuration.WayfinderServiceDesignOptions.AdminGroupAliases"/> —
-/// without it, an authenticated backoffice user who simply lacks the "Blueprints" section (the
-/// default for every group except Administrators) could still call this API directly, bypassing
-/// the section-visibility gate entirely.
+/// without it, an authenticated backoffice user who simply lacks Settings-section access could
+/// still call this API directly, bypassing nav visibility entirely.
 /// </para>
 /// </remarks>
 [Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin)]

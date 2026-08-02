@@ -12,8 +12,11 @@ namespace Wayfinder.Umbraco;
 /// tables, the engine/store/generic stage-rendering infrastructure (see
 /// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/>), and
 /// the backoffice authoring API's Swagger group — all so that a bare package reference gives a
-/// working "Wayfinder" backoffice section with no host <c>Program.cs</c> wiring at all, the same
-/// composability bar a Prism host already gets for free.
+/// working "Blueprints" entry under Umbraco's own Settings section with no host
+/// <c>Program.cs</c> wiring at all. Unlike an earlier version of this package (which shipped its
+/// own top-level "Wayfinder" section), nothing here needs to grant backoffice section access on
+/// startup either — Settings is a built-in section every default install already grants to
+/// Administrators, so there's no new section for a host to remember to enable.
 /// </summary>
 /// <remarks>
 /// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/> is
@@ -27,7 +30,6 @@ public class WayfinderUmbracoComposer : IComposer
     public void Compose(IUmbracoBuilder builder)
     {
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderMigrationHandler>();
-        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderSectionAccessSeeder>();
 
         builder.Services.AddWayfinderUmbraco();
         builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();

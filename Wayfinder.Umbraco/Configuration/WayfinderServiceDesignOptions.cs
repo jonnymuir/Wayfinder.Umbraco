@@ -28,13 +28,15 @@ public class WayfinderServiceDesignOptions
     public string FileEndpointBasePath { get; set; } = "/service-request";
 
     /// <summary>
-    /// User group aliases automatically granted access to the "Blueprints" backoffice section on
-    /// startup (see <see cref="WayfinderSectionAccessSeeder"/>) — installing an Umbraco extension
-    /// manifest never grants a custom section's visibility to any user group automatically, not
-    /// even Administrators, so without this the section would be invisible to everyone regardless
-    /// of role. Defaults to just the built-in Administrators group
-    /// (<c>Umbraco.Cms.Core.Constants.Security.AdminGroupAlias</c>) — a host adds its own group
-    /// aliases here if editors/other roles should also see it.
+    /// User group aliases authorized to call <see cref="Controllers.ServiceBlueprintAuthoringController"/>
+    /// (enforced by <see cref="WayfinderAdminHandler"/>, policy
+    /// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/>). Blueprints itself
+    /// lives under Umbraco's built-in Settings section, so nav visibility needs no configuration
+    /// of its own — any backoffice user with Settings access sees it — but the authoring API
+    /// is a separate boundary: without this, an authenticated backoffice user without Settings
+    /// access could still reach the API directly. Defaults to just the built-in Administrators
+    /// group (<c>Umbraco.Cms.Core.Constants.Security.AdminGroupAlias</c>) — a host adds its own
+    /// group aliases here if other roles should also be able to author.
     /// </summary>
     public string[] AdminGroupAliases { get; set; } = [global::Umbraco.Cms.Core.Constants.Security.AdminGroupAlias];
 }

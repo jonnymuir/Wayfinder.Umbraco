@@ -23,8 +23,10 @@ public static class WayfinderUmbracoAuthorizationPolicies
     /// something this package already has full information about via
     /// <c>IBackOfficeSecurityAccessor</c>, so a host needs no wiring for it. Membership is
     /// checked against <see cref="Configuration.WayfinderServiceDesignOptions.AdminGroupAliases"/>
-    /// — the same list <see cref="WayfinderSectionAccessSeeder"/> grants the "Blueprints" section
-    /// to, so backoffice nav visibility and API enforcement can't silently drift apart.
+    /// — a separate boundary from backoffice nav visibility (Blueprints lives under Umbraco's
+    /// built-in Settings section, so nav visibility is governed entirely by a user group's
+    /// existing <c>AllowedSections</c>, not by this package): without this policy, an
+    /// authenticated backoffice user without Settings access could still call the API directly.
     /// </summary>
     public const string BlueprintsAdmin = "Wayfinder:BlueprintsAdmin";
 }
