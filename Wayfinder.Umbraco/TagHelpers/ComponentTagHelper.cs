@@ -2,19 +2,21 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.Options;
-using System.Net;
 using Wayfinder.Umbraco.Configuration;
 using Wayfinder.Umbraco.Models;
 using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Rendering.GovUk;
 
 namespace Wayfinder.Umbraco.TagHelpers;
 
 /// <summary>
-/// Renders a service blueprint component (container) or field (input) by dispatching to a
-/// convention-based Razor partial — see <see cref="ComponentPartialResolver"/> for exactly how
-/// (and where) a host can override any type, and why the package's own catalog lives at a
-/// different path than the one a host uses.
+/// Renders a service blueprint component (container) or field (input). A host's own Razor
+/// override (see <see cref="ComponentPartialResolver"/> for exactly how, and where) always wins;
+/// everything else falls through to <c>Wayfinder.Rendering.GovUk</c>'s <see cref="GovUkComponentRenderer"/>
+/// — the shared package's own built-in catalog, plus whatever this package itself has registered
+/// as an override there (<c>file-upload</c>/<c>slider</c>/<c>stat-group</c>/<c>chart</c> — see
+/// <c>WayfinderUmbracoRenderingOverrides</c>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,7 +32,8 @@ namespace Wayfinder.Umbraco.TagHelpers;
 /// To override rendering for a component with Type = "fieldset", place
 /// ~/Views/Partials/Components/_Component-Fieldset.cshtml in your own app. To override a field
 /// with FieldType = "text", place ~/Views/Partials/Fields/_Component-Text.cshtml. Either folder's
-/// own _Component-Default.cshtml can also be overridden as the catch-all fallback.
+/// own _Component-Default.cshtml can also be overridden as the catch-all fallback. This host-facing
+/// contract is unchanged from before this package adopted Wayfinder.Rendering.GovUk.
 /// </para>
 /// <para>
 /// Type normalisation: kebab-case is converted to PascalCase.
@@ -43,15 +46,18 @@ public class ComponentTagHelper : TagHelper
 {
     private readonly IHtmlHelper _htmlHelper;
     private readonly ComponentPartialResolver _partialResolver;
+    private readonly GovUkComponentRenderer _renderer;
     private readonly string _fileEndpointBasePath;
 
     public ComponentTagHelper(
         IHtmlHelper htmlHelper,
         ComponentPartialResolver partialResolver,
+        GovUkComponentRenderer renderer,
         IOptions<WayfinderServiceDesignOptions> options)
     {
         _htmlHelper = htmlHelper;
         _partialResolver = partialResolver;
+        _renderer = renderer;
         _fileEndpointBasePath = options.Value.FileEndpointBasePath;
     }
 
@@ -102,118 +108,157 @@ public class ComponentTagHelper : TagHelper
             return;
         }
 
-        ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
-
-        var ctx = new ComponentContext
+        var hostOverride = _partialResolver.ResolveComponentHostOverride(Component.Type);
+        string inner;
+        if (hostOverride is not null)
         {
-            Component    = Component,
-            Errors       = Errors       ?? new Dictionary<string, string>(),
-            Values       = Values       ?? new Dictionary<string, string>(),
-            ReturnUrl    = ReturnUrl,
-            InstanceId   = InstanceId,
-            StateVersion = StateVersion,
-            BlueprintKey  = BlueprintKey,
-            Nonce        = Nonce,
-            FileEndpointBasePath = _fileEndpointBasePath
-        };
+            ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
+            var ctx = new ComponentContext
+            {
+                Component = Component,
+                Errors = Errors ?? new Dictionary<string, string>(),
+                Values = Values ?? new Dictionary<string, string>(),
+                ReturnUrl = ReturnUrl,
+                InstanceId = InstanceId,
+                StateVersion = StateVersion,
+                BlueprintKey = BlueprintKey,
+                Nonce = Nonce,
+                FileEndpointBasePath = _fileEndpointBasePath
+            };
+            inner = HtmlContentToString(await _htmlHelper.PartialAsync(hostOverride, ctx));
 
-        var partial = _partialResolver.ResolveComponentPartial(Component.Type);
-        var content = await _htmlHelper.PartialAsync(partial, ctx);
-
-        output.Content.SetHtmlContent(content);
-
-        // Live visibility: emit the showWhen expression for the client runtime and the
-        // server-evaluated hidden state, wrapping the rendered component.
-        if (!string.IsNullOrEmpty(Component.ShowWhen))
-        {
-            var expression = WebUtility.HtmlEncode(Component.ShowWhen);
-            var hidden = Component.Hidden ? " hidden" : string.Empty;
-            output.PreContent.SetHtmlContent($@"<div data-wayfinder-show-when=""{expression}""{hidden}>");
-            output.PostContent.SetHtmlContent("</div>");
+            // GovUkComponentRenderer.RenderComponent already wraps its own output in the
+            // showWhen/Hidden div internally — a host's own Razor partial doesn't know about
+            // that at all, so this tag helper has to apply the exact same wrapping itself,
+            // uniformly, regardless of which path actually rendered the inner content.
+            output.Content.SetHtmlContent(WrapShowWhen(Component, inner));
+            return;
         }
+
+        // Every nested field inside this component needs the same submitted-value overlay
+        // ProcessFieldAsync applies for a directly-rendered field — GovUkComponentRenderer only
+        // ever sees FieldRenderPayload.Value, so the overlay has to happen before it's called,
+        // not inside it.
+        var errors = Errors ?? new Dictionary<string, string>();
+        var overlaid = Component with
+        {
+            Fields = Component.Fields.Select(f => f with { Value = FieldContext.ResolveDisplayValue(f, Values) }).ToArray()
+        };
+        output.Content.SetHtmlContent(_renderer.RenderComponent(overlaid, errors));
+    }
+
+    private static string HtmlContentToString(Microsoft.AspNetCore.Html.IHtmlContent content)
+    {
+        using var writer = new StringWriter();
+        content.WriteTo(writer, System.Text.Encodings.Web.HtmlEncoder.Default);
+        return writer.ToString();
+    }
+
+    private static string WrapShowWhen(ComponentRenderPayload component, string inner)
+    {
+        if (string.IsNullOrEmpty(component.ShowWhen))
+        {
+            return inner;
+        }
+
+        var expression = System.Net.WebUtility.HtmlEncode(component.ShowWhen);
+        var hidden = component.Hidden ? " hidden" : string.Empty;
+        return $"""<div data-wayfinder-show-when="{expression}"{hidden}>{inner}</div>""";
     }
 
     private async Task ProcessFieldAsync(TagHelperOutput output)
     {
-        ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
-
         var fieldType = (Field!.FieldType ?? "text").ToLowerInvariant();
+        var hostOverride = _partialResolver.ResolveFieldHostOverride(fieldType);
 
-        // Content-only field types rendered inline — they are not form controls
-        // and do not need the govuk-form-group wrapper or the partial dispatch system.
-        var inlineHtml = RenderInlineFieldType(fieldType);
-        if (inlineHtml is not null)
+        if (hostOverride is not null)
         {
-            output.Content.SetHtmlContent(inlineHtml);
+            ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
+            var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
+            var ctx = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey, _fileEndpointBasePath);
+            output.Content.SetHtmlContent(await _htmlHelper.PartialAsync(hostOverride, ctx));
             return;
         }
 
-        var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
-        var ctx        = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey, _fileEndpointBasePath);
-        var partial    = _partialResolver.ResolveFieldPartial(fieldType);
-        var content    = await _htmlHelper.PartialAsync(partial, ctx);
-
-        output.Content.SetHtmlContent(content);
-    }
-
-    /// <summary>
-    /// Renders content-only field types that are not form controls.
-    /// Returns null for standard field types that use the partial system.
-    /// </summary>
-    private string? RenderInlineFieldType(string fieldType)
-    {
-        var content = Field!.Content;
-        var encodedContent = string.IsNullOrEmpty(content) ? string.Empty : WebUtility.HtmlEncode(content);
-        var encodedLabel = string.IsNullOrEmpty(Field.Label) ? string.Empty : WebUtility.HtmlEncode(Field.Label);
-        var bannerTitleId = string.IsNullOrEmpty(Field.FieldKey)
-            ? "wayfinder-inline-banner-title"
-            : $"wayfinder-inline-banner-title-{SanitizeIdFragment(Field.FieldKey)}";
-
-        return fieldType switch
+        // file-upload's async progressive-upload markup needs InstanceId/Nonce/FileEndpointBasePath
+        // to build its own upload/download URLs — per-request context the shared renderer's plain
+        // (payload, errors) delegate signature has no room to carry, so this stays a permanent
+        // special case here rather than a registered GovUkComponentRenderer override (see
+        // WayfinderUmbracoRenderingOverrides' remarks for slider/stat-group/chart, which don't
+        // need this and ARE registered overrides).
+        if (fieldType == "file-upload")
         {
-            "inset-text" when !string.IsNullOrEmpty(content) =>
-                $@"<div class=""govuk-inset-text"">{encodedContent}</div>",
+            var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
+            var ctx = FieldContext.Build(Field, fieldError, Values, InstanceId, Nonce, BlueprintKey, _fileEndpointBasePath);
+            output.Content.SetHtmlContent(RenderFileUpload(ctx));
+            return;
+        }
 
-            "warning-text" when !string.IsNullOrEmpty(content) =>
-                $@"<div class=""govuk-warning-text"">
-  <span class=""govuk-warning-text__icon"" aria-hidden=""true"">!</span>
-  <strong class=""govuk-warning-text__text"">
-    <span class=""govuk-visually-hidden"">Warning</span>
-    {encodedContent}
-  </strong>
-</div>",
-
-            "details" when !string.IsNullOrEmpty(content) =>
-                $@"<details class=""govuk-details"">
-  <summary class=""govuk-details__summary"">
-    <span class=""govuk-details__summary-text"">{(string.IsNullOrEmpty(encodedLabel) ? "More information" : encodedLabel)}</span>
-  </summary>
-  <div class=""govuk-details__text"">{encodedContent}</div>
-</details>",
-
-            "notification-banner" when !string.IsNullOrEmpty(content) =>
-                $@"<div class=""govuk-notification-banner"" role=""region"" aria-labelledby=""{bannerTitleId}"">
-  <div class=""govuk-notification-banner__header"">
-    <h2 class=""govuk-notification-banner__title"" id=""{bannerTitleId}"">{(string.IsNullOrEmpty(encodedLabel) ? "Information" : encodedLabel)}</h2>
-  </div>
-  <div class=""govuk-notification-banner__content"">
-    <p class=""govuk-body"">{encodedContent}</p>
-  </div>
-</div>",
-
-            "body" when !string.IsNullOrEmpty(content) =>
-                $@"<p class=""govuk-body"">{encodedContent}</p>",
-
-            "heading" when !string.IsNullOrEmpty(content) =>
-                $@"<h2 class=""govuk-heading-m"">{encodedContent}</h2>",
-
-            "inset-text" or "warning-text" or "details" or "notification-banner" or "body" or "heading"
-                => string.Empty, // content was null/empty — suppress
-
-            _ => null // use the partial dispatch system
-        };
+        var displayValue = FieldContext.ResolveDisplayValue(Field, Values);
+        var errors = Errors ?? new Dictionary<string, string>();
+        output.Content.SetHtmlContent(_renderer.RenderField(Field with { Value = displayValue }, errors));
     }
 
-    private static string SanitizeIdFragment(string value) =>
-        string.Concat(value.Select(c => char.IsLetterOrDigit(c) ? c : '-'));
+    // Kept in sync with ServiceRequestPageController.DefaultMaxFileSizeBytes by hand (10MB) —
+    // same tradeoff as that controller's own local copy of this constant; a TagHelper
+    // referencing a Controller class just to share one constant isn't a cross-layer dependency
+    // worth introducing.
+    private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
+
+    private string RenderFileUpload(FieldContext ctx)
+    {
+        var field = ctx.Field;
+        var acceptAttr = field.AcceptedFileTypes is { Count: > 0 }
+            ? $" accept=\"{string.Join(",", field.AcceptedFileTypes)}\""
+            : string.Empty;
+        var acceptList = field.AcceptedFileTypes is { Count: > 0 } ? string.Join(",", field.AcceptedFileTypes) : string.Empty;
+        var maxSizeBytes = field.MaxSizeBytes ?? DefaultMaxFileSizeBytes;
+        var alreadyUploaded = !string.IsNullOrEmpty(ctx.DisplayValue);
+        var downloadUrl = alreadyUploaded && !string.IsNullOrEmpty(ctx.InstanceId)
+            ? $"{ctx.FileEndpointBasePath}/files/{Uri.EscapeDataString(ctx.InstanceId)}/{Uri.EscapeDataString(field.FieldKey)}"
+            : null;
+        var uploadUrl = $"{ctx.FileEndpointBasePath}/upload/{Uri.EscapeDataString(ctx.InstanceId)}/{Uri.EscapeDataString(field.FieldKey)}";
+
+        var uploadedBlock = $"""
+            <div data-wayfinder-file-upload-uploaded{(alreadyUploaded ? "" : " hidden")}>
+              <p class="govuk-body" data-wayfinder-file-upload-uploaded-text>
+                Uploaded: <span data-wayfinder-file-upload-filename>{System.Net.WebUtility.HtmlEncode(ctx.DisplayValue)}</span>
+                — <a class="govuk-link" data-wayfinder-file-upload-view-link href="{downloadUrl ?? "#"}" target="_blank" rel="noopener"{(downloadUrl is null ? " hidden" : "")}>View</a>
+              </p>
+              <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-2" data-module="govuk-button" data-wayfinder-file-upload-change>
+                Choose a different file
+              </button>
+            </div>
+            """;
+
+        return $"""
+            <div class="{ctx.WrapperClass}"{ctx.WrapperAttrs}
+                 data-wayfinder-file-upload
+                 data-wayfinder-upload-url="{uploadUrl}"
+                 data-wayfinder-nonce="{ctx.Nonce}"
+                 data-wayfinder-field-key="{field.FieldKey}"
+                 data-wayfinder-max-size="{maxSizeBytes}"
+                 data-wayfinder-accept="{acceptList}"
+                 data-wayfinder-label="{field.Label}">
+              <label class="govuk-label" for="{field.FieldKey}">{field.Label}{(field.Required ? """<span class="govuk-visually-hidden"> (required)</span>""" : "")}</label>
+              {(ctx.HasHint ? $"""<div class="govuk-hint" id="{ctx.HintId}">{field.Hint}</div>""" : "")}
+              {(ctx.HasFieldError ? $"""<p class="govuk-error-message" id="{ctx.ErrorId}"><span class="govuk-visually-hidden">Error:</span> {ctx.FieldError}</p>""" : "")}
+              {uploadedBlock}
+              <div class="wayfinder-file-upload-progress" data-wayfinder-file-upload-progress hidden>
+                <p class="govuk-body" data-wayfinder-file-upload-progress-label>Uploading {field.Label}…</p>
+                <div class="wayfinder-file-upload-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                     aria-label="Upload progress for {field.Label}" data-wayfinder-file-upload-progress-bar>
+                  <div class="wayfinder-file-upload-progress-fill" data-wayfinder-file-upload-progress-fill></div>
+                </div>
+                <span class="govuk-visually-hidden" aria-live="polite" data-wayfinder-file-upload-progress-announce></span>
+              </div>
+              <p class="govuk-error-message" data-wayfinder-file-upload-error hidden></p>
+              <input class="govuk-file-upload{(ctx.HasFieldError ? " govuk-file-upload--error" : "")}"
+                     type="file" id="{field.FieldKey}" name="fields[{field.FieldKey}]"
+                     data-wayfinder-file-upload-input data-label="{field.Label}"{acceptAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
+                     {(alreadyUploaded ? "hidden disabled" : "")} />
+              <input type="hidden" name="fields[{field.FieldKey}]" data-wayfinder-file-upload-token disabled value="" />
+            </div>
+            """;
+    }
 }

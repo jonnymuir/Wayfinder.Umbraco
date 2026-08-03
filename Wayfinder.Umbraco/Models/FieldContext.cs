@@ -87,17 +87,20 @@ public record FieldContext
 
     // -- Factory --
 
-    public static FieldContext Build(
-        FieldRenderPayload field,
-        string? fieldError,
-        IReadOnlyDictionary<string, string>? values,
-        string instanceId = "",
-        string nonce = "",
-        string blueprintKey = "",
-        string fileEndpointBasePath = "")
+    /// <summary>
+    /// Resolves the value to actually display for a field — submitted (a redisplay after a
+    /// validation failure, so the visitor doesn't lose what they typed) takes precedence, unless
+    /// <see cref="FieldRenderPayload.DefaultValue"/> is set, which always wins over both submitted
+    /// and engine-persisted values. Strips <see cref="FieldRenderPayload.Prefix"/> from the
+    /// front, since a caller renders that separately alongside the input, not baked into its
+    /// value. Shared by <see cref="Build"/> and by <c>ComponentTagHelper</c>'s
+    /// Wayfinder.Rendering.GovUk dispatch path, which needs this same overlay but none of this
+    /// record's other derived rendering state.
+    /// </summary>
+    public static string ResolveDisplayValue(FieldRenderPayload field, IReadOnlyDictionary<string, string>? values)
     {
         var submittedValue = values?.GetValueOrDefault(field.FieldKey);
-        var displayValue   = !string.IsNullOrWhiteSpace(field.DefaultValue)
+        var displayValue = !string.IsNullOrWhiteSpace(field.DefaultValue)
             ? field.DefaultValue
             : submittedValue ?? field.Value?.ToString() ?? string.Empty;
 
@@ -107,6 +110,20 @@ public record FieldContext
         {
             displayValue = displayValue[field.Prefix.Length..];
         }
+
+        return displayValue;
+    }
+
+    public static FieldContext Build(
+        FieldRenderPayload field,
+        string? fieldError,
+        IReadOnlyDictionary<string, string>? values,
+        string instanceId = "",
+        string nonce = "",
+        string blueprintKey = "",
+        string fileEndpointBasePath = "")
+    {
+        var displayValue = ResolveDisplayValue(field, values);
 
         var hasHint  = !string.IsNullOrEmpty(field.Hint);
         var hasError = !string.IsNullOrEmpty(fieldError);

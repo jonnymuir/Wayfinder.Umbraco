@@ -4,57 +4,48 @@ using Microsoft.AspNetCore.Mvc.ViewEngines;
 namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// Resolves which Razor partial renders a given component/field type, letting a host override
-/// any type (or the fallback default) by placing a same-named file at the documented convention
-/// path — <c>~/Views/Partials/Components/_Component-{Type}.cshtml</c> and
+/// Resolves a host's own Razor override for a given component/field type, if one exists, at the
+/// documented convention path — <c>~/Views/Partials/Components/_Component-{Type}.cshtml</c> and
 /// <c>~/Views/Partials/Fields/_Component-{Type}.cshtml</c> (see
-/// docs/guides/service-request-customisation.md in Umbraco.Prism).
+/// docs/guides/service-request-customisation.md in Umbraco.Prism). Returns <c>null</c> when no
+/// host override exists, in which case <c>ComponentTagHelper</c> falls through to
+/// <c>Wayfinder.Rendering.GovUk</c>'s <c>GovUkComponentRenderer</c> — the shared package's own
+/// built-in catalog plus whatever Wayfinder.Umbraco itself has registered as overrides there
+/// (<c>file-upload</c>, <c>slider</c>, <c>stat-group</c>, <c>chart</c> — genuinely richer than
+/// the shared package's deliberately plain defaults, so this package keeps its own markup for
+/// those specific types rather than downgrading to the shared default).
 /// </summary>
 /// <remarks>
-/// <para>
-/// Wayfinder.Umbraco's own built-in catalog deliberately does NOT live at that convention path —
-/// it lives under <c>~/Views/Partials/_WayfinderComponents/</c> and
-/// <c>~/Views/Partials/_WayfinderFields/</c> instead. This is load-bearing, not cosmetic:
-/// ASP.NET Core's compiled-view lookup resolves a precompiled item at an exact virtual path
-/// immediately and never falls through to check whether the consuming app ALSO defines a
-/// runtime-compiled view at that identical path. If the package's own defaults occupied the same
-/// path a host is documented to use for overrides, the host's file would be silently ignored —
-/// confirmed live, that was the original bug this resolver replaces. Keeping the two catalogs on
-/// separate paths turns "does a host override exist" into a genuine, unambiguous existence check
-/// instead of an unwinnable race between two views claiming the same identity.
-/// </para>
-/// <para>
-/// Resolution is cached indefinitely per type in a process-lifetime dictionary — the set of
-/// types is small and effectively closed (the built-in catalog plus whatever a host adds), so a
-/// render only ever consults the view engine once per type, not once per request. A host adding
-/// a new override file requires an app restart to be picked up, the same as any other compiled
-/// asset — that trade-off is what buys every subsequent render a plain dictionary lookup with no
-/// view-engine call and no filesystem I/O at all.
-/// </para>
+/// This resolver used to also own the *package's own* built-in catalog, at a deliberately
+/// different virtual path than the host-override convention — ASP.NET Core's compiled-view
+/// lookup resolves a precompiled item at an exact virtual path immediately and never falls
+/// through to check whether the host ALSO defines a runtime-compiled view at that identical
+/// path, so sharing one path would have silently shadowed a host's own override (confirmed
+/// live, historically). Since the built-in catalog is no longer Razor at all — it moved to
+/// <c>Wayfinder.Rendering.GovUk</c>, plain C#, no ViewEngine involved — that entire class of bug
+/// is gone by construction: there's nothing left at any package-owned virtual path to collide
+/// with a host's own file.
 /// </remarks>
 public sealed class ComponentPartialResolver(ICompositeViewEngine viewEngine)
 {
-    private const string ComponentsHostBase    = "~/Views/Partials/Components/";
-    private const string ComponentsPackageBase = "~/Views/Partials/_WayfinderComponents/";
-    private const string FieldsHostBase        = "~/Views/Partials/Fields/";
-    private const string FieldsPackageBase     = "~/Views/Partials/_WayfinderFields/";
+    private const string ComponentsHostBase = "~/Views/Partials/Components/";
+    private const string FieldsHostBase = "~/Views/Partials/Fields/";
 
-    private readonly ConcurrentDictionary<string, string> _componentCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _fieldCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string?> _componentCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string?> _fieldCache = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Resolves the partial for a component <c>type</c> (kebab-case, e.g. "summary-list"),
-    /// preferring a host override, then the host's own default override, then the package's
-    /// built-in partial for this type, then the package's own default.
-    /// </summary>
-    public string ResolveComponentPartial(string? componentType) =>
-        _componentCache.GetOrAdd(componentType ?? "default", type => Resolve(type, ComponentsHostBase, ComponentsPackageBase));
+    /// <summary>Resolves a host's own override view for a component <c>type</c> (kebab-case,
+    /// e.g. "summary-list") — its own type-specific file, then its own catch-all default, then
+    /// <c>null</c> if neither exists.</summary>
+    public string? ResolveComponentHostOverride(string? componentType) =>
+        _componentCache.GetOrAdd(componentType ?? "default", type => Resolve(type, ComponentsHostBase));
 
-    /// <summary>Resolves the partial for a field <c>fieldType</c> (kebab-case, e.g. "file-upload"), same precedence as <see cref="ResolveComponentPartial"/>.</summary>
-    public string ResolveFieldPartial(string fieldType) =>
-        _fieldCache.GetOrAdd(fieldType, type => Resolve(type, FieldsHostBase, FieldsPackageBase));
+    /// <summary>Resolves a host's own override view for a field <c>fieldType</c> (kebab-case,
+    /// e.g. "file-upload"), same precedence as <see cref="ResolveComponentHostOverride"/>.</summary>
+    public string? ResolveFieldHostOverride(string fieldType) =>
+        _fieldCache.GetOrAdd(fieldType, type => Resolve(type, FieldsHostBase));
 
-    private string Resolve(string type, string hostBase, string packageBase)
+    private string? Resolve(string type, string hostBase)
     {
         var typeName = KebabToPascalCase(type);
 
@@ -62,12 +53,7 @@ public sealed class ComponentPartialResolver(ICompositeViewEngine viewEngine)
         if (ViewExists(hostSpecific)) return hostSpecific;
 
         var hostDefault = $"{hostBase}_Component-Default.cshtml";
-        if (ViewExists(hostDefault)) return hostDefault;
-
-        var packageSpecific = $"{packageBase}_Component-{typeName}.cshtml";
-        if (ViewExists(packageSpecific)) return packageSpecific;
-
-        return $"{packageBase}_Component-Default.cshtml";
+        return ViewExists(hostDefault) ? hostDefault : null;
     }
 
     private bool ViewExists(string viewPath) =>

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Engine.Extensions;
+using Wayfinder.Rendering.GovUk;
 using Wayfinder.Services.Sanitization;
 using Wayfinder.Umbraco.Configuration;
 using Wayfinder.Umbraco.Services;
@@ -65,14 +66,30 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // rebuilt from scratch every time.
         services.TryAddSingleton<ComponentPartialResolver>();
 
+        // Wayfinder.Rendering.GovUk's built-in catalog covers most component/field types; this
+        // package registers its own richer markup for the handful where its default is a
+        // deliberate simplification — see WayfinderUmbracoRenderingOverrides' own remarks.
+        // Singleton: the renderer holds only its own override registrations, no per-request
+        // state, and registering the overrides is a one-time startup cost.
+        services.TryAddSingleton(sp =>
+        {
+            var renderer = new GovUkComponentRenderer();
+            WayfinderUmbracoRenderingOverrides.Register(renderer);
+            return renderer;
+        });
+
         // Ganss.Xss-backed GDS allowlist. Registered as singleton: HtmlSanitizer is
         // thread-safe for concurrent Sanitize calls when configuration is not mutated after
         // construction.
         services.TryAddSingleton<IServiceContentSanitizer, ServiceContentSanitizer>();
 
         // File-upload storage for the "file-upload" component type — disk-backed by default;
-        // a host can replace this registration with its own (blob storage, etc.).
-        services.TryAddSingleton<IServiceRequestFileStorage, DiskServiceRequestFileStorage>();
+        // a host can replace this registration with its own (blob storage, etc.). Fully
+        // qualified: Wayfinder.Engine 0.4.1 added its own same-named IServiceRequestFileStorage
+        // (Wayfinder.Engine.Abstractions, a different, narrower interface for its own
+        // reference-app use) — coincidental collision, not a shared contract; this package's
+        // own richer interface (async token/progress-bar upload) is what's registered here.
+        services.TryAddSingleton<Services.IServiceRequestFileStorage, DiskServiceRequestFileStorage>();
 
         // Binds an async-uploaded file to the opaque token the client carries until the
         // stage's real POST — same IDistributedCache mechanism as the nonce service.
