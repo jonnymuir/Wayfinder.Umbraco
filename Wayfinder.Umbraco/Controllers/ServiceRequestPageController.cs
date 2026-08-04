@@ -11,6 +11,7 @@ using Wayfinder.Umbraco.Models;
 using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
 using Wayfinder.Rendering.GovUk;
+using Wayfinder.Services.Validation;
 
 namespace Wayfinder.Umbraco.Controllers;
 
@@ -49,7 +50,6 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
     private readonly IPublishedValueFallback _publishedValueFallback;
     private readonly IAntiforgery _antiforgery;
     private readonly IStageNonceService _nonceService;
-    private readonly IServiceRequestFieldValidator _fieldValidator;
     private readonly IServiceRequestFileStorage _fileStorage;
     private readonly IUploadTokenService _uploadTokenService;
 
@@ -63,7 +63,6 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
     /// <param name="publishedValueFallback">Umbraco helper for retrieving published property values with fallback support.</param>
     /// <param name="antiforgery">Service for validating antiforgery tokens on form submissions.</param>
     /// <param name="nonceService">Service for creating and resolving tamper-proof nonces bound to field definitions.</param>
-    /// <param name="fieldValidator">Service for validating submitted field values against their server-side definitions.</param>
     /// <param name="fileStorage">Service for persisting files posted against <c>file-upload</c> fields.</param>
     /// <param name="uploadTokenService">Resolves a field that was already uploaded asynchronously ahead of this submission.</param>
     protected ServiceRequestPageController(
@@ -74,7 +73,6 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
         IPublishedValueFallback publishedValueFallback,
         IAntiforgery antiforgery,
         IStageNonceService nonceService,
-        IServiceRequestFieldValidator fieldValidator,
         IServiceRequestFileStorage fileStorage,
         IUploadTokenService uploadTokenService)
         : base(logger, compositeViewEngine, umbracoContextAccessor)
@@ -84,7 +82,6 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
         _publishedValueFallback = publishedValueFallback;
         _antiforgery = antiforgery;
         _nonceService = nonceService;
-        _fieldValidator = fieldValidator;
         _fileStorage = fileStorage;
         _uploadTokenService = uploadTokenService;
     }
@@ -297,7 +294,7 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
             validationInput[fieldKey] = value;
         }
 
-        var validationResult = _fieldValidator.Validate(authoritativeFields, validationInput);
+        var validationResult = FieldValueValidator.Validate(authoritativeFields, validationInput);
         var errors = new Dictionary<string, string>(validationResult.Errors);
 
         foreach (var (field, file) in postedFiles)
