@@ -34,22 +34,28 @@ public static class WayfinderUmbracoRenderingOverrides
         var prefix = field.Prefix ?? string.Empty;
         var suffix = field.Suffix ?? string.Empty;
         var hasError = errors.TryGetValue(field.FieldKey, out var error);
-        var name = $"field:{field.FieldKey}";
+        // id stays the bare field key (plain CSS-selector-friendly, matching every other
+        // rendered field); name carries GovUk.FieldName's "field:{fieldKey}" convention a
+        // host's own form-submission parsing keys off. The two used to be the same string here,
+        // which broke id-based selectors (see Wayfinder.Rendering.GovUk's own GovUkFields.Common
+        // for the same fix and its full rationale).
+        var id = field.FieldKey;
+        var name = GovUk.FieldName(field.FieldKey);
 
-        var hint = string.IsNullOrEmpty(field.Hint) ? "" : $"""<div id="{name}-hint" class="govuk-hint">{Esc(field.Hint)}</div>""";
-        var errorMessage = error is null ? "" : $"""<p class="govuk-error-message" id="{name}-error"><span class="govuk-visually-hidden">Error:</span> {Esc(error)}</p>""";
-        var describedByIds = string.Join(' ', new[] { string.IsNullOrEmpty(field.Hint) ? null : $"{name}-hint", hasError ? $"{name}-error" : null }.Where(v => v is not null));
+        var hint = string.IsNullOrEmpty(field.Hint) ? "" : $"""<div id="{id}-hint" class="govuk-hint">{Esc(field.Hint)}</div>""";
+        var errorMessage = error is null ? "" : $"""<p class="govuk-error-message" id="{id}-error"><span class="govuk-visually-hidden">Error:</span> {Esc(error)}</p>""";
+        var describedByIds = string.Join(' ', new[] { string.IsNullOrEmpty(field.Hint) ? null : $"{id}-hint", hasError ? $"{id}-error" : null }.Where(v => v is not null));
         var describedBy = describedByIds.Length == 0 ? "" : $" aria-describedby=\"{describedByIds}\"";
         var required = field.Required ? "required" : "";
 
         return $"""
             <div class="govuk-form-group{(hasError ? " govuk-form-group--error" : "")}" data-wayfinder-slider>
-              <label class="govuk-label" for="{name}">{Esc(field.Label)}</label>
+              <label class="govuk-label" for="{id}">{Esc(field.Label)}</label>
               {hint}
               {errorMessage}
               <div class="wayfinder-slider__row">
                 <input class="wayfinder-slider__input{(hasError ? " wayfinder-slider__input--error" : "")}"
-                       type="range" id="{name}" name="{name}" value="{Esc(value)}"
+                       type="range" id="{id}" name="{name}" value="{Esc(value)}"
                        data-label="{Esc(field.Label)}" data-wayfinder-slider-input{describedBy} {required}
                        min="{min}" max="{max}" step="{field.Step ?? 1}" />
                 <span class="wayfinder-slider__value" data-wayfinder-slider-value
