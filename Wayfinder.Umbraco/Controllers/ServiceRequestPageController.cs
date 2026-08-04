@@ -10,6 +10,7 @@ using Umbraco.Extensions;
 using Wayfinder.Umbraco.Models;
 using Wayfinder.Umbraco.Services;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Rendering.GovUk;
 
 namespace Wayfinder.Umbraco.Controllers;
 
@@ -219,11 +220,15 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
             return Redirect(safeReturnUrl);
         }
 
-        // Structural validation
+        // Structural validation. Fields post under GovUk.FieldName's "field:{fieldKey}"
+        // convention (Wayfinder.Rendering.GovUk's own rendering contract) — this used to be
+        // the "fields[{fieldKey}]" bracket form this package's own now-removed Razor field
+        // partials rendered, before adopting the shared renderer.
+        const string FieldPrefix = "field:";
         var submittedFields = form.Keys
-            .Where(k => k.StartsWith("fields[", StringComparison.Ordinal) && k.EndsWith("]"))
+            .Where(k => k.StartsWith(FieldPrefix, StringComparison.Ordinal))
             .ToDictionary(
-                k => k[7..^1],
+                k => k[FieldPrefix.Length..],
                 k => form[k].ToString());
 
         // Files never appear in form.Keys (they're a separate IFormFileCollection) — a
@@ -234,7 +239,7 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
         // point, so it must not leak into the redisplay-on-failure form values.
         var postedFiles = authoritativeFields
             .Where(field => field.FieldType.Equals("file-upload", StringComparison.OrdinalIgnoreCase))
-            .Select(field => (Field: field, File: form.Files.GetFile($"fields[{field.FieldKey}]")))
+            .Select(field => (Field: field, File: form.Files.GetFile(GovUk.FieldName(field.FieldKey))))
             .Where(pair => pair.File is not null)
             .ToList();
 

@@ -254,10 +254,10 @@ public class ComponentTagHelper : TagHelper
               </div>
               <p class="govuk-error-message" data-wayfinder-file-upload-error hidden></p>
               <input class="govuk-file-upload{(ctx.HasFieldError ? " govuk-file-upload--error" : "")}"
-                     type="file" id="{field.FieldKey}" name="fields[{field.FieldKey}]"
+                     type="file" id="{field.FieldKey}" name="{GovUk.FieldName(field.FieldKey)}"
                      data-wayfinder-file-upload-input data-label="{field.Label}"{acceptAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
                      {(alreadyUploaded ? "hidden disabled" : "")} />
-              <input type="hidden" name="fields[{field.FieldKey}]" data-wayfinder-file-upload-token disabled value="" />
+              <input type="hidden" name="{GovUk.FieldName(field.FieldKey)}" data-wayfinder-file-upload-token disabled value="" />
             </div>
             """;
     }
