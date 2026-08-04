@@ -59,7 +59,6 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         services.AddOptions<WayfinderServiceDesignOptions>().BindConfiguration("Wayfinder");
 
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
-        services.TryAddTransient<IServiceRequestFieldValidator, ServiceRequestFieldValidator>();
 
         // Singleton so ComponentTagHelper's partial-resolution cache (see the resolver's own
         // remarks for why this matters) actually persists across requests instead of being
