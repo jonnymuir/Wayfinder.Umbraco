@@ -40,6 +40,30 @@ public class WayfinderUmbracoRenderingOverridesTests
         Assert.DoesNotContain("<output", html);
     }
 
+    // Regression coverage: id and name used to share the same "field:{fieldKey}"-prefixed
+    // string here too, breaking any plain CSS ID selector targeting the rendered input (a
+    // colon in an id isn't safely selectable via #id without escaping) — see
+    // Wayfinder.Rendering.GovUk's own GovUkFields.Common for the sibling fix and full rationale.
+    [Fact]
+    public void Slider_IdStaysBareFieldKey_NameCarriesFieldPrefix()
+    {
+        var renderer = BuildRenderer();
+        var html = renderer.RenderField(new FieldRenderPayload
+        {
+            FieldKey = "risk",
+            Label = "Risk appetite",
+            FieldType = "slider",
+            Required = true,
+            Min = 0,
+            Max = 10,
+        }, NoErrors);
+
+        Assert.Contains("id=\"risk\"", html);
+        Assert.Contains("for=\"risk\"", html);
+        Assert.Contains("name=\"field:risk\"", html);
+        Assert.DoesNotContain("id=\"field:risk\"", html);
+    }
+
     [Fact]
     public void StatGroup_UsesThisPackagesBespokeMarkupNotTheSharedDefault()
     {
