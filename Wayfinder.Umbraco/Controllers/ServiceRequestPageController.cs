@@ -324,6 +324,18 @@ public abstract class ServiceRequestPageController<TViewModel> : RenderControlle
             kvp => kvp.Key,
             kvp => (object?)kvp.Value);
 
+        // An untouched file-upload field still posts as a regular, empty form field under its
+        // own name — a browser can never leave an <input type="file"> out of the submission the
+        // way it can skip an unchecked checkbox, it just posts empty. Left in fieldValues as an
+        // explicit "", the engine reads it as "cleared" rather than "unchanged" and the already-
+        // persisted reference (validationOverrides above already proved it exists, or this
+        // field wouldn't have passed the required check moments ago) gets wiped. Strip these
+        // back out so the engine sees a genuinely omitted key instead, and keeps what's there.
+        foreach (var fieldKey in validationOverrides.Keys)
+        {
+            fieldValues.Remove(fieldKey);
+        }
+
         // Validation passed, so every posted file is genuinely wanted — save it now and
         // replace its sentinel with the real reference the engine will persist.
         foreach (var (field, file) in postedFiles)
