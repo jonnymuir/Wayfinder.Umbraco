@@ -14,9 +14,9 @@ namespace Wayfinder.Umbraco.TagHelpers;
 /// Renders a service blueprint component (container) or field (input). A host's own Razor
 /// override (see <see cref="ComponentPartialResolver"/> for exactly how, and where) always wins;
 /// everything else falls through to <c>Wayfinder.Rendering.GovUk</c>'s <see cref="GovUkComponentRenderer"/>
-/// — the shared package's own built-in catalog, plus whatever this package itself has registered
-/// as an override there (<c>file-upload</c>/<c>slider</c>/<c>stat-group</c>/<c>chart</c> — see
-/// <c>WayfinderUmbracoRenderingOverrides</c>).
+/// — the shared package's own built-in catalog, the gold-standard rendering for every type
+/// including slider/stat-group/chart. <c>file-upload</c> is the one permanent exception (see
+/// below), handled directly by this tag helper rather than the renderer.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -183,9 +183,7 @@ public class ComponentTagHelper : TagHelper
         // file-upload's async progressive-upload markup needs InstanceId/Nonce/FileEndpointBasePath
         // to build its own upload/download URLs — per-request context the shared renderer's plain
         // (payload, errors) delegate signature has no room to carry, so this stays a permanent
-        // special case here rather than a registered GovUkComponentRenderer override (see
-        // WayfinderUmbracoRenderingOverrides' remarks for slider/stat-group/chart, which don't
-        // need this and ARE registered overrides).
+        // special case here rather than a registered GovUkComponentRenderer override.
         if (fieldType == "file-upload")
         {
             var fieldError = Errors?.GetValueOrDefault(Field.FieldKey);
