@@ -65,17 +65,10 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // rebuilt from scratch every time.
         services.TryAddSingleton<ComponentPartialResolver>();
 
-        // Wayfinder.Rendering.GovUk's built-in catalog covers most component/field types; this
-        // package registers its own richer markup for the handful where its default is a
-        // deliberate simplification — see WayfinderUmbracoRenderingOverrides' own remarks.
-        // Singleton: the renderer holds only its own override registrations, no per-request
-        // state, and registering the overrides is a one-time startup cost.
-        services.TryAddSingleton(sp =>
-        {
-            var renderer = new GovUkComponentRenderer();
-            WayfinderUmbracoRenderingOverrides.Register(renderer);
-            return renderer;
-        });
+        // Wayfinder.Rendering.GovUk's built-in catalog is the gold-standard rendering for every
+        // component/field type, slider/stat-group/chart included — this package needs no
+        // overrides of its own. Singleton: the renderer holds no per-request state.
+        services.TryAddSingleton<GovUkComponentRenderer>();
 
         // Ganss.Xss-backed GDS allowlist. Registered as singleton: HtmlSanitizer is
         // thread-safe for concurrent Sanitize calls when configuration is not mutated after
