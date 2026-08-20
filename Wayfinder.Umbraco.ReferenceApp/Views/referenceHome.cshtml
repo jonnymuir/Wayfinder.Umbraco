@@ -1,0 +1,40 @@
+﻿@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Cms.Core.Models.Blocks
+@using Umbraco.Extensions
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@{
+    Layout = null;
+    var citizenGrid = Model.Value<BlockGridModel>("citizenArea");
+    var caseworkerGrid = Model.Value<BlockGridModel>("caseworkerArea");
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Wayfinder.Umbraco reference app</title>
+</head>
+<body>
+    <h1>Wayfinder.Umbraco reference app</h1>
+    <p><a href="/demo/login">Demo login</a> &middot; <a href="/umbraco">Backoffice</a></p>
+
+    <h2>Citizen area</h2>
+    @if (citizenGrid is not null && citizenGrid.Any())
+    {
+        @await Html.GetBlockGridHtmlAsync(citizenGrid)
+    }
+    else
+    {
+        <p><em>No citizen-facing block placed yet — add a "Wayfinder Service Request Stage" block in the backoffice.</em></p>
+    }
+
+    <h2>Caseworker area</h2>
+    @if (caseworkerGrid is not null && caseworkerGrid.Any())
+    {
+        @await Html.GetBlockGridHtmlAsync(caseworkerGrid)
+    }
+    else
+    {
+        <p><em>No caseworker-facing block placed yet — add a "Wayfinder Service Request Worklist" block in the backoffice.</em></p>
+    }
+</body>
+</html>
