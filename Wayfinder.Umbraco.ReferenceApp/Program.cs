@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
-using Wayfinder.Models.ServiceDesign;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Notifications;
 using Wayfinder.Umbraco.Extensions;
 using Wayfinder.Umbraco.ReferenceApp;
 
@@ -9,18 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Local secrets override — gitignored.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
-// A demo identity for the two actor lanes this reference app proves: the citizen-facing stage
-// block (owner-restricted, one instance per visitor) and the caseworker-facing worklist block
-// (a shared queue, real pickup/putback). Named scheme, not the ASP.NET Core default — Umbraco's
-// own backoffice authentication owns that.
-builder.Services
-    .AddAuthentication(ReferenceAppAuth.SchemeName)
-    .AddCookie(ReferenceAppAuth.SchemeName, options =>
-    {
-        options.LoginPath = "/demo/login";
-        options.Cookie.Name = "WayfinderUmbracoReferenceApp";
-    });
-builder.Services.AddAuthorization();
+// The demo cookie authentication scheme itself is registered as the app-wide default in
+// ReferenceAppComposer, not here — see that class's own remarks for why it must be a composer.
 
 builder.Services.AddWayfinderUmbraco(options =>
 {
@@ -36,22 +26,24 @@ builder.CreateUmbracoBuilder()
     .AddComposers()
     .Build();
 
-builder.Services.AddSingleton<Umbraco.Cms.Core.Events.INotificationAsyncHandler<
-    Umbraco.Cms.Core.Notifications.UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
+builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
+builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceBlueprintSeeder>();
 
 var app = builder.Build();
 
-// No explicit UseAuthentication()/UseAuthorization() here — Umbraco's own pipeline
-// (UseUmbraco().WithMiddleware(...) below) already wires both in at the right point, the same
-// way UmbracoPrism.Core's own PrismComposer never calls them directly either; only the DI
-// registrations above (AddAuthentication/AddCookie/AddAuthorization) are this app's job.
 ReferenceAppAuth.MapDemoLoginRoutes(app);
 
 await app.BootUmbracoAsync();
 
+// UseAuthentication()/UseAuthorization() must run inside WithMiddleware, not before it — Umbraco's
+// own UseUmbraco() sets up UseRouting() internally, and WithMiddleware is the documented extension
+// point for anything that needs to run between routing and endpoint dispatch, which is exactly
+// where these belong.
 app.UseUmbraco()
     .WithMiddleware(u =>
     {
+        u.AppBuilder.UseAuthentication();
+        u.AppBuilder.UseAuthorization();
         u.UseBackOffice();
         u.UseWebsite();
     })

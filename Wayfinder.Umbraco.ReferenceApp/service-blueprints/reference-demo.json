@@ -1,0 +1,100 @@
+{
+  "definitionKey": "reference-demo",
+  "displayName": "Reference demo request",
+  "version": 1,
+  "description": "Minimal two-actor blueprint seeded by this reference app to exercise both packaged Block Grid blocks: the citizen-facing stage and the caseworker-facing worklist.",
+  "initialStage": "apply",
+  "requestPolicy": "single",
+  "stages": [
+    {
+      "stageKey": "apply",
+      "displayName": "Tell us what you need",
+      "queueKey": "citizen",
+      "components": [
+        {
+          "type": "text",
+          "fieldKey": "message",
+          "label": "What do you need?",
+          "required": true
+        }
+      ],
+      "routes": [
+        {
+          "id": "apply--submit--to-review",
+          "target": "to-review",
+          "trigger": "submit",
+          "label": "Submit",
+          "style": "primary"
+        }
+      ]
+    },
+    {
+      "stageKey": "review",
+      "displayName": "Review request",
+      "queueKey": "caseworker",
+      "components": [
+        {
+          "type": "summary-list",
+          "title": "Request details",
+          "children": [
+            {
+              "type": "text",
+              "fieldKey": "message",
+              "label": "What do you need?",
+              "changeStateKey": "apply"
+            }
+          ]
+        }
+      ],
+      "routes": [
+        {
+          "id": "review--approve--post-review",
+          "target": "post-review",
+          "trigger": "approve",
+          "label": "Approve",
+          "style": "primary"
+        }
+      ]
+    },
+    {
+      "stageKey": "approved",
+      "displayName": "Request approved",
+      "stageType": "Confirmation",
+      "queueKey": "citizen",
+      "components": [
+        {
+          "type": "panel",
+          "heading": "Request approved"
+        },
+        {
+          "type": "body",
+          "content": "A caseworker has approved your request."
+        }
+      ]
+    }
+  ],
+  "queues": [
+    { "key": "citizen", "displayName": "Applicant", "actor": "citizen" },
+    { "key": "caseworker", "displayName": "Caseworker", "actor": "caseworker" }
+  ],
+  "gateways": [
+    {
+      "key": "to-review",
+      "displayName": "Hand off to caseworker",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-review--submit--review", "target": "review", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "post-review",
+      "displayName": "Request reviewed",
+      "gatewayType": "Join",
+      "queueKey": "caseworker",
+      "routes": [
+        { "id": "post-review--approve--approved", "target": "approved", "trigger": "approve" }
+      ]
+    }
+  ]
+}
