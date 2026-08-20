@@ -84,17 +84,22 @@
       "gatewayType": "Split",
       "queueKey": "citizen",
       "routes": [
-        { "id": "to-review--submit--review", "target": "review", "trigger": "submit" }
+        { "id": "to-review--submit--review", "target": "review", "trigger": "submit" },
+        { "id": "to-review--submit--post-review", "target": "post-review", "trigger": "submit" }
       ]
     },
     {
       "key": "post-review",
       "displayName": "Request reviewed",
       "gatewayType": "Join",
-      "queueKey": "caseworker",
+      "queueKey": "citizen",
       "routes": [
         { "id": "post-review--approve--approved", "target": "approved", "trigger": "approve" }
-      ]
+      ],
+      "waitingContent": "A caseworker is reviewing your request. We'll update this page once a decision is made.",
+      "waitingExpectedSeconds": 60,
+      "waitingPollIntervalMs": 5000,
+      "requiredIncomingQueues": ["citizen", "caseworker"]
     }
   ]
 }
