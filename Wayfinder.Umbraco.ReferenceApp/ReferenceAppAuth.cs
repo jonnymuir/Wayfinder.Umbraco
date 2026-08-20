@@ -63,27 +63,22 @@ public static class ReferenceAppAuth
             string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
 
             var options = string.Join("\n", AllUsers.Select(u => $"""
-                <li>
+                <div class="govuk-button-group">
                   <form method="post" action="/demo/login">
                     <input type="hidden" name="email" value="{Esc(u.Email)}" />
-                    <button type="submit">{Esc(u.DisplayName)} ({Esc(u.Role)})</button>
+                    <button type="submit" class="govuk-button" data-module="govuk-button">{Esc(u.DisplayName)} ({Esc(u.Role)})</button>
                   </form>
-                </li>
+                </div>
                 """));
 
-            var html = $"""
-                <!doctype html>
-                <html>
-                <head><title>Wayfinder.Umbraco reference app — demo login</title></head>
-                <body>
-                  <h1>Demo login</h1>
-                  <p>Pick a demo persona — no real password needed.</p>
-                  <ul>{options}</ul>
-                </body>
-                </html>
+            var body = $"""
+                <h1 class="govuk-heading-l">Demo login</h1>
+                <p class="govuk-body">Pick a demo persona — no real password needed.</p>
+                {options}
                 """;
 
-            return Results.Content(html, "text/html");
+            var html = ReferenceAppPageShell.Render("Demo login", body, ctx.User);
+            return Results.Content(html, "text/html; charset=utf-8");
         });
 
         app.MapPost("/demo/login", async (HttpContext ctx) =>

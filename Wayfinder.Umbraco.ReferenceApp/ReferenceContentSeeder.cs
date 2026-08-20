@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
@@ -34,6 +35,17 @@ public class ReferenceContentSeeder(
     // The two Block Grid data types Wayfinder.Umbraco's own migration plan ships on install.
     private static readonly Guid StageBlockGridDataTypeKey = new("7a3b2d4e-9c5f-4b2a-8d7e-3f8c6b0a2d41");
     private static readonly Guid WorklistBlockGridDataTypeKey = new("9c5d4f60-1e7b-4d4c-af90-5b0e8d2c4f63");
+
+    // Matches CreateServiceRequestStageBlock.cs/CreateServiceRequestWorklistBlock.cs's own fixed
+    // element type keys — see this class's own remarks on why the block value is seeded directly
+    // rather than left for an editor to place by hand.
+    private static readonly Guid StageElementTypeKey = new("6f2a1c3d-8b4e-4a1f-9c6d-2e7b5a9f1c30");
+    private static readonly Guid WorklistElementTypeKey = new("8b4c3e5f-0d6a-4c3b-9e8f-4a9d7c1b3e52");
+
+    private static readonly JsonSerializerOptions BlockValueWriteOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
     {
@@ -142,6 +154,17 @@ public class ReferenceContentSeeder(
         }
 
         var home = contentService.Create("Home", -1, homeType.Alias);
+
+        // Seed a real placed block into each area, not an empty Block Grid — otherwise there is
+        // nothing to log in and see: the demo blueprint (reference-demo.json,
+        // ReferenceBlueprintSeeder) exists, but a citizen/caseworker persona has no page rendering
+        // either block until an editor places one by hand in the backoffice. This is the same
+        // BlockGridValue JSON shape Umbraco's own Management API round-trips (confirmed live via
+        // GET after a PUT through the real backoffice) — canonical "values" array per content-data
+        // item, not the flatter shorthand the PUT endpoint happens to also accept leniently.
+        home.SetValue("citizenArea", BuildStageBlockGridValue());
+        home.SetValue("caseworkerArea", BuildWorklistBlockGridValue());
+
         contentService.Save(home);
 #pragma warning disable CS0618 // No non-obsolete overload of Publish takes a user key on IContentService in v17
         var result = contentService.Publish(home, ["*"], Constants.Security.SuperUserId);
@@ -154,5 +177,71 @@ public class ReferenceContentSeeder(
         }
 
         logger.LogInformation("REFERENCE CONTENT SEEDER: created and published Home content node.");
+    }
+
+    private static string BuildStageBlockGridValue()
+    {
+        var blockKey = Guid.NewGuid();
+        return BuildBlockGridValueJson(StageElementTypeKey, blockKey,
+        [
+            new BlockPropertyValue("blueprintKey", "Umbraco.TextBox", ReferenceBlueprintSeeder.DefinitionKey)
+        ]);
+    }
+
+    private static string BuildWorklistBlockGridValue()
+    {
+        var blockKey = Guid.NewGuid();
+        return BuildBlockGridValueJson(WorklistElementTypeKey, blockKey, []);
+    }
+
+    private sealed record BlockPropertyValue(string Alias, string EditorAlias, object Value);
+
+    /// <summary>
+    /// The persisted <c>Umbraco.BlockGrid</c> property value shape — one block, no areas, full
+    /// column span. Matches the exact JSON Umbraco's own Management API returns for a real
+    /// backoffice-placed block, not a guessed/simplified shape.
+    /// </summary>
+    private static string BuildBlockGridValueJson(Guid contentTypeKey, Guid blockKey, IReadOnlyList<BlockPropertyValue> values)
+    {
+        var blockValue = new
+        {
+            layout = new Dictionary<string, object>
+            {
+                ["Umbraco.BlockGrid"] = new[]
+                {
+                    new
+                    {
+                        contentKey = blockKey,
+                        settingsKey = (Guid?)null,
+                        columnSpan = 12,
+                        rowSpan = 1,
+                        areas = Array.Empty<object>()
+                    }
+                }
+            },
+            contentData = new[]
+            {
+                new
+                {
+                    contentTypeKey,
+                    key = blockKey,
+                    values = values.Select(v => new
+                    {
+                        editorAlias = v.EditorAlias,
+                        culture = (string?)null,
+                        segment = (string?)null,
+                        alias = v.Alias,
+                        value = v.Value
+                    })
+                }
+            },
+            settingsData = Array.Empty<object>(),
+            expose = new[]
+            {
+                new { contentKey = blockKey, culture = (string?)null, segment = (string?)null }
+            }
+        };
+
+        return JsonSerializer.Serialize(blockValue, BlockValueWriteOptions);
     }
 }
