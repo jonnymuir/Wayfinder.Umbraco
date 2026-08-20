@@ -57,7 +57,13 @@ public class ReferenceContentSeeder(
         logger.LogInformation("REFERENCE CONTENT SEEDER: starting");
 
         var homeType = await EnsureHomeDocumentTypeAsync();
-        await EnsureHomeContentAsync(homeType);
+
+        // Two separate pages, not one shared page with both areas — a real citizen only ever sees
+        // their own apply journey, a real caseworker only ever sees their own queue. Co-locating
+        // both on one page was purely a demo shortcut, and it showed: an "Access denied"/empty
+        // "Caseworker area" section on the citizen's own page, and vice versa.
+        EnsureContent(homeType, "Home", citizenArea: true, caseworkerArea: false);
+        EnsureContent(homeType, "Caseworker queue", citizenArea: false, caseworkerArea: true);
 
         logger.LogInformation("REFERENCE CONTENT SEEDER: complete");
     }
@@ -145,38 +151,46 @@ public class ReferenceContentSeeder(
         // there on a fresh clone; nothing further to do here.
     }
 
-    private async Task EnsureHomeContentAsync(IContentType homeType)
+    private void EnsureContent(IContentType homeType, string name, bool citizenArea, bool caseworkerArea)
     {
-        var existing = contentService.GetRootContent().FirstOrDefault(c => c.ContentType.Alias == HomeAlias);
+        var existing = contentService.GetRootContent().FirstOrDefault(c =>
+            c.ContentType.Alias == HomeAlias && string.Equals(c.Name, name, StringComparison.Ordinal));
         if (existing != null)
         {
             return;
         }
 
-        var home = contentService.Create("Home", -1, homeType.Alias);
+        var node = contentService.Create(name, -1, homeType.Alias);
 
-        // Seed a real placed block into each area, not an empty Block Grid — otherwise there is
-        // nothing to log in and see: the demo blueprint (reference-demo.json,
-        // ReferenceBlueprintSeeder) exists, but a citizen/caseworker persona has no page rendering
-        // either block until an editor places one by hand in the backoffice. This is the same
-        // BlockGridValue JSON shape Umbraco's own Management API round-trips (confirmed live via
-        // GET after a PUT through the real backoffice) — canonical "values" array per content-data
-        // item, not the flatter shorthand the PUT endpoint happens to also accept leniently.
-        home.SetValue("citizenArea", BuildStageBlockGridValue());
-        home.SetValue("caseworkerArea", BuildWorklistBlockGridValue());
+        // Seed a real placed block, not an empty Block Grid — otherwise there is nothing to log in
+        // and see: the demo blueprint (reference-demo.json, ReferenceBlueprintSeeder) exists, but a
+        // citizen/caseworker persona has no page rendering either block until an editor places one
+        // by hand in the backoffice. This is the same BlockGridValue JSON shape Umbraco's own
+        // Management API round-trips (confirmed live via GET after a PUT through the real
+        // backoffice) — canonical "values" array per content-data item, not the flatter shorthand
+        // the PUT endpoint happens to also accept leniently.
+        if (citizenArea)
+        {
+            node.SetValue("citizenArea", BuildStageBlockGridValue());
+        }
 
-        contentService.Save(home);
+        if (caseworkerArea)
+        {
+            node.SetValue("caseworkerArea", BuildWorklistBlockGridValue());
+        }
+
+        contentService.Save(node);
 #pragma warning disable CS0618 // No non-obsolete overload of Publish takes a user key on IContentService in v17
-        var result = contentService.Publish(home, ["*"], Constants.Security.SuperUserId);
+        var result = contentService.Publish(node, ["*"], Constants.Security.SuperUserId);
 #pragma warning restore CS0618
 
         if (!result.Success)
         {
-            logger.LogError("REFERENCE CONTENT SEEDER: failed to publish Home content node: {Result}", result.Result);
+            logger.LogError("REFERENCE CONTENT SEEDER: failed to publish {Name} content node: {Result}", name, result.Result);
             return;
         }
 
-        logger.LogInformation("REFERENCE CONTENT SEEDER: created and published Home content node.");
+        logger.LogInformation("REFERENCE CONTENT SEEDER: created and published {Name} content node.", name);
     }
 
     private static string BuildStageBlockGridValue()

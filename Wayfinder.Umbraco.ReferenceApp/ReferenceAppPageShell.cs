@@ -59,6 +59,8 @@ public static class ReferenceAppPageShell
                     <div class="govuk-service-navigation__container">
                       <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
                         <ul class="govuk-service-navigation__list">
+                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/">Apply</a></li>
+                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/caseworker-queue">Caseworker queue</a></li>
                           {nav}
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/umbraco">Backoffice</a></li>
                         </ul>

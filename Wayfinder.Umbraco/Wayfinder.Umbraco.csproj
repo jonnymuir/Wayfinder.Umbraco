@@ -68,7 +68,7 @@
     <PackageReference Include="Wayfinder" Version="0.7.0" />
     <PackageReference Include="Wayfinder.Editor" Version="0.2.1" />
     <PackageReference Include="Wayfinder.Engine" Version="0.7.0" />
-    <PackageReference Include="Wayfinder.Rendering.GovUk" Version="0.3.1" />
+    <PackageReference Include="Wayfinder.Rendering.GovUk" Version="0.3.2" />
   </ItemGroup>
 
   <ItemGroup>

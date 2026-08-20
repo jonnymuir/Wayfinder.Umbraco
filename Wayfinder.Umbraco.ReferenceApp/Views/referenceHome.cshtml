@@ -9,32 +9,30 @@
     Layout = null;
     var citizenGrid = Model.Value<BlockGridModel>("citizenArea");
     var caseworkerGrid = Model.Value<BlockGridModel>("caseworkerArea");
+    var hasCitizenBlock = citizenGrid is not null && citizenGrid.Any();
+    var hasCaseworkerBlock = caseworkerGrid is not null && caseworkerGrid.Any();
 
-    string citizenHtml;
-    if (citizenGrid is not null && citizenGrid.Any())
+    // Each seeded page carries exactly one of these two areas — a real citizen-facing page has no
+    // business showing a "Caseworker area" heading (empty or not), and vice versa. Only a genuinely
+    // blank page (an editor hasn't placed either block yet) falls through to the hint below.
+    var sections = "";
+    if (hasCitizenBlock)
     {
         using var citizenWriter = new StringWriter();
-        (await Html.GetBlockGridHtmlAsync(citizenGrid)).WriteTo(citizenWriter, HtmlEncoder.Default);
-        citizenHtml = citizenWriter.ToString();
-    }
-    else
-    {
-        citizenHtml = "<p class=\"govuk-body\"><em>No citizen-facing block placed yet — add a &quot;Wayfinder Service Request Stage&quot; block in the backoffice.</em></p>";
+        (await Html.GetBlockGridHtmlAsync(citizenGrid!)).WriteTo(citizenWriter, HtmlEncoder.Default);
+        sections += "<h1 class=\"govuk-heading-l\">Apply</h1>" + citizenWriter;
     }
 
-    string caseworkerHtml;
-    if (caseworkerGrid is not null && caseworkerGrid.Any())
+    if (hasCaseworkerBlock)
     {
         using var caseworkerWriter = new StringWriter();
-        (await Html.GetBlockGridHtmlAsync(caseworkerGrid)).WriteTo(caseworkerWriter, HtmlEncoder.Default);
-        caseworkerHtml = caseworkerWriter.ToString();
-    }
-    else
-    {
-        caseworkerHtml = "<p class=\"govuk-body\"><em>No caseworker-facing block placed yet — add a &quot;Wayfinder Service Request Worklist&quot; block in the backoffice.</em></p>";
+        (await Html.GetBlockGridHtmlAsync(caseworkerGrid!)).WriteTo(caseworkerWriter, HtmlEncoder.Default);
+        sections += "<h1 class=\"govuk-heading-l\">Caseworker queue</h1>" + caseworkerWriter;
     }
 
-    var body = "<h2 class=\"govuk-heading-l\">Citizen area</h2>" + citizenHtml
-        + "<h2 class=\"govuk-heading-l\">Caseworker area</h2>" + caseworkerHtml;
+    if (!hasCitizenBlock && !hasCaseworkerBlock)
+    {
+        sections = "<p class=\"govuk-body\"><em>No block placed yet — add a &quot;Wayfinder Service Request Stage&quot; or &quot;Wayfinder Service Request Worklist&quot; block in the backoffice.</em></p>";
+    }
 }
-@Html.Raw(ReferenceAppPageShell.Render("Home", body, Context.User))
+@Html.Raw(ReferenceAppPageShell.Render(Model.Name ?? "Wayfinder.Umbraco reference app", sections, Context.User))
