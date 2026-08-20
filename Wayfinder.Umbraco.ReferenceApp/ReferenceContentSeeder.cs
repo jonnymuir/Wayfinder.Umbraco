@@ -58,11 +58,15 @@ public class ReferenceContentSeeder(
 
         var homeType = await EnsureHomeDocumentTypeAsync();
 
-        // Two separate pages, not one shared page with both areas — a real citizen only ever sees
-        // their own apply journey, a real caseworker only ever sees their own queue. Co-locating
-        // both on one page was purely a demo shortcut, and it showed: an "Access denied"/empty
-        // "Caseworker area" section on the citizen's own page, and vice versa.
-        EnsureContent(homeType, "Home", citizenArea: true, caseworkerArea: false);
+        // Three separate pages — a real citizen only ever sees their own apply journey, a real
+        // caseworker only ever sees their own queue, and "Home" is a genuine landing page (neither
+        // area populated — referenceHome.cshtml renders welcome copy instead of a block for that
+        // case), not the citizen page wearing two hats. Co-locating everything on one page was
+        // purely a demo shortcut, and it showed: an "Access denied"/empty "Caseworker area" section
+        // on the citizen's own page, and "Return to home" from the apply journey looping back to
+        // the apply form itself rather than an actual home.
+        EnsureContent(homeType, "Home", citizenArea: false, caseworkerArea: false);
+        EnsureContent(homeType, "Apply", citizenArea: true, caseworkerArea: false);
         EnsureContent(homeType, "Caseworker queue", citizenArea: false, caseworkerArea: true);
 
         logger.LogInformation("REFERENCE CONTENT SEEDER: complete");

@@ -18,8 +18,12 @@ or via the Aspire orchestrator (`Wayfinder.Umbraco.AppHost`), or the `.vscode/la
 configs at the repo root ("C#: Aspire (Wayfinder.Umbraco.ReferenceApp)" / standalone).
 
 On first boot it unattended-installs into its own local SQLite file (`umbraco/Data/`, gitignored)
-and seeds two pages plus a demo blueprint — see [`ReferenceContentSeeder.cs`](ReferenceContentSeeder.cs)/
-[`ReferenceBlueprintSeeder.cs`](ReferenceBlueprintSeeder.cs).
+and seeds three pages plus a demo blueprint — see [`ReferenceContentSeeder.cs`](ReferenceContentSeeder.cs)/
+[`ReferenceBlueprintSeeder.cs`](ReferenceBlueprintSeeder.cs):
+
+- `/` — Home, a plain landing page explaining what this app is and linking everywhere else.
+- `/apply` — the citizen-facing stage block.
+- `/caseworker-queue` — the caseworker-facing worklist block.
 
 ## Logins
 
@@ -32,7 +36,7 @@ and seeds two pages plus a demo blueprint — see [`ReferenceContentSeeder.cs`](
 **Front-end demo personas** (`/demo/login`) — no password, just pick a persona. Two lanes, see
 [`ReferenceAppAuth.cs`](ReferenceAppAuth.cs):
 
-- **Alex Applicant** (citizen) — `/` ("Apply"), the citizen-facing stage block.
+- **Alex Applicant** (citizen) — `/apply`, the citizen-facing stage block.
 - **Casey Caseworker** / **Jordan Caseworker** (caseworker) — `/caseworker-queue`, the
   caseworker-facing worklist block. A citizen visiting this page is refused (page-level role
   check in `Views/referenceHome.cshtml`) rather than shown a filtered-but-real worklist —

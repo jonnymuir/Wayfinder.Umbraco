@@ -23,6 +23,48 @@ public static class ReferenceAppPageShell
     private static readonly string AssetVersion =
         typeof(GovUkComponents).Assembly.GetName().Version?.ToString() ?? "0";
 
+    /// <summary>
+    /// The "Home" page's own welcome copy — a plain C# constant, not inline in
+    /// <c>Views/referenceHome.cshtml</c>, because a large multi-line raw string literal
+    /// (<c>"""..."""</c>) inside a Razor <c>@{ }</c> code block trips up
+    /// <c>CollectibleRuntimeViewCompiler</c>'s own compile step (confirmed live: every page threw
+    /// <c>UmbracoCompilationException</c> with no useful diagnostic logged, even for requests that
+    /// never executed the branch containing it — Razor compiles the whole file as one class
+    /// regardless of which branch runs). Plain .cs files don't have this problem.
+    /// </summary>
+    public const string HomePageBody = """
+        <h1 class="govuk-heading-l">Wayfinder.Umbraco reference app</h1>
+        <p class="govuk-body">
+          This is a real, bootable Umbraco 17 site proving <a class="govuk-link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">Wayfinder.Umbraco</a>
+          end to end — the citizen-facing stage block and the caseworker-facing worklist block,
+          composed onto ordinary Umbraco pages via Block Grid, backed by a real in-process
+          workflow engine (pickup/putback, access control, a join gateway with a live wait
+          screen). Nothing here is mocked.
+        </p>
+
+        <div class="govuk-button-group">
+          <a class="govuk-button" data-module="govuk-button" href="/apply">Apply for something</a>
+          <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/caseworker-queue">View the caseworker queue</a>
+        </div>
+
+        <h2 class="govuk-heading-m">Try it as different people</h2>
+        <p class="govuk-body">
+          <a class="govuk-link" href="/demo/login">Pick a demo persona</a> — a citizen
+          (Alex Applicant) or a caseworker (Casey or Jordan Caseworker). No password needed.
+        </p>
+
+        <h2 class="govuk-heading-m">See how it's put together</h2>
+        <p class="govuk-body">
+          Everything on this site — the pages, the two Block Grid blocks, the demo service
+          blueprint — is real Umbraco content and configuration, viewable and editable in the
+          backoffice.
+        </p>
+        <p class="govuk-body">
+          <a class="govuk-link" href="/umbraco">Sign in to the backoffice</a> with
+          <code>admin@example.test</code> / <code>Wayfinder123!</code>.
+        </p>
+        """;
+
     public static string Render(string title, string bodyHtml, ClaimsPrincipal? user)
     {
         string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
@@ -70,7 +112,8 @@ public static class ReferenceAppPageShell
                     <div class="govuk-service-navigation__container">
                       <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
                         <ul class="govuk-service-navigation__list">
-                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/">Apply</a></li>
+                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/">Home</a></li>
+                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/apply">Apply</a></li>
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/caseworker-queue">Caseworker queue</a></li>
                           {nav}
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/umbraco">Backoffice</a></li>

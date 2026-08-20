@@ -48,7 +48,10 @@
 
     if (!hasCitizenBlock && !hasCaseworkerBlock)
     {
-        sections = "<p class=\"govuk-body\"><em>No block placed yet — add a &quot;Wayfinder Service Request Stage&quot; or &quot;Wayfinder Service Request Worklist&quot; block in the backoffice.</em></p>";
+        // The only page this reference app seeds with neither area populated is "Home" itself —
+        // a genuine landing page, not a block placeholder. See ReferenceContentSeeder.cs. The copy
+        // itself lives in ReferenceAppPageShell.HomePageBody — see that constant's own remarks.
+        sections = ReferenceAppPageShell.HomePageBody;
     }
 }
 @Html.Raw(ReferenceAppPageShell.Render(Model.Name ?? "Wayfinder.Umbraco reference app", sections, Context.User))

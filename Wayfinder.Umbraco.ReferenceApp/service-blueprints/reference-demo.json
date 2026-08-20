@@ -53,6 +53,13 @@
           "trigger": "approve",
           "label": "Approve",
           "style": "primary"
+        },
+        {
+          "id": "review--reject--post-review",
+          "target": "post-review",
+          "trigger": "reject",
+          "label": "Reject",
+          "style": "destructive"
         }
       ]
     },
@@ -69,6 +76,22 @@
         {
           "type": "body",
           "content": "A caseworker has approved your request."
+        }
+      ]
+    },
+    {
+      "stageKey": "rejected",
+      "displayName": "Request not approved",
+      "stageType": "Confirmation",
+      "queueKey": "citizen",
+      "components": [
+        {
+          "type": "panel",
+          "heading": "Request not approved"
+        },
+        {
+          "type": "body",
+          "content": "A caseworker has not approved your request this time."
         }
       ]
     }
@@ -94,7 +117,8 @@
       "gatewayType": "Join",
       "queueKey": "citizen",
       "routes": [
-        { "id": "post-review--approve--approved", "target": "approved", "trigger": "approve" }
+        { "id": "post-review--approve--approved", "target": "approved", "trigger": "approve" },
+        { "id": "post-review--reject--rejected", "target": "rejected", "trigger": "reject" }
       ],
       "waitingContent": "A caseworker is reviewing your request. We'll update this page once a decision is made.",
       "waitingExpectedSeconds": 60,
