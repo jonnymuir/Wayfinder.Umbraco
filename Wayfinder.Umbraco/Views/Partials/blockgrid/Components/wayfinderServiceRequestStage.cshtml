@@ -1,0 +1,46 @@
+@using System.Text.Json
+@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Extensions
+@using Wayfinder.Umbraco.Models
+@using Wayfinder.Umbraco.Services
+@using Wayfinder.Models.ServiceDesign
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Umbraco.Cms.Core.Models.Blocks.BlockGridItem>
+@inject ServiceRequestStageService StageService
+@inject IPublishedValueFallback PublishedValueFallback
+@{
+    var blueprintKey = Model.Content.Value<string>(PublishedValueFallback, "blueprintKey") ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(blueprintKey))
+    {
+        <div class="stage-alert stage-alert--error">
+            <p>No blueprint key configured on this Wayfinder Service Request Stage block.</p>
+        </div>
+        return;
+    }
+
+    IReadOnlyList<ServiceRequestProblem>? problems = null;
+    IReadOnlyDictionary<string, string>? formValues = null;
+    if (TempData.TryGetValue("ServiceRequestProblems", out var rawProblems) && rawProblems is string problemsJson)
+    {
+        try { problems = JsonSerializer.Deserialize<List<ServiceRequestProblem>>(problemsJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+    if (TempData.TryGetValue("ServiceRequestFormValues", out var rawFormValues) && rawFormValues is string formValuesJson)
+    {
+        try { formValues = JsonSerializer.Deserialize<Dictionary<string, string>>(formValuesJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+
+    var instanceId = Context.Request.Query["instanceId"].ToString();
+    var action = Context.Request.Query["action"].ToString();
+
+    var result = await StageService.RenderCurrentAsync(
+        Context, blueprintKey,
+        string.IsNullOrEmpty(instanceId) ? null : instanceId,
+        string.IsNullOrEmpty(action) ? null : action,
+        problems, formValues);
+
+    var returnUrl = Context.Request.PathBase + Context.Request.Path;
+    var vm = ServiceRequestPageViewModel.FromRenderResult(result, returnUrl);
+}
+@await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)

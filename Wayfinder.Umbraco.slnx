@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
   <Project Path="Wayfinder.Umbraco.Tests/Wayfinder.Umbraco.Tests.csproj" />
+  <Project Path="Wayfinder.Umbraco.ReferenceApp/Wayfinder.Umbraco.ReferenceApp.csproj" />
+  <Project Path="Wayfinder.Umbraco.AppHost/Wayfinder.Umbraco.AppHost.csproj" />
 </Solution>

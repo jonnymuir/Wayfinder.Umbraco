@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Wayfinder.Umbraco.Controllers;
 
 namespace Wayfinder.Umbraco.TagHelpers;
 
@@ -34,7 +35,10 @@ public class StageFormTagHelper(IAntiforgery antiforgery) : TagHelper
 
         output.Attributes.SetAttribute("class", "wayfinder-stage");
         output.Attributes.SetAttribute("method", "post");
-        output.Attributes.SetAttribute("action", ReturnUrl);
+        // Posts to WayfinderStageSurfaceController, not ReturnUrl (the page this block is
+        // rendered on) — an ordinary Umbraco page only ever handles GET; ReturnUrl still rides
+        // as a hidden field below so the surface controller knows where to redirect back to.
+        output.Attributes.SetAttribute("action", WayfinderStageSurfaceController.RoutePath);
         output.Attributes.SetAttribute("novalidate", "novalidate");
         // Always multipart, not just when the current stage happens to render a file-upload
         // field: without this, a stage containing <input type="file"> silently submits it empty

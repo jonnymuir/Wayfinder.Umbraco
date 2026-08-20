@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dotnet: build AppHost",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/Wayfinder.Umbraco.AppHost/Wayfinder.Umbraco.AppHost.csproj"],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: build ReferenceApp",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/Wayfinder.Umbraco.ReferenceApp/Wayfinder.Umbraco.ReferenceApp.csproj"],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

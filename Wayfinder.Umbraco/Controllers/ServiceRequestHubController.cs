@@ -1,53 +1,33 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewEngines;
-using Microsoft.Extensions.DependencyInjection;
-using Umbraco.Extensions;
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Models.PublishedContent;
-using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.Common.Controllers;
-using Wayfinder.Umbraco.Models;
-using Wayfinder.Umbraco.Services;
+using Umbraco.Extensions;
+using Wayfinder.Engine.Abstractions;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Umbraco.Configuration;
+using Wayfinder.Umbraco.Models;
 
 namespace Wayfinder.Umbraco.Controllers;
 
 /// <summary>
-/// Umbraco route-hijacking controller for the <c>serviceRequestHub</c> document type — a single "My
-/// Workflows" surface across both workflow implementations a host may have running: the
-/// business-app one (<see cref="IBusinessAppProcessManagerClient"/>'s default, unkeyed registration,
-/// talking to a remote business app) and an optional keyed registration under
-/// <see cref="WayfinderUmbracoServiceKeys.InProcessQueueClient"/> (e.g. a host's own in-Umbraco
-/// in-process queue). Displays all workflow instances for the authenticated member from
-/// both, merged into one list — a member shouldn't need to know or care which implementation
-/// authored a given journey. The keyed client is genuinely optional: a host that hasn't
-/// registered one under that key at all just sees the unkeyed client's instances.
+/// Umbraco route-hijacking controller for the <c>serviceRequestHub</c> document type — "My
+/// Service Requests" for the authenticated actor, listing every instance
+/// <see cref="IProcessManager.GetInstances"/> returns for them. The engine is authoritative and
+/// in-process (<see cref="UmbracoProcessManagerEngine"/>) — there is no longer a second, remote
+/// "Business App" source to merge in.
 /// </summary>
-public class ServiceRequestHubController : RenderController
+public class ServiceRequestHubController(
+    ILogger<ServiceRequestHubController> logger,
+    ICompositeViewEngine compositeViewEngine,
+    IUmbracoContextAccessor umbracoContextAccessor,
+    IProcessManager processManager,
+    IOptions<WayfinderServiceDesignOptions> optionsAccessor,
+    IPublishedValueFallback publishedValueFallback)
+    : RenderController(logger, compositeViewEngine, umbracoContextAccessor)
 {
-    private readonly IBusinessAppProcessManagerClient _processManagerClient;
-    private readonly IBusinessAppProcessManagerClient? _cmsProcessManagerClient;
-    private readonly IPublishedValueFallback _publishedValueFallback;
-    private readonly IPublishedContentQuery _publishedContentQuery;
-    private readonly ILogger<ServiceRequestHubController> _logger;
-
-    public ServiceRequestHubController(
-        ILogger<ServiceRequestHubController> logger,
-        ICompositeViewEngine compositeViewEngine,
-        IUmbracoContextAccessor umbracoContextAccessor,
-        IBusinessAppProcessManagerClient workflowClient,
-        IServiceProvider serviceProvider,
-        IPublishedValueFallback publishedValueFallback,
-        IPublishedContentQuery publishedContentQuery)
-        : base(logger, compositeViewEngine, umbracoContextAccessor)
-    {
-        _logger = logger;
-        _processManagerClient = workflowClient;
-        _cmsProcessManagerClient = serviceProvider.GetKeyedService<IBusinessAppProcessManagerClient>(WayfinderUmbracoServiceKeys.InProcessQueueClient);
-        _publishedValueFallback = publishedValueFallback;
-        _publishedContentQuery = publishedContentQuery;
-    }
-
     public override IActionResult Index()
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -55,39 +35,30 @@ public class ServiceRequestHubController : RenderController
             return Redirect(BuildLoginRedirectUrl());
         }
 
-        return IndexAsync().GetAwaiter().GetResult();
+        return IndexInternal();
     }
 
-    private async Task<IActionResult> IndexAsync()
+    private IActionResult IndexInternal()
     {
-        var businessAppEnvelope = await _processManagerClient.GetInstancesAsync();
-        var cmsInstances = _cmsProcessManagerClient is null
-            ? []
-            : (await _cmsProcessManagerClient.GetInstancesAsync()).Instances;
-        var allInstances = businessAppEnvelope.Instances
-            .Concat(cmsInstances)
+        var options = optionsAccessor.Value;
+        var tenantId = options.ResolveTenantId!(HttpContext);
+        var userId = options.ResolveUserId(HttpContext);
+
+        var allInstances = processManager.GetInstances(tenantId, userId).Instances
             .OrderByDescending(i => i.LastUpdatedAt)
             .ToList();
 
         var activeInstances = allInstances
             .Where(i => !i.IsCompleted)
-            .Select(i => new ServiceRequestViewModel
-            {
-                Summary = i,
-                ResumeUrl = ResolveStagePageUrl(i)
-            })
+            .Select(i => new ServiceRequestViewModel { Summary = i, ResumeUrl = ResolveStagePageUrl(i) })
             .ToList();
 
         var completedInstances = allInstances
             .Where(i => i.IsCompleted)
-            .Select(i => new ServiceRequestViewModel
-            {
-                Summary = i,
-                ResumeUrl = ResolveStagePageUrl(i)
-            })
+            .Select(i => new ServiceRequestViewModel { Summary = i, ResumeUrl = ResolveStagePageUrl(i) })
             .ToList();
 
-        var vm = new ServiceRequestHubViewModel(CurrentPage!, _publishedValueFallback)
+        var vm = new ServiceRequestHubViewModel(CurrentPage!, publishedValueFallback)
         {
             ActiveInstances = activeInstances,
             CompletedInstances = completedInstances
@@ -96,11 +67,17 @@ public class ServiceRequestHubController : RenderController
         return CurrentTemplate(vm);
     }
 
+    /// <summary>
+    /// A Block Grid-composed page has no fixed content-type identity to search for the way the
+    /// old single-purpose <c>stagePage</c> document type did — resolution here is deliberately
+    /// just <see cref="ServiceRequestSummary.ServiceRequestPageUrl"/> (the engine's own record of
+    /// where a blueprint's stage lives, when it has one) with a hub-page fallback, not a
+    /// content-tree search.
+    /// </summary>
     private string ResolveStagePageUrl(ServiceRequestSummary summary)
     {
         if (!string.IsNullOrWhiteSpace(summary.ServiceRequestPageUrl) && Url.IsLocalUrl(summary.ServiceRequestPageUrl))
         {
-            // Append instanceId for non-completed instances
             if (!summary.IsCompleted && !string.IsNullOrWhiteSpace(summary.InstanceId))
             {
                 var separator = summary.ServiceRequestPageUrl.Contains('?') ? "&" : "?";
@@ -108,37 +85,6 @@ public class ServiceRequestHubController : RenderController
             }
             return summary.ServiceRequestPageUrl;
         }
-
-        if (string.IsNullOrWhiteSpace(summary.BlueprintKey))
-            return CurrentPage?.Url() ?? "/";
-
-        // "stagePage" and "publicServiceRequestPage" are host content-type aliases, not a
-        // convention this package defines — a genuine smell (this fallback only works for a
-        // host using exactly these alias names), but rather than guess a config surface for it
-        // under time pressure, it's called out here plainly instead: a host with different
-        // alias names, or a summary that already carries ServiceRequestPageUrl (the primary
-        // path above), isn't affected either way.
-        var stagePage = _publishedContentQuery
-            .ContentAtRoot()
-            .SelectMany(root => root.DescendantsOrSelf())
-            .FirstOrDefault(content =>
-                (content.ContentType.Alias == "stagePage" || content.ContentType.Alias == "publicServiceRequestPage")
-                && string.Equals(content.Value<string>("blueprintKey"), summary.BlueprintKey, StringComparison.OrdinalIgnoreCase));
-
-        if (stagePage != null)
-        {
-            var baseUrl = stagePage.Url();
-            // Append instanceId for non-completed instances
-            if (!summary.IsCompleted && !string.IsNullOrWhiteSpace(summary.InstanceId))
-            {
-                return $"{baseUrl}?instanceId={Uri.EscapeDataString(summary.InstanceId)}";
-            }
-            return baseUrl;
-        }
-
-        _logger.LogWarning(
-            "Workflow hub could not resolve a content-driven URL for workflow key {BlueprintKey}; defaulting to the hub page",
-            summary.BlueprintKey);
 
         return CurrentPage?.Url() ?? "/";
     }

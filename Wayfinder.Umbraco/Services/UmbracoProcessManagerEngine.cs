@@ -9,16 +9,17 @@ using Wayfinder.Engine.Services;
 namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
-/// This package's own in-Umbraco, in-process <see cref="IProcessManager"/> — a distinctly
-/// named singleton so it's discoverable in DI registration/debugging, kept separate from any
-/// business-app-hosted engine a host might also run (a host registers an
-/// <c>IBusinessAppProcessManagerClient</c> facade over this one under
-/// <see cref="WayfinderUmbracoServiceKeys.InProcessQueueClient"/> if it wants it to also show
-/// on <see cref="Controllers.ServiceRequestHubController"/>). No
-/// override logic lives here: <c>serviceInputsResolver</c> (the toolkit's existing extension
-/// point for <c>source: "service"</c> calculation fields — see <see cref="ProcessManagerEngine.ResolveServiceInputs"/>)
+/// This package's own in-Umbraco, in-process <see cref="IProcessManager"/> — the sole,
+/// authoritative engine for every Wayfinder.Umbraco-hosted service request; a distinctly named
+/// singleton so it's discoverable in DI registration/debugging. No override logic lives here:
+/// <c>serviceInputsResolver</c> (the toolkit's existing extension point for
+/// <c>source: "service"</c> calculation fields — see <see cref="ProcessManagerEngine.ResolveServiceInputs"/>)
 /// is supplied as a plain delegate at registration time, so a demo host (e.g. TestSite's
-/// juggling-society membership lookup) needs no subclass of its own.
+/// juggling-society membership lookup) needs no subclass of its own. Likewise
+/// <paramref name="supportSystemClients"/> forwards straight to the base engine — a host wanting
+/// a real downstream support-system integration (see docs/guides/support-systems.md in the core
+/// Wayfinder repo) registers its own <c>ISupportSystemClient</c> implementations and they're
+/// picked up automatically.
 /// </summary>
 public sealed class UmbracoProcessManagerEngine(
     ILogger<UmbracoProcessManagerEngine> logger,
@@ -26,8 +27,9 @@ public sealed class UmbracoProcessManagerEngine(
     IServiceContentSanitizer sanitizer,
     IServiceRequestStore instanceStore,
     IHttpContextAccessor httpContextAccessor,
-    Func<ServiceRequest, ServiceBlueprint, StageDefinition, IReadOnlyDictionary<string, object?>?>? serviceInputsResolver = null)
-    : ProcessManagerEngine(logger, definitionStore, sanitizer, serviceInputsResolver, instanceStore)
+    Func<ServiceRequest, ServiceBlueprint, StageDefinition, IReadOnlyDictionary<string, object?>?>? serviceInputsResolver = null,
+    IEnumerable<ISupportSystemClient>? supportSystemClients = null)
+    : ProcessManagerEngine(logger, definitionStore, sanitizer, serviceInputsResolver, instanceStore, supportSystemClients)
 {
     /// <summary>
     /// A new instance is authenticated when the request creating it belongs to a signed-in

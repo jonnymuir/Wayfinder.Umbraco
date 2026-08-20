@@ -495,6 +495,13 @@ umbraco-package-schema.json
 # Media files
 /wwwroot/media/
 
+# Wayfinder.Umbraco.ReferenceApp's own runtime Umbraco site data — regenerated on every boot via
+# its unattended install + ReferenceContentSeeder, never committed.
+Wayfinder.Umbraco.ReferenceApp/umbraco/Data/
+Wayfinder.Umbraco.ReferenceApp/umbraco/Logs/
+Wayfinder.Umbraco.ReferenceApp/wwwroot/media/
+Wayfinder.Umbraco.ReferenceApp/appsettings.Local.json
+
 # Data Protection key rings + other runtime app data (never committed; regenerated per machine)
 src/UmbracoPrism.TestSite/App_Data/
 src/UmbracoPrism.MockBusinessApp/App_Data/

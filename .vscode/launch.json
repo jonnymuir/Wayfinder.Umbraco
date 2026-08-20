@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C#: Aspire (Wayfinder.Umbraco.ReferenceApp)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build AppHost",
+      "program": "${workspaceFolder}/Wayfinder.Umbraco.AppHost/bin/Debug/net10.0/Wayfinder.Umbraco.AppHost.dll",
+      "cwd": "${workspaceFolder}/Wayfinder.Umbraco.AppHost",
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:17415;http://localhost:15415",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21415",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22415",
+        // Local dev only: skips the dashboard's browser-token login prompt so VS Code's
+        // serverReadyAction can open it straight to the URL below. Never set this outside a
+        // local debug session — it disables the dashboard's own auth entirely.
+        "DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS": "true"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Distributed application started\\.",
+        "uriFormat": "https://localhost:17415"
+      }
+    },
+    {
+      "name": "C#: Wayfinder.Umbraco.ReferenceApp (standalone)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build ReferenceApp",
+      "program": "${workspaceFolder}/Wayfinder.Umbraco.ReferenceApp/bin/Debug/net10.0/Wayfinder.Umbraco.ReferenceApp.dll",
+      "cwd": "${workspaceFolder}/Wayfinder.Umbraco.ReferenceApp",
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Now listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s"
+      }
+    }
+  ]
+}
