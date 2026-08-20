@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Wayfinder.Umbraco.Services;
+using Microsoft.Extensions.Options;
+using Wayfinder.Engine.Abstractions;
+using Wayfinder.Umbraco.Configuration;
 
 namespace Wayfinder.Umbraco.Controllers;
 
@@ -12,18 +14,8 @@ namespace Wayfinder.Umbraco.Controllers;
 [ApiController]
 [Route("api/wayfinder/workflow")]
 [Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling)]
-public class ServiceRequestPollController : ControllerBase
+public class ServiceRequestPollController(IProcessManager processManager, IOptions<WayfinderServiceDesignOptions> optionsAccessor) : ControllerBase
 {
-    private readonly IBusinessAppProcessManagerClient _processManagerClient;
-
-    /// <summary>
-    /// Initialises a new instance of <see cref="ServiceRequestPollController"/>.
-    /// </summary>
-    public ServiceRequestPollController(IBusinessAppProcessManagerClient workflowClient)
-    {
-        _processManagerClient = workflowClient;
-    }
-
     /// <summary>
     /// Polls for workflow state changes without a full page render.
     /// Returns whether the state version has changed since the client last checked.
@@ -35,7 +27,7 @@ public class ServiceRequestPollController : ControllerBase
     /// A JSON object with <c>changed</c> (bool), <c>newStateVersion</c> (int), and <c>stepType</c> (string).
     /// </returns>
     [HttpGet("poll")]
-    public async Task<IActionResult> Poll(
+    public IActionResult Poll(
         [FromQuery] string blueprintKey,
         [FromQuery] string instanceId,
         [FromQuery] int knownStateVersion)
@@ -43,7 +35,12 @@ public class ServiceRequestPollController : ControllerBase
         if (string.IsNullOrWhiteSpace(blueprintKey) || string.IsNullOrWhiteSpace(instanceId))
             return BadRequest(new { error = "blueprintKey and instanceId are required" });
 
-        var envelope = await _processManagerClient.GetCurrentAsync(blueprintKey, instanceId, action: null);
+        var options = optionsAccessor.Value;
+        var tenantId = options.ResolveTenantId!(HttpContext);
+        var userId = options.ResolveUserId(HttpContext);
+        var accessProfile = options.ResolveAccessProfile!(HttpContext);
+
+        var envelope = processManager.GetCurrent(blueprintKey, tenantId, userId, accessProfile, instanceId);
 
         if (envelope.ResponseState == "error")
             return NotFound(new { error = "Instance not found or workflow unavailable" });

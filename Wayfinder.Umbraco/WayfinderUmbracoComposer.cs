@@ -9,7 +9,7 @@ namespace Wayfinder.Umbraco;
 
 /// <summary>
 /// Always-on composition for the Wayfinder.Umbraco package: the migration that creates its own
-/// tables, the engine/store/generic stage-rendering infrastructure (see
+/// tables and Block Grid stage element, the engine/store/stage-rendering infrastructure (see
 /// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/>), and
 /// the backoffice authoring API's Swagger group — all so that a bare package reference gives a
 /// working "Blueprints" entry under Umbraco's own Settings section with no host
@@ -19,11 +19,18 @@ namespace Wayfinder.Umbraco;
 /// Administrators, so there's no new section for a host to remember to enable.
 /// </summary>
 /// <remarks>
-/// <see cref="Extensions.WayfinderUmbracoServiceCollectionExtensions.AddWayfinderUmbraco"/> is
-/// also called explicitly by Prism's own composition (<c>AddPrismCmsServiceBlueprint</c>) — every
-/// registration inside it is now genuinely safe to run twice (TryAdd* throughout, plus an
-/// explicit guard on the one AddHostedService call that wasn't TryAdd-safe), so calling it here
-/// unconditionally doesn't double-run anything for a Prism host that also calls it itself.
+/// Calls <c>AddWayfinderUmbraco</c> with a no-op <c>configure</c> — this composer runs
+/// automatically with no host-specific input, so it can register everything host-agnostic (the
+/// engine, stores, rendering) but genuinely cannot supply
+/// <see cref="Configuration.WayfinderServiceDesignOptions.ResolveTenantId"/>/
+/// <see cref="Configuration.WayfinderServiceDesignOptions.ResolveAccessProfile"/> itself — only a
+/// host knows its own identity model. A host's own explicit call (e.g. Prism's
+/// <c>AddPrismCmsServiceBlueprint</c>) supplies those; every registration here is genuinely safe
+/// to run twice (TryAdd* throughout, plus an explicit guard on the one AddHostedService call that
+/// wasn't TryAdd-safe, and <c>OptionsBuilder.Configure</c> composes rather than overwrites), so
+/// calling this unconditionally doesn't double-run anything for a host that also calls it itself
+/// — and startup fails fast via <c>ValidateOnStart</c> if no host ever supplies the required
+/// resolvers at all, rather than silently working with a null identity.
 /// </remarks>
 public class WayfinderUmbracoComposer : IComposer
 {
@@ -31,7 +38,7 @@ public class WayfinderUmbracoComposer : IComposer
     {
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderMigrationHandler>();
 
-        builder.Services.AddWayfinderUmbraco();
+        builder.Services.AddWayfinderUmbraco(_ => { });
         builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();
 
         // Self-contained, unlike WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling: a

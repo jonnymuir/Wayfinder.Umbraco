@@ -1,3 +1,7 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Wayfinder.Models.ServiceDesign;
+
 namespace Wayfinder.Umbraco.Configuration;
 
 /// <summary>
@@ -11,6 +15,29 @@ public class WayfinderServiceDesignOptions
     /// Defaults to 2 hours. Increase for slow multi-step workflows.
     /// </summary>
     public TimeSpan NonceExpiry { get; set; } = TimeSpan.FromHours(2);
+
+    /// <summary>
+    /// Required. How this host resolves the tenant id for the current request — this package
+    /// carries no multi-tenancy opinion of its own (see this class's own remarks elsewhere), so
+    /// a host (Prism, or any other Umbraco site) must supply this. The engine is authoritative
+    /// and in-process (<see cref="Services.UmbracoProcessManagerEngine"/>) — there is no longer
+    /// a remote "Business App" to derive tenant identity from a forwarded bearer token instead.
+    /// </summary>
+    public Func<HttpContext, string>? ResolveTenantId { get; set; }
+
+    /// <summary>
+    /// Required. How this host resolves the accessing actor's <see cref="ActorProfile"/> for the
+    /// current request — see <see cref="ResolveTenantId"/>'s own remarks.
+    /// </summary>
+    public Func<HttpContext, ActorProfile>? ResolveAccessProfile { get; set; }
+
+    /// <summary>Defaults to reading <see cref="ClaimTypes.NameIdentifier"/> — override only if
+    /// this host resolves the acting user id differently.</summary>
+    public Func<HttpContext, string> ResolveUserId { get; set; } = DefaultResolveUserId;
+
+    private static string DefaultResolveUserId(HttpContext ctx) =>
+        ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? throw new InvalidOperationException("Authenticated request has no NameIdentifier claim.");
 
     /// <summary>
     /// Base route the built-in <c>file-upload</c>/<c>summary-list</c> partials build their

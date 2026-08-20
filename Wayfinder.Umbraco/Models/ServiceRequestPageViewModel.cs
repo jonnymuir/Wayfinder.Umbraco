@@ -1,37 +1,20 @@
-using Umbraco.Cms.Core.Models.PublishedContent;
 using Wayfinder.Models.ServiceDesign;
 
 namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
-/// Base view model for Wayfinder service request pages.
-/// Encapsulates all data required to render a workflow step within an Umbraco content page.
-/// Integrators can extend this class to add custom properties or use it directly.
+/// View model for one rendered Wayfinder stage — carries everything the <c>_Stage-*.cshtml</c>
+/// partials need. A plain class, not a wrapped <c>IPublishedContent</c>: it's built from a
+/// <see cref="Services.ServiceRequestStageRenderResult"/> by the
+/// <c>wayfinderServiceRequestStage</c> Block Grid block's own partial, and a Block Grid
+/// element's content (<c>IPublishedElement</c>) isn't a real page with a URL/parent/children the
+/// way <c>IPublishedContent</c> promises — nothing here ever needed those members anyway (every
+/// <c>_Stage-*.cshtml</c> partial binds via a plain <c>@model</c>, reading only the explicit
+/// properties below).
 /// </summary>
-/// <remarks>
-/// <para>
-/// This view model bridges the gap between the Business App workflow engine and Umbraco's rendering pipeline.
-/// It is populated by <see cref="ServiceRequestPageController{TViewModel}"/> during GET requests (rendering)
-/// and receives validation errors and form values from POST round-trips (PRG pattern).
-/// </para>
-/// <para>
-/// Key responsibilities:
-/// </para>
-/// <list type="bullet">
-/// <item>Holds the current workflow instance identifier and state version for optimistic concurrency.</item>
-/// <item>Provides the step type (question, check-answers, confirmation, etc.) to drive partial view selection.</item>
-/// <item>Carries field groups and their pre-populated values for form rendering.</item>
-/// <item>Stores validation problems and pre-filled form values from the previous POST.</item>
-/// <item>Maintains the tamper-proof nonce that binds the rendered form to its server-side field definitions.</item>
-/// <item>Tracks workflow definition and display names for breadcrumbing and page titles.</item>
-/// </list>
-/// </remarks>
-public class ServiceRequestPageViewModel : PublishedContentWrapped
+public class ServiceRequestPageViewModel
 {
-    public ServiceRequestPageViewModel(IPublishedContent content, IPublishedValueFallback publishedValueFallback)
-        : base(content, publishedValueFallback) { }
-
-    /// <summary>The workflow instance identifier used in form hidden fields and Business App requests.</summary>
+    /// <summary>The workflow instance identifier used in form hidden fields and engine requests.</summary>
     public string InstanceId { get; set; } = string.Empty;
 
     /// <summary>The state version for optimistic concurrency — must be echoed in form submissions and compared on AdvanceAsync calls.</summary>
@@ -45,7 +28,7 @@ public class ServiceRequestPageViewModel : PublishedContentWrapped
 
     /// <summary>
     /// The step type driving the partial view selection (e.g., "question", "check-answers", "confirmation", "status-timeline", "task-list").
-    /// This value is not Archetype — it is the type classification from the Business App state definition.
+    /// This value is not Archetype — it is the type classification from the engine's own state definition.
     /// </summary>
     public string StepType { get; set; } = string.Empty;
 
@@ -76,7 +59,7 @@ public class ServiceRequestPageViewModel : PublishedContentWrapped
     /// </summary>
     public bool ShowInstancePicker { get; set; }
 
-    /// <summary>True when the workflow engine returned a fatal error (definition not found, Business App unreachable, etc.).</summary>
+    /// <summary>True when the workflow engine returned a fatal error (definition not found, etc.).</summary>
     public bool HasError { get; set; }
 
     /// <summary>Human-readable error message when <see cref="HasError"/> is true (e.g., "Workflow definition 'pension-application' not found").</summary>

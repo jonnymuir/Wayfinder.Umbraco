@@ -1,0 +1,117 @@
+@using System.Text.Json
+@using Microsoft.AspNetCore.Mvc.ViewEngines
+@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Extensions
+@using Wayfinder.Umbraco.Models
+@using Wayfinder.Umbraco.Services
+@using Wayfinder.Models.ServiceDesign
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Umbraco.Cms.Core.Models.Blocks.BlockGridItem>
+@inject ServiceRequestStageService StageService
+@inject IPublishedValueFallback PublishedValueFallback
+@inject ICompositeViewEngine ViewEngine
+@{
+    var blueprintKey = Model.Content.Value<string>(PublishedValueFallback, "blueprintKey") ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(blueprintKey))
+    {
+        <div class="stage-alert stage-alert--error">
+            <p>No blueprint key configured on this Wayfinder Service Request Stage block.</p>
+        </div>
+        return;
+    }
+
+    IReadOnlyList<ServiceRequestProblem>? problems = null;
+    IReadOnlyDictionary<string, string>? formValues = null;
+    if (TempData.TryGetValue("ServiceRequestProblems", out var rawProblems) && rawProblems is string problemsJson)
+    {
+        try { problems = JsonSerializer.Deserialize<List<ServiceRequestProblem>>(problemsJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+    if (TempData.TryGetValue("ServiceRequestFormValues", out var rawFormValues) && rawFormValues is string formValuesJson)
+    {
+        try { formValues = JsonSerializer.Deserialize<Dictionary<string, string>>(formValuesJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+
+    var instanceId = Context.Request.Query["instanceId"].ToString();
+    var action = Context.Request.Query["action"].ToString();
+
+    var result = await StageService.RenderCurrentAsync(
+        Context, blueprintKey,
+        string.IsNullOrEmpty(instanceId) ? null : instanceId,
+        string.IsNullOrEmpty(action) ? null : action,
+        problems, formValues);
+
+    var envelope = result.Envelope;
+
+    if (envelope.ResponseState == "error")
+    {
+        var message = envelope.Problems.FirstOrDefault()?.Message ?? $"Could not start service request '{blueprintKey}'.";
+        <div class="stage-alert stage-alert--error">
+            <p>@message</p>
+        </div>
+        return;
+    }
+
+    var vm = new ServiceRequestPageViewModel
+    {
+        InstanceId = envelope.InstanceId,
+        StateVersion = envelope.StateVersion,
+        BlueprintKey = blueprintKey,
+        ReturnUrl = Context.Request.PathBase + Context.Request.Path,
+        StepType = envelope.Render?.StepType ?? string.Empty,
+        StateDisplayName = envelope.Render?.StateDisplayName ?? string.Empty,
+        Components = envelope.Render?.Components ?? Array.Empty<ComponentRenderPayload>(),
+        AvailableActions = envelope.Render?.AvailableActions ?? Array.Empty<ServiceRequestAction>(),
+        Problems = result.Problems,
+        FormValues = result.FormValues,
+        Nonce = result.Nonce,
+        PollAfterMs = envelope.PollAfterMs,
+        LiveModelJson = envelope.Render?.Data?["live"]?.ToJsonString()
+    };
+
+    if (envelope.ResponseState == "instance_picker")
+    {
+        vm.ShowInstancePicker = true;
+        vm.StateDisplayName = envelope.Render?.StateDisplayName ?? blueprintKey;
+        <h2 class="stage-page__title">@vm.StateDisplayName</h2>
+        @await Html.PartialAsync("~/Views/Partials/_ServiceRequestHub-InstancePicker.cshtml", vm)
+        return;
+    }
+
+    var shell = ServiceRequestRenderShellResolver.ResolveShell(
+        vm.Components,
+        vm.StepType,
+        vm.Components.Any(c => string.Equals(c.Type, "waiting", StringComparison.OrdinalIgnoreCase)),
+        vm.AvailableActions.Any());
+
+    var partialName = shell switch
+    {
+        "question" => "_Stage-Question",
+        "check-answers" => "_Stage-Review",
+        "confirmation" => "_Stage-Completion",
+        "status-timeline" => "_Stage-StatusTimeline",
+        "task-list" => "_Stage-TaskList",
+        "waiting" => "_Stage-Waiting",
+        _ => $"_Stage-{shell}"
+    };
+    var partialPath = $"~/Views/Partials/{partialName}.cshtml";
+    var viewResult = ViewEngine.GetView(null, partialPath, false);
+}
+<div class="stage-page">
+    @if (viewResult.Success)
+    {
+        if (partialName == "_Stage-Question")
+        {
+            <h2 class="stage-page__title">@vm.StateDisplayName</h2>
+        }
+        @await Html.PartialAsync(partialName, vm)
+    }
+    else
+    {
+        <h2 class="stage-page__title">@vm.StateDisplayName</h2>
+        <div class="stage-alert stage-alert--warn">
+            <p>No template found for stage shell: <code>@shell</code></p>
+        </div>
+    }
+</div>

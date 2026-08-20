@@ -11,12 +11,12 @@ using Wayfinder.Umbraco.Services.Sanitization;
 namespace Wayfinder.Umbraco.Extensions;
 
 /// <summary>
-/// Registers Wayfinder's Umbraco-hosted service design building blocks — a DB-backed engine
-/// and definition store, the generic stage-rendering infrastructure (nonce, field validation,
-/// file upload, content sanitization) shared by every <c>ServiceRequestPageController{T}</c>
-/// flow regardless of which <see cref="IBusinessAppProcessManagerClient"/> a host wires up, and
-/// uSync portability. Carries no multi-tenancy, auth, or single-queue opinions of its own —
-/// see a host's own composition (e.g. Prism's "CMS Workflow" feature) for that layer.
+/// Registers Wayfinder's Umbraco-hosted service design building blocks — a DB-backed, in-process,
+/// authoritative <see cref="Wayfinder.Engine.Abstractions.IProcessManager"/> and definition store,
+/// the Block Grid-composable stage rendering (<c>wayfinderServiceRequestStage</c>) and its
+/// generic infrastructure (nonce, field validation, file upload, content sanitization), and
+/// uSync portability. Carries no multi-tenancy, auth, or single-queue opinions of its own — a
+/// host supplies identity resolution via <paramref name="configure"/> below.
 /// </summary>
 /// <remarks>
 /// Every registration here uses <c>TryAdd*</c> so calling this method more than once (or
@@ -25,7 +25,17 @@ namespace Wayfinder.Umbraco.Extensions;
 /// </remarks>
 public static class WayfinderUmbracoServiceCollectionExtensions
 {
-    public static IServiceCollection AddWayfinderUmbraco(this IServiceCollection services)
+    /// <param name="configure">
+    /// Required — must set <see cref="WayfinderServiceDesignOptions.ResolveTenantId"/> and
+    /// <see cref="WayfinderServiceDesignOptions.ResolveAccessProfile"/> at minimum (validated at
+    /// startup). The engine is authoritative and in-process
+    /// (<see cref="Services.UmbracoProcessManagerEngine"/>) — a host resolves identity for it the
+    /// same way <c>Wayfinder.Engine.Worklist</c>/<c>Wayfinder.Engine.Journey</c> already ask a
+    /// host to, rather than this package assuming a remote "Business App" derives it from a
+    /// forwarded bearer token.
+    /// </param>
+    public static IServiceCollection AddWayfinderUmbraco(
+        this IServiceCollection services, Action<WayfinderServiceDesignOptions> configure)
     {
         // Boot-time definition loader — deliberately has no dependency on the engine itself;
         // see UmbracoServiceBlueprintBootStore's own remarks for why a combined store would
@@ -37,6 +47,11 @@ public static class WayfinderUmbracoServiceCollectionExtensions
 
         services.TryAddSingleton<UmbracoProcessManagerEngine>();
         services.TryAddSingleton<IProcessManager>(sp => sp.GetRequiredService<UmbracoProcessManagerEngine>());
+
+        // Render/advance logic shared by the wayfinderServiceRequestStage Block Grid partial
+        // (GET) and WayfinderStageSurfaceController (POST) — stateless beyond its own
+        // constructor-injected dependencies, so a singleton is safe.
+        services.TryAddSingleton<ServiceRequestStageService>();
 
         // Authoring-side store — a save reaches the live engine immediately (see
         // UmbracoServiceBlueprintStore's own remarks).
@@ -56,7 +71,12 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // or AddDistributedSqlServerCache() for multi-server production.
         services.AddDistributedMemoryCache();
 
-        services.AddOptions<WayfinderServiceDesignOptions>().BindConfiguration("Wayfinder");
+        services.AddOptions<WayfinderServiceDesignOptions>()
+            .BindConfiguration("Wayfinder")
+            .Configure(configure)
+            .Validate(o => o.ResolveTenantId is not null, $"{nameof(WayfinderServiceDesignOptions.ResolveTenantId)} must be set.")
+            .Validate(o => o.ResolveAccessProfile is not null, $"{nameof(WayfinderServiceDesignOptions.ResolveAccessProfile)} must be set.")
+            .ValidateOnStart();
 
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
 
