@@ -37,6 +37,11 @@ own small demo-queue implementation (identity resolution, a single-queue constra
 package's own `SingleQueueStructuralValidator`) — `UmbracoPrism.Core` itself carries no
 service-design opinion at all.
 
+## Reference app
+
+[`Wayfinder.Umbraco.ReferenceApp`](Wayfinder.Umbraco.ReferenceApp/README.md) — a real, bootable
+Umbraco 17 site proving this package end to end (backoffice + demo logins documented there).
+
 ## Depends on
 
 - [`Wayfinder`](https://github.com/jonnymuir/Wayfinder) — domain models, calculation engine
