@@ -19,18 +19,10 @@ namespace Wayfinder.Umbraco.Controllers;
 /// discovers MVC controllers via assembly scanning instead.
 /// </summary>
 /// <remarks>
-/// Single-front-stage-queue scope: Wayfinder.Umbraco's rendering pipeline currently only serves
-/// one actor's perspective (a visitor-facing page), so only a single queue's worth of content
-/// can ever be rendered — <see cref="SingleQueueStructuralValidator"/> enforces that at save
-/// time, and <see cref="GetQueues"/> offers exactly one queue to keep the editor's picker
-/// consistent with it. Multi-queue/back-stage authoring is future Wayfinder work, not a
-/// limitation specific to this controller.
-/// <para>
 /// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> requires membership of a
 /// group listed in <see cref="Configuration.WayfinderServiceDesignOptions.AdminGroupAliases"/> —
 /// without it, an authenticated backoffice user who simply lacks Settings-section access could
 /// still call this API directly, bypassing nav visibility entirely.
-/// </para>
 /// </remarks>
 [Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin)]
 [VersionedApiBackOfficeRoute("wayfinder")]
@@ -38,9 +30,32 @@ namespace Wayfinder.Umbraco.Controllers;
 [MapToApi("Wayfinder")]
 public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringService authoringService) : ManagementApiControllerBase
 {
+    /// <summary>
+    /// Every queue key/display name already declared across every saved blueprint in this
+    /// install — an autocomplete aid for the editor's queue picker (see this package's own
+    /// <c>wayfinder-service-blueprint-workspace-editor.element.ts</c>, which already falls back
+    /// gracefully to an empty list), not a restriction: any queue key an editor types is valid,
+    /// this just helps them reuse an existing one (e.g. a shared "caseworker" queue two
+    /// blueprints both want) instead of accidentally forking a same-purpose queue under a
+    /// second key. No longer limited to a single fixed "front-stage" queue — multi-queue
+    /// blueprints (a citizen-facing queue plus a caseworker/backstage one) are fully supported.
+    /// </summary>
     [HttpGet("service-blueprints/queues")]
-    public IActionResult GetQueues() =>
-        Ok(new[] { new { queueName = WayfinderFrontStageQueue.Key, displayName = WayfinderFrontStageQueue.DisplayName } });
+    public async Task<IActionResult> GetQueues(CancellationToken ct)
+    {
+        var summaries = await authoringService.ListAsync(ct);
+        var blueprints = await Task.WhenAll(summaries.Select(s => authoringService.ReadAsync(s.DefinitionKey, ct)));
+
+        var queues = blueprints
+            .Where(b => b is not null)
+            .SelectMany(b => b!.Queues ?? [])
+            .GroupBy(q => q.Key, StringComparer.Ordinal)
+            .Select(g => new { queueName = g.Key, displayName = g.First().DisplayName })
+            .OrderBy(q => q.queueName, StringComparer.Ordinal)
+            .ToArray();
+
+        return Ok(queues);
+    }
 
     [HttpGet("service-blueprints")]
     public async Task<IActionResult> ListServiceBlueprints(CancellationToken ct) =>

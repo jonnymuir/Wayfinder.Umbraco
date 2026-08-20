@@ -1,4 +1,5 @@
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.Models;
 
@@ -113,4 +114,51 @@ public class ServiceRequestPageViewModel
     public bool HasFileUploadField =>
         AllFields.Any(f => f.FieldType.Equals("file-upload", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Builds the render-ready view model from a <see cref="ServiceRequestStageRenderResult"/> —
+    /// the one place both <c>wayfinderServiceRequestStage.cshtml</c> and the worklist block's own
+    /// "review this item" mode construct it, so <c>_WayfinderStageRender.cshtml</c> always sees
+    /// the same shape regardless of which block rendered it.
+    /// </summary>
+    public static ServiceRequestPageViewModel FromRenderResult(ServiceRequestStageRenderResult result, string returnUrl)
+    {
+        var envelope = result.Envelope;
+
+        if (envelope.ResponseState == "error")
+        {
+            return new ServiceRequestPageViewModel
+            {
+                BlueprintKey = result.BlueprintKey,
+                ReturnUrl = returnUrl,
+                HasError = true,
+                ErrorMessage = envelope.Problems.FirstOrDefault()?.Message
+                    ?? $"Could not start service request '{result.BlueprintKey}'."
+            };
+        }
+
+        var vm = new ServiceRequestPageViewModel
+        {
+            InstanceId = envelope.InstanceId,
+            StateVersion = envelope.StateVersion,
+            BlueprintKey = result.BlueprintKey,
+            ReturnUrl = returnUrl,
+            StepType = envelope.Render?.StepType ?? string.Empty,
+            StateDisplayName = envelope.Render?.StateDisplayName ?? string.Empty,
+            Components = envelope.Render?.Components ?? Array.Empty<ComponentRenderPayload>(),
+            AvailableActions = envelope.Render?.AvailableActions ?? Array.Empty<ServiceRequestAction>(),
+            Problems = result.Problems,
+            FormValues = result.FormValues,
+            Nonce = result.Nonce,
+            PollAfterMs = envelope.PollAfterMs,
+            LiveModelJson = envelope.Render?.Data?["live"]?.ToJsonString()
+        };
+
+        if (envelope.ResponseState == "instance_picker")
+        {
+            vm.ShowInstancePicker = true;
+            vm.StateDisplayName = envelope.Render?.StateDisplayName ?? result.BlueprintKey;
+        }
+
+        return vm;
+    }
 }

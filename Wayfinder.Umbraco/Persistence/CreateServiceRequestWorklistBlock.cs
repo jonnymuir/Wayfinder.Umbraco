@@ -9,16 +9,15 @@ using Umbraco.Cms.Infrastructure.Migrations;
 namespace Wayfinder.Umbraco.Persistence;
 
 /// <summary>
-/// Creates the <c>wayfinderServiceRequestStage</c> element type and a packaged
-/// <c>Umbraco.BlockGrid</c> data type wrapping it, on package install — the Block Grid-composable
-/// building block a CMS editor drags onto any content page to render one Wayfinder stage (see
-/// <c>Controllers.WayfinderStageSurfaceController</c>/<c>Services.ServiceRequestStageService</c>
-/// for the rendering/advance logic this block calls into). Ships via the package's own migration
-/// plan (mirroring <see cref="CreateServiceBlueprintTable"/>/<see cref="CreateServiceRequestTable"/>'s
-/// own DB-schema-on-install pattern) rather than a host-side dev-only seeder, so the block exists
-/// the moment a site installs this NuGet package — no manual uSync import required.
+/// Creates the <c>wayfinderServiceRequestWorklist</c> element type and a packaged
+/// <c>Umbraco.BlockGrid</c> data type wrapping it — the caseworker/backstage counterpart to
+/// <see cref="CreateServiceRequestStageBlock"/>'s citizen-facing stage block. A CMS editor drops
+/// this block on any page to show the current actor's own queue work
+/// (<see cref="Services.ServiceRequestWorklistService"/>) — unlike the stage block, it needs no
+/// <c>blueprintKey</c> property: <c>IProcessManager.GetQueueWorkItems</c> is scoped entirely by
+/// the resolved <c>ActorProfile</c>, not by a specific blueprint the block author picks.
 /// </summary>
-public class CreateServiceRequestStageBlock(
+public class CreateServiceRequestWorklistBlock(
     IMigrationContext context,
     IContentTypeService contentTypeService,
     IDataTypeService dataTypeService,
@@ -27,18 +26,16 @@ public class CreateServiceRequestStageBlock(
     IConfigurationEditorJsonSerializer configurationEditorJsonSerializer)
     : AsyncMigrationBase(context)
 {
-    // Deterministic, fixed GUIDs — stable across every install of this package, so a re-run finds
-    // and patches the same entities rather than creating duplicates.
-    private static readonly Guid ElementTypeKey = new("6f2a1c3d-8b4e-4a1f-9c6d-2e7b5a9f1c30");
-    private static readonly Guid BlockGridDataTypeKey = new("7a3b2d4e-9c5f-4b2a-8d7e-3f8c6b0a2d41");
+    private static readonly Guid ElementTypeKey = new("8b4c3e5f-0d6a-4c3b-9e8f-4a9d7c1b3e52");
+    private static readonly Guid BlockGridDataTypeKey = new("9c5d4f60-1e7b-4d4c-af90-5b0e8d2c4f63");
 
     protected override async Task MigrateAsync()
     {
-        var elementType = await GetOrCreateElementTypeAsync();
+        var elementType = GetOrCreateElementType();
         await GetOrCreateBlockGridDataTypeAsync(elementType);
     }
 
-    private async Task<IContentType> GetOrCreateElementTypeAsync()
+    private IContentType GetOrCreateElementType()
     {
         if (contentTypeService.Get(ElementTypeKey) is { } existing)
         {
@@ -48,23 +45,23 @@ public class CreateServiceRequestStageBlock(
         var elementType = new ContentType(shortStringHelper, -1)
         {
             Key = ElementTypeKey,
-            Alias = "wayfinderServiceRequestStage",
-            Name = "Wayfinder Service Request Stage",
+            Alias = "wayfinderServiceRequestWorklist",
+            Name = "Wayfinder Service Request Worklist",
             IsElement = true,
-            Icon = "icon-molecule-alt"
+            Icon = "icon-list"
         };
 
-        var textBox = await dataTypeService.GetAsync(Constants.DataTypes.Guids.TextstringGuid)
-            ?? throw new InvalidOperationException("Built-in Textstring data type not found.");
+        var numeric = dataTypeService.GetAsync(Constants.DataTypes.Guids.NumericGuid).GetAwaiter().GetResult()
+            ?? throw new InvalidOperationException("Built-in Numeric data type not found.");
 
-        const string groupName = "Stage";
-        elementType.AddPropertyGroup(groupName, "stage");
+        const string groupName = "Worklist";
+        elementType.AddPropertyGroup(groupName, "worklist");
 
-        elementType.AddPropertyType(new PropertyType(shortStringHelper, textBox, "blueprintKey")
+        elementType.AddPropertyType(new PropertyType(shortStringHelper, numeric, "pageSize")
         {
-            Name = "Blueprint key",
-            Description = "The service blueprint definition key this block renders (e.g. \"apply-for-a-thing\").",
-            Mandatory = true,
+            Name = "Page size",
+            Description = "How many rows to show per page. Leave blank to use the default (20).",
+            Mandatory = false,
             SortOrder = 0
         }, groupName);
 
@@ -88,7 +85,7 @@ public class CreateServiceRequestStageBlock(
         var dataType = new DataType(editor, configurationEditorJsonSerializer)
         {
             Key = BlockGridDataTypeKey,
-            Name = "Wayfinder Service Request Stage (Block Grid)",
+            Name = "Wayfinder Service Request Worklist (Block Grid)",
             DatabaseType = ValueStorageType.Ntext,
             EditorUiAlias = "Umb.PropertyEditorUi.BlockGrid",
             ConfigurationData = new Dictionary<string, object>

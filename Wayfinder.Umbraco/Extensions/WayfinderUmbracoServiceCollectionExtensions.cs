@@ -53,18 +53,15 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // constructor-injected dependencies, so a singleton is safe.
         services.TryAddSingleton<ServiceRequestStageService>();
 
+        // The caseworker/backstage counterpart — shared by the wayfinderServiceRequestWorklist
+        // Block Grid partial and WayfinderWorklistSurfaceController.
+        services.TryAddSingleton<ServiceRequestWorklistService>();
+
         // Authoring-side store — a save reaches the live engine immediately (see
         // UmbracoServiceBlueprintStore's own remarks).
         services.TryAddSingleton<IServiceBlueprintSourceStore, UmbracoServiceBlueprintStore>();
 
         services.AddServiceBlueprintAuthoring();
-
-        // Wayfinder.Umbraco's own single-queue authoring constraint — see
-        // SingleQueueStructuralValidator's remarks for why this belongs here rather than in a
-        // host's own composition (unlike Prism's CMS Workflow-specific constraints, this one
-        // is a direct consequence of the rendering pipeline this package itself ships).
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IServiceBlueprintStructuralValidator, SingleQueueStructuralValidator>());
 
         // Distributed cache backing the nonce/upload-token services below — works out of the
         // box for single-server dev; a host can replace it with AddStackExchangeRedisCache()

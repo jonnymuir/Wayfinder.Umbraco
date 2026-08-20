@@ -18,6 +18,7 @@ public class WayfinderMigrationPlan : PackageMigrationPlan
     {
         To<CreateServiceBlueprintTable>("initial-state")
             .To<CreateServiceRequestTable>("add-cms-service-requests")
-            .To<CreateServiceRequestStageBlock>("add-service-request-stage-block");
+            .To<CreateServiceRequestStageBlock>("add-service-request-stage-block")
+            .To<CreateServiceRequestWorklistBlock>("add-service-request-worklist-block");
     }
 }

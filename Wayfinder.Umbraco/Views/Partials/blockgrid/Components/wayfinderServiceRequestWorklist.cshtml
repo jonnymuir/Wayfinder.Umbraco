@@ -1,0 +1,107 @@
+@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Extensions
+@using Wayfinder.Models.ServiceDesign
+@using Wayfinder.Umbraco.Controllers
+@using Wayfinder.Umbraco.Models
+@using Wayfinder.Umbraco.Services
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Umbraco.Cms.Core.Models.Blocks.BlockGridItem>
+@inject ServiceRequestStageService StageService
+@inject ServiceRequestWorklistService WorklistService
+@inject IPublishedValueFallback PublishedValueFallback
+@{
+    var pageUrl = Context.Request.PathBase + Context.Request.Path;
+    var instanceId = Context.Request.Query["instanceId"].ToString();
+
+    if (!string.IsNullOrEmpty(instanceId))
+    {
+        // Reviewing one item — same stage-rendering pipeline the stage block itself uses.
+        var blueprintKey = Context.Request.Query["blueprintKey"].ToString();
+        var result = await StageService.RenderCurrentAsync(Context, blueprintKey, instanceId, action: null);
+        var vm = ServiceRequestPageViewModel.FromRenderResult(result, pageUrl);
+        <p><a href="@pageUrl">&larr; Back to worklist</a></p>
+        @await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)
+        return;
+    }
+
+    var pageSizeText = Model.Content.Value<string>(PublishedValueFallback, "pageSize");
+    var pageSize = int.TryParse(pageSizeText, out var parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 20;
+    var pageIndex = int.TryParse(Context.Request.Query["page"], out var parsedPage) ? Math.Max(parsedPage, 0) : 0;
+
+    var envelope = WorklistService.GetWorklist(Context, pageIndex: pageIndex, pageSize: pageSize);
+
+    string StatusTag(QueueWorkItemStatus status) => status switch
+    {
+        QueueWorkItemStatus.Unassigned => "<strong class=\"wayfinder-tag wayfinder-tag--blue\">Unassigned</strong>",
+        QueueWorkItemStatus.Waiting => "<strong class=\"wayfinder-tag wayfinder-tag--yellow\">Waiting</strong>",
+        QueueWorkItemStatus.Done => "<strong class=\"wayfinder-tag wayfinder-tag--green\">Done</strong>",
+        _ => ""
+    };
+
+    string ReviewUrl(QueueWorkItem item) =>
+        $"{pageUrl}?instanceId={Uri.EscapeDataString(item.InstanceId)}&blueprintKey={Uri.EscapeDataString(item.BlueprintKey)}";
+}
+<table class="wayfinder-worklist">
+    <thead>
+        <tr>
+            <th scope="col">Service</th>
+            <th scope="col">Stage</th>
+            <th scope="col">Instance</th>
+            <th scope="col"><span class="wayfinder-visually-hidden">Actions</span></th>
+            <th scope="col"><span class="wayfinder-visually-hidden">Pick up</span></th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (envelope.Items.Count == 0)
+        {
+            <tr><td colspan="5">No service requests match the current filters</td></tr>
+        }
+        else
+        {
+            @foreach (var item in envelope.Items)
+            {
+                <tr>
+                    <td>@item.BlueprintDisplayName</td>
+                    <td>@item.StateDisplayName @Html.Raw(StatusTag(item.Status))</td>
+                    <td>@item.InstanceId[..Math.Min(8, item.InstanceId.Length)]&hellip;</td>
+                    <td>
+                        <a href="@ReviewUrl(item)">@(item.Status == QueueWorkItemStatus.Actionable ? "Review" : "View")</a>
+                    </td>
+                    <td>
+                        @if (item.PickupState == QueueWorkItemPickupState.NotPickedUp)
+                        {
+                            <form method="post" action="@WayfinderWorklistSurfaceController.PickupRoutePath">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="instanceId" value="@item.InstanceId" />
+                                <input type="hidden" name="cursorId" value="@item.CursorId" />
+                                <input type="hidden" name="returnUrl" value="@pageUrl" />
+                                <button type="submit" class="wayfinder-button wayfinder-button--secondary">Pick up</button>
+                            </form>
+                        }
+                        else if (item.PickupState == QueueWorkItemPickupState.PickedUpByMe)
+                        {
+                            <span class="wayfinder-tag">With you</span>
+                            <form method="post" action="@WayfinderWorklistSurfaceController.PutbackRoutePath">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="instanceId" value="@item.InstanceId" />
+                                <input type="hidden" name="cursorId" value="@item.CursorId" />
+                                <input type="hidden" name="returnUrl" value="@pageUrl" />
+                                <button type="submit" class="wayfinder-button wayfinder-button--secondary">Put back</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+<nav>
+    <span>Page @(pageIndex + 1) &mdash; showing @envelope.Items.Count of @envelope.TotalMatchingCount</span>
+    @if (pageIndex > 0)
+    {
+        <a href="@pageUrl?page=@(pageIndex - 1)">Previous</a>
+    }
+    @if ((pageIndex + 1) * pageSize < envelope.TotalMatchingCount)
+    {
+        <a href="@pageUrl?page=@(pageIndex + 1)">Next</a>
+    }
+</nav>

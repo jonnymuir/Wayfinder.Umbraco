@@ -1,0 +1,55 @@
+@using Microsoft.AspNetCore.Mvc.ViewEngines
+@model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
+@inject ICompositeViewEngine ViewEngine
+@{
+    if (Model.HasError)
+    {
+        <div class="stage-alert stage-alert--error">
+            <p>@Model.ErrorMessage</p>
+        </div>
+        return;
+    }
+
+    if (Model.ShowInstancePicker)
+    {
+        <h2 class="stage-page__title">@Model.StateDisplayName</h2>
+        @await Html.PartialAsync("~/Views/Partials/_ServiceRequestHub-InstancePicker.cshtml", Model)
+        return;
+    }
+
+    var shell = Wayfinder.Umbraco.Models.ServiceRequestRenderShellResolver.ResolveShell(
+        Model.Components,
+        Model.StepType,
+        Model.Components.Any(c => string.Equals(c.Type, "waiting", StringComparison.OrdinalIgnoreCase)),
+        Model.AvailableActions.Any());
+
+    var partialName = shell switch
+    {
+        "question" => "_Stage-Question",
+        "check-answers" => "_Stage-Review",
+        "confirmation" => "_Stage-Completion",
+        "status-timeline" => "_Stage-StatusTimeline",
+        "task-list" => "_Stage-TaskList",
+        "waiting" => "_Stage-Waiting",
+        _ => $"_Stage-{shell}"
+    };
+    var partialPath = $"~/Views/Partials/{partialName}.cshtml";
+    var viewResult = ViewEngine.GetView(null, partialPath, false);
+}
+<div class="stage-page">
+    @if (viewResult.Success)
+    {
+        if (partialName == "_Stage-Question")
+        {
+            <h2 class="stage-page__title">@Model.StateDisplayName</h2>
+        }
+        @await Html.PartialAsync(partialName, Model)
+    }
+    else
+    {
+        <h2 class="stage-page__title">@Model.StateDisplayName</h2>
+        <div class="stage-alert stage-alert--warn">
+            <p>No template found for stage shell: <code>@shell</code></p>
+        </div>
+    }
+</div>
