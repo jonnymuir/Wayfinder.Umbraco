@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
+using Wayfinder.Rendering.GovUk;
 using Wayfinder.Umbraco.Extensions;
 using Wayfinder.Umbraco.ReferenceApp;
 
@@ -42,6 +43,14 @@ await app.BootUmbracoAsync();
 app.UseUmbraco()
     .WithMiddleware(u =>
     {
+        // Wayfinder.Rendering.GovUk's own vendored govuk-frontend CSS/JS (served automatically
+        // as a static web asset under _content/Wayfinder.Rendering.GovUk/... once UseStaticFiles()
+        // runs) plus its own font re-rooting — govuk-frontend.min.css's @font-face rules request
+        // fonts at a hard-coded absolute "/assets/fonts/...", regardless of where the CSS itself is
+        // served from. See Wayfinder.ReferenceApp/Program.cs for the same pattern in the core repo.
+        u.AppBuilder.UseStaticFiles();
+        u.AppBuilder.UseGovUkFrontendAssets();
+
         u.AppBuilder.UseAuthentication();
         u.AppBuilder.UseAuthorization();
         u.UseBackOffice();

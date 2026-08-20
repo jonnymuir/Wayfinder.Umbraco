@@ -1,4 +1,4 @@
-﻿@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Cms.Core.Models.PublishedContent
 @using Umbraco.Cms.Core.Models.Blocks
 @using Umbraco.Extensions
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
@@ -8,33 +8,83 @@
     var caseworkerGrid = Model.Value<BlockGridModel>("caseworkerArea");
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="govuk-template">
 <head>
     <meta charset="utf-8" />
     <title>Wayfinder.Umbraco reference app</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1d70b8">
+    <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/govuk-frontend/govuk-frontend.min.css">
+    <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/css/wayfinder-components.css">
 </head>
-<body>
-    <h1>Wayfinder.Umbraco reference app</h1>
-    <p><a href="/demo/login">Demo login</a> &middot; <a href="/umbraco">Backoffice</a></p>
+<body class="govuk-template__body">
+    <script>document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');</script>
+    <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
 
-    <h2>Citizen area</h2>
-    @if (citizenGrid is not null && citizenGrid.Any())
-    {
-        @await Html.GetBlockGridHtmlAsync(citizenGrid)
-    }
-    else
-    {
-        <p><em>No citizen-facing block placed yet — add a "Wayfinder Service Request Stage" block in the backoffice.</em></p>
-    }
+    <header class="govuk-template__header">
+        <div class="govuk-generic-header">
+            <div class="govuk-generic-header__container govuk-width-container">
+                <div class="govuk-generic-header__logo">
+                    <a href="/" class="govuk-generic-header__homepage-link">Wayfinder.Umbraco reference app</a>
+                </div>
+            </div>
+        </div>
+        <div class="govuk-service-navigation" data-module="govuk-service-navigation">
+            <div class="govuk-width-container">
+                <div class="govuk-service-navigation__container">
+                    <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
+                        <ul class="govuk-service-navigation__list">
+                            <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/demo/login">Demo login</a></li>
+                            <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/umbraco">Backoffice</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
 
-    <h2>Caseworker area</h2>
-    @if (caseworkerGrid is not null && caseworkerGrid.Any())
-    {
-        @await Html.GetBlockGridHtmlAsync(caseworkerGrid)
-    }
-    else
-    {
-        <p><em>No caseworker-facing block placed yet — add a "Wayfinder Service Request Worklist" block in the backoffice.</em></p>
-    }
+    <div class="govuk-width-container">
+        <main class="govuk-main-wrapper" id="main-content">
+            <h2 class="govuk-heading-l">Citizen area</h2>
+            @if (citizenGrid is not null && citizenGrid.Any())
+            {
+                @await Html.GetBlockGridHtmlAsync(citizenGrid)
+            }
+            else
+            {
+                <p class="govuk-body"><em>No citizen-facing block placed yet — add a "Wayfinder Service Request Stage" block in the backoffice.</em></p>
+            }
+
+            <h2 class="govuk-heading-l">Caseworker area</h2>
+            @if (caseworkerGrid is not null && caseworkerGrid.Any())
+            {
+                @await Html.GetBlockGridHtmlAsync(caseworkerGrid)
+            }
+            else
+            {
+                <p class="govuk-body"><em>No caseworker-facing block placed yet — add a "Wayfinder Service Request Worklist" block in the backoffice.</em></p>
+            }
+        </main>
+    </div>
+
+    <footer class="govuk-template__footer">
+        <div class="govuk-footer">
+            <div class="govuk-width-container">
+                <div class="govuk-footer__meta">
+                    <div class="govuk-footer__meta-item govuk-footer__meta-item--grow">
+                        <h2 class="govuk-visually-hidden">Support links</h2>
+                        <div class="govuk-footer__meta-custom">
+                            A transient Wayfinder.Umbraco reference host — <a class="govuk-footer__link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">github.com/jonnymuir/Wayfinder.Umbraco</a>, MIT licensed.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-govuk-frontend-init.js"></script>
+    <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-poll.js"></script>
+    <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-slider.js"></script>
+    <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js"></script>
 </body>
 </html>
