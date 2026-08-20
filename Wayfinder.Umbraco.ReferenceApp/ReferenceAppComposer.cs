@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 
@@ -42,6 +43,21 @@ public class ReferenceAppComposer : IComposer
             options.Cookie.Name = "WayfinderUmbracoReferenceApp";
         });
 
-        builder.Services.AddAuthorization();
+        // Wayfinder.Umbraco's ServiceRequestPollController requires this named policy — the
+        // package deliberately registers no opinion of its own on how a host authenticates (see
+        // WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling's own remarks: "a host must
+        // register this policy"). Missing it isn't a visible failure at first glance: the waiting
+        // screen's own poll script (_Stage-Waiting.cshtml) just gets a denied request, catches it,
+        // and silently retries forever — the page never live-updates, but a manual refresh always
+        // works (a fresh page load re-evaluates state directly, no poll endpoint involved), which
+        // is exactly what made this easy to miss until someone actually sat and watched the wait
+        // screen. Any authenticated demo persona may poll — GetCurrent itself already scopes the
+        // result to that caller's own userId/ActorProfile, so this policy only needs to gate
+        // "signed in at all", not re-implement ownership checking.
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling,
+                policy => policy.RequireAuthenticatedUser());
+        });
     }
 }
