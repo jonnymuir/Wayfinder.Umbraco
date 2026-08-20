@@ -21,6 +21,12 @@ public static class ReferenceAppAuth
     public const string CitizenQueue = "citizen";
     public const string CaseworkerQueue = "caseworker";
 
+    // Same string as CaseworkerQueue today, deliberately named/kept separate — this one is the
+    // ClaimTypes.Role value a signed-in demo user carries (checked by referenceHome.cshtml to gate
+    // which page an actor can even reach), not a Wayfinder queue key; the two concepts happen to
+    // share a name in this reference app's own simple two-persona model, nothing more.
+    public const string CaseworkerRole = "caseworker";
+
     private sealed record DemoUser(string Email, string DisplayName, string Role);
 
     private static readonly DemoUser Citizen = new("alex@example.test", "Alex Applicant", "citizen");

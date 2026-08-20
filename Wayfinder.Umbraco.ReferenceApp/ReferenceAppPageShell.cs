@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Wayfinder.Rendering.GovUk;
 
 namespace Wayfinder.Umbraco.ReferenceApp;
 
@@ -12,6 +13,16 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 /// </summary>
 public static class ReferenceAppPageShell
 {
+    // Wayfinder.Rendering.GovUk's own static-asset routes carry no Cache-Control header, so a
+    // browser's heuristic caching can keep serving an old copy of wayfinder-components.css across
+    // a NuGet package bump with no round-trip check at all — confirmed live (this exact scenario:
+    // a real style fix landed in a new package version, but a long-lived tab kept showing the old
+    // CSS until a hard refresh). Query-string-versioned by that package's own assembly version, so
+    // every real upgrade gets a new URL the browser has never cached, with no host-side
+    // Cache-Control change needed.
+    private static readonly string AssetVersion =
+        typeof(GovUkComponents).Assembly.GetName().Version?.ToString() ?? "0";
+
     public static string Render(string title, string bodyHtml, ClaimsPrincipal? user)
     {
         string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
@@ -39,8 +50,8 @@ public static class ReferenceAppPageShell
               <title>{Esc(title)} — Wayfinder.Umbraco reference app</title>
               <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
               <meta name="theme-color" content="#1d70b8">
-              <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/govuk-frontend/govuk-frontend.min.css">
-              <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/css/wayfinder-components.css">
+              <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/govuk-frontend/govuk-frontend.min.css?v={AssetVersion}">
+              <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/css/wayfinder-components.css?v={AssetVersion}">
             </head>
             <body class="govuk-template__body">
               <script>document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');</script>
@@ -91,10 +102,10 @@ public static class ReferenceAppPageShell
                 </div>
               </footer>
 
-              <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-govuk-frontend-init.js"></script>
-              <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-poll.js"></script>
-              <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-slider.js"></script>
-              <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js"></script>
+              <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-govuk-frontend-init.js?v={AssetVersion}"></script>
+              <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-poll.js?v={AssetVersion}"></script>
+              <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-slider.js?v={AssetVersion}"></script>
+              <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js?v={AssetVersion}"></script>
             </body>
             </html>
             """;

@@ -1,4 +1,5 @@
 ﻿@using System.IO
+@using System.Security.Claims
 @using System.Text.Encodings.Web
 @using Umbraco.Cms.Core.Models.PublishedContent
 @using Umbraco.Cms.Core.Models.Blocks
@@ -11,6 +12,13 @@
     var caseworkerGrid = Model.Value<BlockGridModel>("caseworkerArea");
     var hasCitizenBlock = citizenGrid is not null && citizenGrid.Any();
     var hasCaseworkerBlock = caseworkerGrid is not null && caseworkerGrid.Any();
+
+    // Wayfinder.Umbraco's worklist block carries no access-control opinion of its own — see its
+    // own remarks — it renders whatever the signed-in actor's own ActorProfile can see, which for
+    // a citizen is simply an empty/filtered table, not a refusal. A real host is expected to gate
+    // *which pages* an actor can even reach; this reference app's own (deliberately simple) way of
+    // doing that is a role check right here, before the block ever renders.
+    var isCaseworker = Context.User.FindFirst(ClaimTypes.Role)?.Value == ReferenceAppAuth.CaseworkerRole;
 
     // Each seeded page carries exactly one of these two areas — a real citizen-facing page has no
     // business showing a "Caseworker area" heading (empty or not), and vice versa. Only a genuinely
@@ -25,9 +33,17 @@
 
     if (hasCaseworkerBlock)
     {
-        using var caseworkerWriter = new StringWriter();
-        (await Html.GetBlockGridHtmlAsync(caseworkerGrid!)).WriteTo(caseworkerWriter, HtmlEncoder.Default);
-        sections += "<h1 class=\"govuk-heading-l\">Caseworker queue</h1>" + caseworkerWriter;
+        sections += "<h1 class=\"govuk-heading-l\">Caseworker queue</h1>";
+        if (isCaseworker)
+        {
+            using var caseworkerWriter = new StringWriter();
+            (await Html.GetBlockGridHtmlAsync(caseworkerGrid!)).WriteTo(caseworkerWriter, HtmlEncoder.Default);
+            sections += caseworkerWriter;
+        }
+        else
+        {
+            sections += "<div class=\"stage-alert stage-alert--error\"><p>You don't have access to the caseworker queue. <a class=\"govuk-link\" href=\"/demo/login\">Sign in as a caseworker</a> to view it.</p></div>";
+        }
     }
 
     if (!hasCitizenBlock && !hasCaseworkerBlock)
