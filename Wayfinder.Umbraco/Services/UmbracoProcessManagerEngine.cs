@@ -28,8 +28,9 @@ public sealed class UmbracoProcessManagerEngine(
     IServiceRequestStore instanceStore,
     IHttpContextAccessor httpContextAccessor,
     Func<ServiceRequest, ServiceBlueprint, StageDefinition, IReadOnlyDictionary<string, object?>?>? serviceInputsResolver = null,
-    IEnumerable<ISupportSystemClient>? supportSystemClients = null)
-    : ProcessManagerEngine(logger, definitionStore, sanitizer, serviceInputsResolver, instanceStore, supportSystemClients)
+    IEnumerable<ISupportSystemClient>? supportSystemClients = null,
+    IBulkDatasetStore? bulkDatasetStore = null)
+    : ProcessManagerEngine(logger, definitionStore, sanitizer, serviceInputsResolver, instanceStore, supportSystemClients, bulkDatasetStore)
 {
     /// <summary>
     /// A new instance is authenticated when the request creating it belongs to a signed-in

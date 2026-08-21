@@ -100,6 +100,17 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // own richer interface (async token/progress-bar upload) is what's registered here.
         services.TryAddSingleton<Services.IServiceRequestFileStorage, DiskServiceRequestFileStorage>();
 
+        // The engine's own narrower IServiceRequestFileStorage (see the remark just above) backs
+        // IBulkDatasetStore/ISupportSystemClient — EngineServiceRequestFileStorageAdapter delegates
+        // to the richer registration above rather than standing up a second, disconnected storage
+        // backend, so a citizen-uploaded file and the engine's own dataset ingest see the same
+        // bytes. Without this, bulk-dataset-materialize/bulk-dataset-ingest actions silently
+        // no-op (ProcessManagerEngine logs "No IBulkDatasetStore registered" and skips) — the
+        // bulk-data-review capability (docs/guides/bulk-data-review.md in the core Wayfinder repo)
+        // never actually worked in a Wayfinder.Umbraco-hosted blueprint before this.
+        services.TryAddSingleton<Wayfinder.Engine.Abstractions.IServiceRequestFileStorage, EngineServiceRequestFileStorageAdapter>();
+        services.TryAddSingleton<Wayfinder.Engine.Abstractions.IBulkDatasetStore, Wayfinder.Engine.Stores.InMemoryBulkDatasetStore>();
+
         // Binds an async-uploaded file to the opaque token the client carries until the
         // stage's real POST — same IDistributedCache mechanism as the nonce service.
         services.TryAddSingleton<IUploadTokenService, UploadTokenService>();
