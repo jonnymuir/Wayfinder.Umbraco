@@ -53,6 +53,18 @@ public class ServiceRequestStageService(
             return new ServiceRequestStageRenderResult(envelope, blueprintKey, Nonce: "", problems ?? [], formValues ?? new Dictionary<string, string>());
         }
 
+        // A caseworker/citizen viewing an uploaded file, or a bulk-data-review component's own
+        // row cards, needs real REST URLs to fetch against — see WayfinderStageDataController,
+        // the routes these prefixes resolve to. Without this, WithBulkDatasetApiUrls never fires
+        // (ComponentRenderPayload.BulkDatasetApiUrl stays null), and the client-side bulk review
+        // script never even runs: the component keeps rendering its own static "Nothing to review
+        // yet" placeholder regardless of how much data was actually ingested. Found live via a
+        // real Playwright walkthrough that submitted a genuine file and got back a correct summary
+        // but no row cards to act on.
+        var (filesPrefix, bulkDatasetsPrefix) = Controllers.WayfinderStageDataController.BuildUrlPrefixes(blueprintKey, envelope.InstanceId);
+        envelope = envelope.WithFileDownloadUrls(filesPrefix);
+        envelope = envelope.WithBulkDatasetApiUrls(bulkDatasetsPrefix);
+
         // Check-answers is a read-only summary — it has no fields to validate on POST.
         var stepType = envelope.Render?.StepType ?? string.Empty;
         var nonceFields = stepType == "check-answers"

@@ -20,7 +20,17 @@ public sealed class EngineServiceRequestFileStorageAdapter(IServiceRequestFileSt
 {
     public async Task<string> SaveAsync(string instanceId, string fieldKey, Stream content, string fileName, CancellationToken ct = default)
     {
-        var formFile = new FormFile(content, 0, content.Length, fieldKey, fileName);
+        // FormFile's own ContentType/Length getters read Headers/the constructor args directly —
+        // a bare `new FormFile(...)` leaves Headers null, which DiskServiceRequestFileStorage's
+        // own file.ContentType read then NullReferenceExceptions on. FormFile is normally only
+        // ever constructed by ASP.NET Core's own multipart form parser, which always sets this;
+        // direct construction (the only option this adapter has, since it's handed a plain
+        // Stream, not a real multipart request) needs to set it explicitly instead.
+        var formFile = new FormFile(content, 0, content.Length, fieldKey, fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/octet-stream"
+        };
         var reference = await inner.SaveAsync(instanceId, fieldKey, formFile, ct);
         return reference.StorageKey;
     }

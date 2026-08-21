@@ -1,8 +1,19 @@
 @model Wayfinder.Umbraco.Models.ServiceRequestPageViewModel
+@{
+    // A panel component (see ServiceRequestRenderShellResolver's own remarks on why a panel no
+    // longer forces the terminal "confirmation" shell whenever real actions exist) already
+    // renders its own <h1 class="govuk-panel__title"> — skip this shell's own heading in that
+    // case rather than showing the state name twice, matching Wayfinder.Rendering.GovUk's own
+    // RenderJourneyBody/HasPanel convention for exactly this.
+    var hasPanel = Model.Components.Any(c => c.Type == "panel");
+}
 
 <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
-        <h1 class="govuk-heading-l">@Model.StateDisplayName</h1>
+        @if (!hasPanel)
+        {
+            <h1 class="govuk-heading-l">@Model.StateDisplayName</h1>
+        }
 
         <wayfinder-stage-form instance-id="@Model.InstanceId"
                              state-version="@Model.StateVersion"
