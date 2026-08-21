@@ -104,14 +104,20 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
     }
 
     /* Outer-tree declarations beat the editor's own :host rules, which hard-code
-       height: 100% + overflow: hidden for viewport-owning hosts. Here that combination
-       would resolve against this host's now-definite height and clip the editor to
-       exactly the container — leaving nothing for the scroll container above to scroll.
-       Force natural content height instead. */
+       height: 100% + overflow: hidden for viewport-owning hosts. This host is already the
+       scroll container above (a definite height:100%, per the comment above), so give the
+       editor that same definite height rather than a min-height:70vh floor — a fixed
+       percentage of the viewport ignores how much of it Umbraco's own chrome (top nav,
+       section tabs, this workspace's own Canvas/Calculations/Validation/Definition tabs)
+       actually leaves available, so on real screens the canvas — and the bird's-eye-view
+       minimap pinned to its bottom-right corner — routinely runs past the fold even though
+       nothing is technically clipped (this :host still scrolls to reach it). height: 100%
+       against a genuinely definite ancestor doesn't collapse the way an unconstrained
+       height: auto chain would; overflow stays visible so a canvas that's still taller than
+       its box (a large graph) keeps scrolling within this host exactly as before. */
     wayfinder-service-blueprint-editor {
       display: block;
-      height: auto;
-      min-height: 70vh;
+      height: 100%;
       overflow: visible;
     }
   `;
