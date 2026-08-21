@@ -32,7 +32,16 @@ public static class ServiceRequestRenderShellResolver
 
         var hasInteractiveInputs = items.Any(ComponentHasInteractiveInputs);
 
-        if (HasComponentType(items, "panel") && !hasInteractiveInputs)
+        // A panel signals a genuinely terminal/confirmation screen only when there's nothing
+        // left to do here — no interactive inputs AND no real routes to trigger. The core
+        // Wayfinder blueprint convention also uses "panel" purely for a heading treatment on
+        // stages that still have real actions (see the reference njf-contributions.json's own
+        // review/confirm-warnings stages) — the core Wayfinder.Rendering.GovUk pipeline renders
+        // those fine (it has no notion of shells at all), but this package's own shell split
+        // was flattening any such stage to _Stage-Completion's inert <a href="/"> links instead
+        // of real submit buttons. Found live: a bulk-data-review stage's own "Resubmit corrected
+        // file" route rendered as a dead link once AvailableActions was actually populated.
+        if (HasComponentType(items, "panel") && !hasInteractiveInputs && !hasAvailableActions)
         {
             return "confirmation";
         }
@@ -42,7 +51,17 @@ public static class ServiceRequestRenderShellResolver
             return "status-timeline";
         }
 
-        return NormalizeShell(legacyStepType) ?? "question";
+        var normalized = NormalizeShell(legacyStepType);
+        if (normalized == "confirmation" && hasAvailableActions)
+        {
+            // The engine's own component-shape inference (ComponentExtensions.InferStepType,
+            // which has no notion of AvailableActions) still said "confirmation" — right for a
+            // genuinely terminal stage, wrong here since real actions exist. check-answers
+            // (_Stage-Review.cshtml) renders the exact same shape with real submit buttons.
+            return "check-answers";
+        }
+
+        return normalized ?? "question";
     }
 
     private static bool AllDataCarryingComponentsAreSummaryLists(IReadOnlyList<ComponentRenderPayload> components)

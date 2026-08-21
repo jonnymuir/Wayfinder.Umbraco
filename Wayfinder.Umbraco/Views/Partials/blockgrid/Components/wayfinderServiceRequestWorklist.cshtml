@@ -15,9 +15,16 @@
     if (!string.IsNullOrEmpty(instanceId))
     {
         // Reviewing one item — same stage-rendering pipeline the stage block itself uses.
+        // ReturnUrl must carry this item's own ?instanceId=/&blueprintKey= query string, not the
+        // bare listing path pageUrl already is (Context.Request.Path drops it) — otherwise every
+        // Advance() from here (a correction's resubmit, an accept, ...) PRGs the caseworker back
+        // to the listing instead of back to the item they were actually working on. Found live:
+        // a real Playwright walkthrough resubmitting a corrected bulk-data-review file landed back
+        // on the queue instead of the item's own wait screen.
         var blueprintKey = Context.Request.Query["blueprintKey"].ToString();
+        var itemUrl = $"{pageUrl}{Context.Request.QueryString}";
         var result = await StageService.RenderCurrentAsync(Context, blueprintKey, instanceId, action: null);
-        var vm = ServiceRequestPageViewModel.FromRenderResult(result, pageUrl);
+        var vm = ServiceRequestPageViewModel.FromRenderResult(result, itemUrl);
         <p><a href="@pageUrl">&larr; Back to worklist</a></p>
         @await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)
         return;
