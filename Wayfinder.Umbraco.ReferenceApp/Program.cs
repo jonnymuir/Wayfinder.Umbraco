@@ -1,7 +1,11 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
+using Wayfinder.Engine.Mcp;
 using Wayfinder.Rendering.GovUk;
+using Wayfinder.Umbraco;
 using Wayfinder.Umbraco.Extensions;
 using Wayfinder.Umbraco.ReferenceApp;
 
@@ -20,6 +24,13 @@ builder.Services.AddWayfinderUmbraco(options =>
         ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     options.ResolveAccessProfile = ctx => ReferenceAppAuth.ResolveAccessProfile(ctx.User);
 });
+
+// AddWayfinderUmbraco() above already registers ServiceBlueprintAuthoringService (the same
+// transport-agnostic service the backoffice REST authoring controller uses) — this just adds
+// the MCP transport over it. Anonymous by design in Wayfinder.Engine.Mcp itself; this app
+// chains its own RequireAuthorization() onto the mapped endpoint below, same convention as
+// Wayfinder.ReferenceApp documents for the REST authoring API.
+builder.Services.AddServiceBlueprintAuthoringMcp();
 
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
@@ -61,5 +72,27 @@ app.UseUmbraco()
         u.UseBackOfficeEndpoints();
         u.UseWebsiteEndpoints();
     });
+
+// Endpoint registration isn't order-dependent on the middleware pipeline structure above (only
+// enforcement is, via UseAuthorization() already wired inside WithMiddleware) — mapped here on
+// `app` directly since this isn't an Umbraco backoffice/website endpoint of its own.
+// BlueprintsAdmin is self-registered by WayfinderUmbracoComposer (no wiring needed for the
+// policy itself) — same policy ServiceBlueprintAuthoringController's REST surface already uses.
+// Explicit AuthenticationSchemes is required here (confirmed live — without it, this endpoint
+// challenges the app's *default* scheme, this reference app's own demo citizen/caseworker
+// cookie, not Umbraco's backoffice one). ServiceBlueprintAuthoringController never needs this
+// because Umbraco's Management API route group forces the backoffice scheme(s) for every
+// controller under it; a bare minimal API mapped outside that grouping doesn't inherit that.
+// The bearer-token scheme is "OpenIddict.Validation.AspNetCore", not
+// Constants.Security.BackOfficeTokenAuthenticationType ("UmbracoBackOfficeToken") — confirmed
+// live: that legacy constant has no registered handler in Umbraco 17 (it moved to OpenIddict's
+// client-credentials grant against the Management API token endpoint — see
+// docs/demos/licence-transfer-mcp-walkthrough.md's historical flow). The interactive backoffice
+// cookie scheme is included too so a signed-in backoffice browser session can call it directly.
+app.MapServiceBlueprintAuthoringMcp().RequireAuthorization(new AuthorizeAttribute
+{
+    Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin,
+    AuthenticationSchemes = $"{Constants.Security.BackOfficeAuthenticationType},OpenIddict.Validation.AspNetCore",
+});
 
 await app.RunAsync();

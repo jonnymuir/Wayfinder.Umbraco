@@ -17,6 +17,12 @@
     <!-- ProjectReference, not a NuGet PackageReference — this app exists to prove the package
          works before it's ever published, and to keep proving it afterward. It never ships. -->
     <ProjectReference Include="../Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
+    <!-- Not one of Wayfinder.Umbraco.csproj's own PackageReferences (that package has no MCP
+         opinion of its own) — this app wires the MCP authoring surface itself, the same way
+         Wayfinder.ReferenceApp does in the core repo, chaining its own RequireAuthorization()
+         onto it (WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin) instead of leaving it
+         anonymous. -->
+    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.7.5" />
   </ItemGroup>
 
   <ItemGroup>
