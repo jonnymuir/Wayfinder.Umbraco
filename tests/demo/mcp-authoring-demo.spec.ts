@@ -220,19 +220,35 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // Idempotent across takes/attempts — a previous registration (possibly against a
       // since-expired token) would otherwise short-circuit `add` with "already exists" and leave
       // a dead entry.
-      await sendTerminalText('claude mcp remove wayfinder-umbraco 2>/dev/null');
-      sendTerminalKey('Enter');
-      await waitForPaneStable();
-
+      //
+      // remove, add, and list are sent as ONE atomic command line rather than three separate
+      // sendTerminalText calls with a waitForPaneStable() between each — confirmed live this was a
+      // real race, not resolved by tuning the stability window. waitForPaneStable() only proxies
+      // "the screen looks quiet for ~450ms," not "the previous process has actually exited" — each
+      // of these is a real subprocess with real (if usually brief) wall-clock work, and under the
+      // heavier system load a real recording take runs under (Chromium + video encoding + the
+      // dotnet app all concurrently), it's realistic for the pane to look quiet for 450ms while one
+      // is still genuinely running and bash hasn't yet regained the terminal — so the next
+      // command's keystrokes land on nothing and get silently dropped. Confirmed live, twice: a
+      // real take where `claude mcp add` never appeared in the session log at all after `remove`
+      // (not corrupted, completely absent), and separately a standalone reproduction where `claude
+      // mcp list` vanished the same way after `add`. A lightweight standalone reproduction with no
+      // browser/video overhead never hit either, consistent with a genuine timing race rather than
+      // a logic bug.
+      //
+      // remove is joined with `;`, not `&&` — confirmed live this distinction is load-bearing:
+      // `claude mcp remove` exits 1 (even with 2>/dev/null suppressing its error *message*) when
+      // there's nothing to remove, which is the NORMAL case on every fresh scratch directory this
+      // Act starts from — `&&` after it would silently short-circuit the whole chain before `add`
+      // ever ran, on exactly the common case. add and list ARE joined with `&&`: add succeeding is
+      // the expected case, and if it doesn't, there's nothing useful for list to check anyway.
       await sendTerminalText(
-        'claude mcp add --transport http wayfinder-umbraco ' +
+        'claude mcp remove wayfinder-umbraco 2>/dev/null; ' +
+          'claude mcp add --transport http wayfinder-umbraco ' +
           'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp ' +
-          '--header "Authorization: Bearer $(jq -r .access_token /tmp/mcp-token.json)"'
+          '--header "Authorization: Bearer $(jq -r .access_token /tmp/mcp-token.json)" && ' +
+          'claude mcp list'
       );
-      sendTerminalKey('Enter');
-      await waitForPaneStable();
-
-      await sendTerminalText('claude mcp list');
       sendTerminalKey('Enter');
       // "claude mcp list" does its own live health check (visibly takes a beat, per the "Checking
       // MCP server health…" line) — waitForPaneStable alone isn't a strong enough signal that the
