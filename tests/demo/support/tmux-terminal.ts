@@ -103,20 +103,64 @@ export async function waitForPaneStable(timeoutMs = 5_000): Promise<void> {
   }
 }
 
-/** Sends literal text to the session, one character at a time, at a human-looking pace. */
-export async function sendTerminalText(text: string, delayMs = 8): Promise<void> {
-  for (const ch of text) {
-    // tmux parses a lone ";" argument as its own command separator BEFORE send-keys sees it —
-    // even after "--" and even with -l — so a bare semicolon is silently swallowed. "\;" is
-    // tmux's documented escape for a literal one.
-    tmux('send-keys', '-t', SESSION, '-l', '--', ch === ';' ? '\\;' : ch);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+/**
+ * Sends the full text to the session as ONE atomic `send-keys` call — this can never drop or
+ * corrupt a leading (or mid-string) character the way per-character sends could, because there's
+ * no per-character race against the pty/shell to lose. Confirmed live, twice, that even a
+ * readiness poll before sending wasn't enough to fully eliminate the old per-character approach's
+ * race: "claude" arrived as "laude" right after session creation, and separately "claude mcp add
+ * ..." arrived with a large leading chunk missing right after an unrelated command had just
+ * returned. A single `-l` argument also sidesteps the old lone-";" escaping problem for free —
+ * that only occurred because each character was passed as its own separate argv element; a
+ * semicolon embedded inside one already-split multi-character argument is never re-parsed by
+ * tmux's own command-line splitter.
+ *
+ * `cosmeticTypingDelayMs` (optional) reveals the newly-appeared text character-by-character in
+ * the recorded page's own DOM mirror ONLY — a purely visual animation layered on top of content
+ * that has already fully and reliably landed in the real terminal, never a re-drive of the real
+ * input. Falls back to an instant reveal (no animation) if the pane's before/after content isn't
+ * a clean append (e.g. a line wrap or scroll happened) rather than risk animating a wrong diff.
+ */
+export async function sendTerminalText(text: string, cosmeticTypingDelayMs = 0): Promise<void> {
+  const before = captureTerminal();
+  tmux('send-keys', '-t', SESSION, '-l', '--', text);
+  if (cosmeticTypingDelayMs > 0) {
+    await animateReveal(before, cosmeticTypingDelayMs);
   }
 }
 
 /** Sends a named key (Enter, Escape, C-c, ...) to the session. */
 export function sendTerminalKey(key: string): void {
   tmux('send-keys', '-t', SESSION, key);
+}
+
+/**
+ * Polls the LIVE pane content (never a rolling session-log tail) until `pattern` matches, or the
+ * timeout elapses. Checking the live pane specifically — not an ever-growing log file — matters:
+ * confirmed live, a rolling tail of the log can still contain a gate's own option text well after
+ * that gate has actually been dismissed and the pane has moved on, which previously caused a
+ * stray answer to get sent into whatever's genuinely on screen by that point (a real, blocking
+ * consent gate's option text overlapped with an already-handled EARLIER gate's option text — "No,
+ * exit" appears in both the trust-folder gate and the BypassPermissions gate, so a rolling-buffer
+ * match on it alone couldn't tell "still showing" from "already handled and now stale").
+ */
+export async function waitForPromptText(pattern: RegExp, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (pattern.test(stripAnsiForMatching(captureTerminal()))) return true;
+    if (Date.now() > deadline) return false;
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+}
+
+/** The inverse of waitForPromptText — polls until `pattern` no longer matches the live pane. */
+export async function waitForPromptTextGone(pattern: RegExp, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (!pattern.test(stripAnsiForMatching(captureTerminal()))) return;
+    if (Date.now() > deadline) return;
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
 }
 
 /** The visible pane content, with SGR colour escapes preserved for the mirror to render. */
@@ -257,6 +301,45 @@ export function ansiToHtml(raw: string): string {
 
 let mirrorTimer: ReturnType<typeof setInterval> | null = null;
 let lastFrame = '';
+let activePage: Page | null = null;
+let animating = false;
+
+/**
+ * Cosmetic-only character reveal for text just sent atomically via sendTerminalText — the real
+ * terminal already has the full content by the time this runs; this only controls what the
+ * recorded page's DOM mirror shows, and when. Sets `animating` so the normal poll loop (below)
+ * steps aside while this drives the DOM directly, restoring it afterward so real content (cursor
+ * blink, later output) resumes updating normally.
+ */
+async function animateReveal(beforeRaw: string, delayMs: number): Promise<void> {
+  if (!activePage) return;
+  // send-keys returns once tmux has queued the write, not once the shell/pty has actually
+  // processed and echoed it — give that a brief moment before diffing.
+  await new Promise(resolve => setTimeout(resolve, 60));
+  const afterRaw = captureTerminal();
+  if (!afterRaw.startsWith(beforeRaw)) {
+    // Not a clean append (a line wrap or scroll shifted earlier content) — safe fallback: let
+    // the normal poll show the final state instantly rather than animate a wrong diff.
+    return;
+  }
+  const newPortion = afterRaw.slice(beforeRaw.length);
+  if (!newPortion.trim()) return;
+
+  animating = true;
+  try {
+    for (let i = 1; i <= newPortion.length; i++) {
+      const html = ansiToHtml((beforeRaw + newPortion.slice(0, i)).replace(/\n$/, ''));
+      await activePage.evaluate((innerHtml) => {
+        const content = document.getElementById('demo-terminal-content');
+        if (content) content.innerHTML = innerHtml;
+      }, html);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  } finally {
+    animating = false;
+    lastFrame = ''; // force the real poll to resync against actual pane state on its next tick
+  }
+}
 
 async function installMirrorChrome(page: Page): Promise<void> {
   await page.evaluate(({ cols }) => {
@@ -320,6 +403,7 @@ async function installMirrorChrome(page: Page): Promise<void> {
  * capture-pane poll. Idempotent — safe to call again in a later act on the same page.
  */
 export async function showTerminalMirror(page: Page): Promise<void> {
+  activePage = page;
   if (!page.url().startsWith('about:blank')) {
     await page.goto('about:blank');
   }
@@ -328,7 +412,7 @@ export async function showTerminalMirror(page: Page): Promise<void> {
   if (mirrorTimer) return;
   let busy = false;
   mirrorTimer = setInterval(() => {
-    if (busy) return;
+    if (busy || animating) return;
     busy = true;
     void (async () => {
       try {

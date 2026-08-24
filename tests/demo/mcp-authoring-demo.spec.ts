@@ -14,6 +14,8 @@ import {
   stopTerminalMirror,
   stripAnsiForMatching,
   waitForPaneStable,
+  waitForPromptText,
+  waitForPromptTextGone,
   captureTerminal
 } from './support/tmux-terminal';
 
@@ -49,8 +51,12 @@ const adminCredentials = { email: 'admin@example.test', password: 'Wayfinder123!
 const mcpAgentClientId = 'wayfinder-demo-agent';
 const mcpAgentClientSecret = 'DemoAgentLocal!12345';
 const seededDefinitionKey = 'reference-demo';
-const newDefinitionKey = 'transfer-juggling-licence';
-const newDisplayName = 'Transfer a Professional Juggling Licence';
+// Deliberately NOT hardcoded — the brief (see Act 2) never tells the agent what definitionKey or
+// exact displayName to use, on purpose: a real service designer wouldn't dictate an internal
+// implementation slug. Act 2 discovers whatever the agent actually chose (the one new entry that
+// appears in the blueprint list beyond the seeded one) and sets these for Acts 3/4 to read.
+let newDefinitionKey = '';
+let newDisplayName = '';
 const claudeSessionLogPath = '/tmp/wayfinder-umbraco-demo-claude-session.log';
 // Deliberately OUTSIDE this repo checkout — the whole point of Act 1/2 is proving the agent has
 // no filesystem access to the codebase, only the MCP tools it was just given (--tools below
@@ -258,8 +264,13 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
 
   test('Act 2 — handing over the brief', async ({ request }) => {
     // Real agent call, doing real iterative validate → fix → re-validate work — observed
-    // elsewhere in this product line to need well over an initial short poll budget.
-    test.setTimeout(40 * 60_000);
+    // elsewhere in this product line to need well over an initial short poll budget. Confirmed
+    // live: a genuinely good conversation that pauses to ask real clarifying questions (the whole
+    // point of a domain-language brief, per the user's own direction) can legitimately run well
+    // past 35 minutes once real dialogue back-and-forth is involved — a real take hit exactly that
+    // 35-minute completion-poll ceiling while the agent was still productively waiting on an
+    // answer, orphaning an otherwise-healthy conversation when the test gave up and exited.
+    test.setTimeout(65 * 60_000);
 
     // Rehearsal mode: a live agent call can't be cheaply re-run just to check a selector in Acts
     // 3-5, and burning 30+ minutes of real agent time for that would be wasteful — fake the
@@ -269,6 +280,8 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     if (process.env.DEMO_REHEARSAL === '1') {
       await beat(page, 'note', '[Rehearsal mode] Faking the agent\'s end state instead of a real call.');
       const fixture = JSON.parse(readFileSync(path.join(__dirname, 'support', 'rehearsal-fake-blueprint.json'), 'utf8'));
+      newDefinitionKey = fixture.definitionKey;
+      newDisplayName = fixture.displayName;
       let token: string | null = null;
       for (let i = 0; i < 10 && !token; i++) {
         const resp = await request.post('/umbraco/management/api/v1/security/back-office/token', {
@@ -302,8 +315,9 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'intent',
-      "We'll hand it one brief and watch it design a complete branching service — eligibility, real " +
-        'document upload, a review and declaration — entirely on its own.',
+      'A real service designer is going to describe the problem in their own words — no Wayfinder ' +
+        "terminology, just the juggling-licensing world they actually know — and we'll watch the " +
+        'agent design the whole thing from that, asking questions of its own where it needs to.',
       { position: 'top' }
     );
 
@@ -328,7 +342,6 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         '--permission-mode bypassPermissions'
     );
     sendTerminalKey('Enter');
-    await page.waitForTimeout(3_000);
 
     // Two distinct one-time consent gates can appear here, in order, on a genuinely fresh
     // scratch-directory launch — confirmed live, both showed up and neither is the other:
@@ -337,54 +350,104 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // second gate's own text — the brief's own text then got typed straight into that still-open
     // menu and corrupted the underlying shell. (2) the BypassPermissions gate ("1. No, exit
     // 2. Yes, I accept"). Neither appears on every Claude Code version, and neither should be
-    // answered blindly — check the session log for each gate's own distinct text first.
-    let recentLog = stripAnsiForMatching(readFileSync(claudeSessionLogPath, 'utf8').slice(-8000));
-    if (/trust this folder/i.test(recentLog)) {
+    // answered blindly.
+    //
+    // Checking the LIVE pane (waitForPromptText, below) rather than a rolling session-log tail —
+    // confirmed live this matters, not just tidier: a rolling buffer can still contain a gate's
+    // own option text well after that gate was actually dismissed. Both gates' option text
+    // includes "No, exit", so a log-tail match on that phrase couldn't distinguish "gate 1 still
+    // showing" from "gate 1 already handled, and now just stale scrollback" — which once caused a
+    // stray "2" to get sent straight into the live, ready prompt after both gates were long past.
+    // Matching on "Yes, I accept" specifically (unique to gate 2 — gate 1's own affirmative option
+    // reads "Yes, I trust this folder") removes the ambiguity entirely rather than working around
+    // it, and waiting for each gate's text to actually disappear after answering confirms it was
+    // really dismissed rather than just sent-and-hoped.
+    if (await waitForPromptText(/trust this folder/i, 8_000)) {
       await waitForPaneStable();
       await sendTerminalText('1');
       sendTerminalKey('Enter');
-      await page.waitForTimeout(2_000);
+      await waitForPromptTextGone(/trust this folder/i, 5_000);
     }
 
-    recentLog = stripAnsiForMatching(readFileSync(claudeSessionLogPath, 'utf8').slice(-8000));
-    if (/Yes, I accept|No, exit/i.test(recentLog)) {
+    if (await waitForPromptText(/Yes, I accept/i, 5_000)) {
       await waitForPaneStable();
       await sendTerminalText('2');
       sendTerminalKey('Enter');
-      await page.waitForTimeout(1_500);
+      await waitForPromptTextGone(/Yes, I accept/i, 5_000);
     }
 
+    // Pure domain language, no Wayfinder vocabulary anywhere — reviewed and approved verbatim by
+    // the real user. This is the entire point of the demo: a service designer who has never heard
+    // of Wayfinder describes a problem statement, user needs, and constraints in their own terms;
+    // the MCP's own resources/skills/prompts are what teach the LLM the implementation mechanics
+    // (routes, gateways, showWhen, component types), not this brief. Deliberately does NOT name a
+    // definitionKey, an exact displayName, a style-reference blueprint, or which MCP tools/
+    // resources to use — a real designer wouldn't know any of that exists, and specifying it here
+    // would be feeding the agent an already-translated answer instead of proving the MCP does the
+    // translating. It also does NOT pre-avoid the two real engine bugs found during earlier
+    // debugging this session (boolean field validation as a summary-list sibling; showWhen
+    // evaluating pre-submission state) — a real designer has no way to know either exists; if the
+    // live agent hits one, that's the validation-feedback loop working as intended, on camera, not
+    // a problem to engineer around in advance.
     const brief = [
-      `You're designing a Wayfinder service blueprint for the National Juggling Authority. Task: `,
-      `design and build "${newDisplayName}" (definitionKey: ${newDefinitionKey}) — for someone who `,
-      `already holds a professional juggling licence from another juggling authority and wants to `,
-      `transfer it. Read the authoring-guide resource for the contract shape, and use `,
-      `read_service_blueprint on the existing "${seededDefinitionKey}" definition as your style `,
-      `reference for this host's conventions (same citizen/caseworker queue keys). Call `,
-      `list_component_types first and design only with component types it actually returns — `,
-      `include a real file-upload component for supporting evidence, a summary-list reviewing what `,
-      `the applicant entered, and a final declaration boolean field — put the declaration on its own `,
-      `stage, separate from the summary-list's own stage (a real submission bug reproduced this `,
-      `session: a boolean field never validates when it's a sibling of a summary-list component on `,
-      `the same stage — a "check your answers" stage followed by a separate "declare and submit" `,
-      `stage is both the workaround and, arguably, better GDS practice anyway). Branch on eligibility `,
-      `(whether they already hold an existing licence) using showWhen — but put the boolean field that `,
-      `showWhen branches on on its OWN stage, separate from the stage whose routes carry the showWhen `,
-      `(another real bug reproduced this session: showWhen evaluates against PRE-submission state, so `,
-      `a route can never correctly branch on a field captured in that very same submission — it always `,
-      `takes the same branch regardless of the real answer; confirmed by actually running it as a `,
-      `citizen and watching every answer land on the same outcome). So: one stage captures `,
-      `hasExistingLicence, then an unconditional gateway hands off to a second, separate stage whose `,
-      `two routes use showWhen on that already-captured field to branch for real. Remember every `,
-      `stage route must target a gateway, never another stage directly, even a plain unconditional `,
-      `hop, so each branch needs its own single-route pass-through gateway in between (check the `,
-      `authoring-guide resource and the style reference's own route targets for exactly how that's `,
-      `structured). Once you believe the design is right, don't just validate and simulate it — `,
-      `actually call simulate_service_blueprint with real field values for BOTH branches (eligible `,
-      `and not-eligible) and confirm each one truly lands on the outcome it should before saving; a `,
-      `design that only validates cleanly can still be functionally wrong. Fix anything you find, `,
-      `then save the service blueprint with displayName "${newDisplayName}".`
+      'Hi. I work on licensing for the National Juggling Authority. I need help designing a new service.\n\n',
+      'The problem: right now, if someone already holds a current professional juggling licence from ',
+      'another recognised juggling authority and wants to work here, they have to apply for a brand ',
+      "new licence from scratch — exactly the same as someone who's never juggled professionally ",
+      "before. That's not fair on them, it duplicates assessment work that's already been done ",
+      'properly elsewhere, and it puts off exactly the experienced jugglers we want performing here.\n\n',
+      'I want a "transfer your licence" service instead. What I know about how it needs to work:\n',
+      '- Only for jugglers who already hold a current licence from a juggling authority we formally ',
+      'recognise — right now that\'s the European Juggling Federation, Async Circle International, ',
+      "and the Ring Masters Guild. Anyone else isn't eligible for transfer; they need to apply as a ",
+      'new licence holder instead, which is a separate existing service.\n',
+      '- We need to see their current licence certificate and some proof of who they are.\n',
+      '- Before we grant anything, they need to formally declare they\'ll uphold our professional ',
+      'standards — same declaration a new applicant makes.\n',
+      '- A caseworker always has to check the evidence and make the actual decision — this can\'t be ',
+      'auto-approved, someone has to look at the documents.\n',
+      '- Same accessibility bar as everything else we ship — WCAG double-A, in line with the GDS ',
+      'service standard.\n\n',
+      "Can you help me design this properly? Ask me anything you need."
     ].join('');
+
+    // A small, prepared set of in-character domain answers — a real live agent's exact clarifying
+    // questions are unpredictable, so this is matched loosely by topic keyword, the same way a
+    // human operator playing this "designer" role would improvise. Answered only in the domain
+    // language a licensing service designer would actually use — never Wayfinder terminology.
+    const designerFaq: Array<{ topics: RegExp; answer: string }> = [
+      {
+        topics: /expir/i,
+        answer: "If their recognised-authority licence has expired, they're not eligible for " +
+          'transfer — they need to apply as a new licence holder instead, same as anyone without a ' +
+          'recognised licence.'
+      },
+      {
+        topics: /order|sequence|before.*document|document.*before|eligib.*(first|before|when)/i,
+        answer: 'The eligibility check should come before we ask for any documents — no point ' +
+          "asking for paperwork from someone who isn't eligible in the first place."
+      },
+      {
+        topics: /identity|proof of who|only.*(licence|certificate)|missing.*document/i,
+        answer: "If they can't provide proof of identity, only the licence certificate, then we " +
+          "can't process the transfer — both documents are required before a caseworker can review it."
+      },
+      {
+        topics: /reject|declin|turn(ed)? down/i,
+        answer: 'If a caseworker rejects the application, the applicant should be told clearly why, ' +
+          'and given the option to apply as a new licence holder instead if that\'s more appropriate.'
+      },
+      {
+        topics: /queue|caseworker.*(team|group|multiple)|how many caseworker/i,
+        answer: "Just one caseworker queue for now — this is a small transfer scheme."
+      },
+      {
+        topics: /save.*(later|progress)|come back|partial|resume/i,
+        answer: "Yes, being able to save and come back later would help — this isn't something " +
+          'people can necessarily finish in one sitting, especially if they need to go find their ' +
+          'documents.'
+      }
+    ];
 
     await waitForPaneStable();
     await sendTerminalText(brief, 12);
@@ -450,15 +513,58 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       await page.waitForTimeout(1_000);
     }
 
+    // Real dialogue, not a one-shot paste: the agent may ask genuine clarifying questions before
+    // it's done designing, and the "designer" persona should answer in domain language, live. A
+    // live agent's exact wording is unpredictable, so this is a pragmatic best-effort check, not
+    // an exhaustive one — the same way a human operator playing this role would improvise.
+    let lastAnsweredSnapshot = '';
+    async function respondToLiveQuestionIfWaiting(): Promise<void> {
+      const current = stripAnsiForMatching(captureTerminal());
+      if (!current.trim() || current === lastAnsweredSnapshot) return;
+      // Only treat it as "waiting on the human" if the pane has genuinely settled (not mid-stream)
+      // AND the tail of the visible content actually ends in a question — a cheap, deliberately
+      // imperfect signal, same spirit as a human glancing at the screen to see if it's their turn.
+      await waitForPaneStable(1_500);
+      const settled = stripAnsiForMatching(captureTerminal());
+      if (settled !== current) return; // still changing — genuinely not settled, skip this tick
+
+      // stripAnsiForMatching collapses ALL whitespace, including every newline, into single
+      // spaces — so there's no line structure left to find "the last line of real text" with.
+      // Confirmed live this made the original tight "?" -near-the-very-end check miss a real,
+      // clearly-waiting question: the empty input box's own border plus the footer status bar
+      // (bypass-permissions hint, login-expiry warning, etc.) trails several hundred characters
+      // AFTER the actual question text, so the "?" was already well outside a 500-char tail
+      // window. Search a much wider window for the LAST "?", and accept it if it's within a
+      // margin roughly the size of that trailing chrome — rejecting only if there's clearly a lot
+      // of further prose after it (which would mean still mid-explanation, not genuinely waiting).
+      const tail = settled.slice(-3_000);
+      const lastQuestionMark = tail.lastIndexOf('?');
+      if (lastQuestionMark === -1 || tail.length - lastQuestionMark > 600) return;
+
+      const match = designerFaq.find(entry => entry.topics.test(tail));
+      const answer = match
+        ? match.answer
+        : "Good question — use your best judgement on that one, based on how the rest of the " +
+          'service works; I trust you to make a sensible call.';
+      await waitForPaneStable();
+      await sendTerminalText(answer);
+      sendTerminalKey('Enter');
+      lastAnsweredSnapshot = settled;
+      await page.waitForTimeout(500);
+    }
+
     let stopKeepalive = false;
     const keepalive = (async () => {
       const refreshEveryMs = 4 * 60_000;
       while (!stopKeepalive) {
         // Poll the stop flag in short slices rather than one long wait — the finally block
         // below needs this loop to exit promptly once the real poll resolves, not up to
-        // refreshEveryMs late.
+        // refreshEveryMs late. Also the natural cadence for checking whether the agent is
+        // waiting on a clarifying-question answer — real dialogue needs a much tighter loop than
+        // the 4-minute token-refresh cycle below.
         for (let waited = 0; waited < refreshEveryMs && !stopKeepalive; waited += 5_000) {
           await page.waitForTimeout(5_000);
+          await respondToLiveQuestionIfWaiting();
         }
         if (stopKeepalive) break;
         await refreshStoredMcpToken();
@@ -474,6 +580,24 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         async () => {
           const token = await mintAgentToken();
           if (!token) return false;
+
+          // The brief never told the agent what definitionKey or exact displayName to use (see
+          // its own remarks above) — discover whatever it actually chose instead of assuming a
+          // fixed key. The seeded "reference-demo" blueprint is the only one known to exist at
+          // the start of this act, so the first OTHER entry the list endpoint reports is the
+          // agent's own new creation, whatever it named it.
+          if (!newDefinitionKey) {
+            const listResp = await request.get('/umbraco/management/api/v1/wayfinder/service-blueprints', {
+              headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true
+            }).catch(() => null);
+            if (!listResp?.ok()) return false;
+            const summaries: Array<{ definitionKey: string; displayName: string }> = await listResp.json();
+            const created = summaries.find(s => s.definitionKey !== seededDefinitionKey);
+            if (!created) return false;
+            newDefinitionKey = created.definitionKey;
+            newDisplayName = created.displayName;
+          }
+
           const response = await request.get(
             `/umbraco/management/api/v1/wayfinder/service-blueprints/${newDefinitionKey}`,
             { headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true }
@@ -494,7 +618,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
             definition.stages?.some((s: { components?: AnyComponent[] }) => hasFileUpload(s.components))
           );
         },
-        { timeout: 35 * 60_000, intervals: [10_000] }
+        { timeout: 55 * 60_000, intervals: [10_000] }
       ).toBe(true);
     } finally {
       stopKeepalive = true;
@@ -567,6 +691,44 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         'there, all saved, all real.'
     );
 
+    // Translate Wayfinder's implementation back to the domain requirement it satisfies — never
+    // the other way round. Deliberately generic rather than matching specific stage names/wording:
+    // the brief never told the agent what to call anything, so this finds whichever stage the
+    // agent actually made into the branch point (2+ outgoing routes = a real decision, not just a
+    // straight-through hop) rather than assuming a name. Best-effort — if the agent's own design
+    // shape doesn't match this expectation for some reason, skip gracefully rather than fail the
+    // whole act over a narration flourish.
+    const canvas = page.getByRole('application', { name: /graph canvas/i });
+    const stageNodes = canvas.getByRole('button', { name: /Applicant queue|Caseworker queue/ });
+    const stageCount = await stageNodes.count();
+    let shownBranchPoint = false;
+    for (let i = 0; i < stageCount && !shownBranchPoint; i++) {
+      await humanClick(page, stageNodes.nth(i));
+      await page.waitForTimeout(500);
+      const routes = page.getByRole('region', { name: 'Outgoing routes' }).getByRole('article');
+      if ((await routes.count()) >= 2) {
+        shownBranchPoint = true;
+        await beat(
+          page,
+          'note',
+          'You said only jugglers from a recognised authority can transfer — here, each outgoing ' +
+            'route has its own "Available when" condition, which is exactly where Wayfinder ' +
+            'implemented that eligibility rule as real routing logic, evaluated before the ' +
+            "applicant even reaches the rest of the form.",
+          { position: 'top' }
+        );
+        await page.waitForTimeout(1_000);
+      }
+    }
+
+    await beat(
+      page,
+      'note',
+      'And the document upload and the caseworker review, further round the graph, are the other ' +
+        "two requirements from the brief — the evidence you asked to see, and the decision you " +
+        'said always needs a person, not an automatic approval.'
+    );
+
     await humanClick(page, page.getByRole('tab', { name: /validation/i }));
     await page.waitForTimeout(800);
     await beat(page, 'note', 'And the validation tab confirms it — a clean, valid definition, exactly as the agent left it.');
@@ -618,6 +780,42 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       for (let i = 0; i < checkboxCount; i++) {
         const box = checkboxes.nth(i);
         if (!(await box.isChecked())) await humanClick(page, box);
+      }
+
+      // Wayfinder's "radio" component is a real GOV.UK radio group — never handled by this walk
+      // at all until now. Confirmed live this is load-bearing, not cosmetic: a real design's
+      // eligibility question ("Which authority issued your current licence?") rendered as a radio
+      // group as its very first stage, so leaving it unanswered meant every later stage was
+      // unreachable and the request never reached the caseworker queue — the walk quietly
+      // exhausted its whole step budget stuck on stage one. Group by `name` (GOV.UK radios in one
+      // question always share it) and pick one option per group — preferring an option whose own
+      // label doesn't read as a negative/opt-out choice ("none of these", "none of the above",
+      // "not sure"), so the happy path stays eligible rather than randomly bailing out into a
+      // rejection branch.
+      const radios = main.locator('input[type="radio"]');
+      const radioCount = await radios.count();
+      if (radioCount > 0) {
+        const radioGroupNames = new Set<string>();
+        for (let i = 0; i < radioCount; i++) {
+          const name = await radios.nth(i).getAttribute('name');
+          if (name) radioGroupNames.add(name);
+        }
+        for (const name of radioGroupNames) {
+          const group = main.locator(`input[type="radio"][name="${name}"]`);
+          if (await group.locator(':checked').count() > 0) continue;
+          const optionCount = await group.count();
+          let chosen = group.first();
+          for (let i = 0; i < optionCount; i++) {
+            const option = group.nth(i);
+            const id = await option.getAttribute('id');
+            const labelText = id ? await page.locator(`label[for="${id}"]`).innerText().catch(() => '') : '';
+            if (!/none of these|none of the above|not sure|don'?t know/i.test(labelText)) {
+              chosen = option;
+              break;
+            }
+          }
+          await humanClick(page, chosen);
+        }
       }
 
       // Wayfinder's "date" component renders as GOV.UK's real day/month/year triple-input
