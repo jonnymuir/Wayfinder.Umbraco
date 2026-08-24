@@ -1,0 +1,90 @@
+# MCP authoring demo — recording
+
+`mcp-authoring-demo.spec.ts` captures the real backoffice-authenticated MCP authoring surface
+(wired into `Wayfinder.Umbraco.ReferenceApp` — see that project's own README, "MCP service
+blueprint authoring") as one continuous take: creating a dedicated API user for an agent and
+connecting Claude Code to nothing but the real MCP endpoint (Act 1), handing it a brief to design
+and save a complete branching service — eligibility, real document upload, a review-and-declare
+step (Act 2), pointing the site's own `/apply` page at what it built (Act 3), reviewing the saved
+definition in the visual editor (Act 4), and running it end to end as a real citizen applicant and
+a real caseworker (Act 5).
+
+**This is not a CI test.** It's a recording tool, ported from Umbraco.Prism's own
+`tests/demo/garden-waste-demo.spec.ts` and `.claude/skills/narrated-single-take-demo-recording/SKILL.md`
+— see that skill doc for the general patterns this follows (one shared Playwright `Page` across
+every act so the video is one file, not several; narration timing computed from word count; a
+tmux `capture-pane` DOM mirror instead of driving a real terminal emulator in the recorded
+browser; headed Chromium for the long unattended agent wait; polling the real REST authoring API
+as the only valid "the agent is done" signal).
+
+## Setup
+
+1. **Reset and warm the reference app, off-camera.** A genuinely clean take needs a fresh SQLite
+   database (so Act 1 doesn't collide with a leftover agent user from a previous run, and Act 3
+   starts from the seeded `reference-demo` placeholder every time). `Umbraco__CMS__Global__TimeOut`
+   is not optional for a real take — confirmed live: Act 2's real agent call routinely runs well
+   past Umbraco's ~20-minute default backoffice session timeout, and Act 3 (which reuses Act 1's
+   admin login) then fails with the admin session already expired; the same fix Umbraco.Prism's
+   own real-take instructions use:
+   ```
+   rm -rf ../../Wayfinder.Umbraco.ReferenceApp/umbraco/Data/*
+   Umbraco__CMS__Global__TimeOut=02:00:00 \
+     dotnet run --project ../../Wayfinder.Umbraco.ReferenceApp --launch-profile Wayfinder.Umbraco.ReferenceApp
+   ```
+   Wait for it to finish its unattended install and start serving `https://localhost:44399`.
+2. **Install this directory's own dependencies** (separate from the rest of the repo — this is
+   the only place in Wayfinder.Umbraco that needs Playwright):
+   ```
+   npm install
+   npx playwright install chromium
+   ```
+3. **Run it:**
+   ```
+   npm run demo:record
+   ```
+   Output lands in `demo-footage/` (gitignored): `wayfinder-umbraco-mcp-authoring-demo.webm`
+   (`.mp4` too, if `ffmpeg` is on your PATH) and `narration-timeline.json` (the line-by-line
+   script with real video-relative timestamps, for a later voiced-narration pass).
+
+No password, no manual ttyd setup — Act 1 creates the agent's terminal as a plain tmux session the
+spec starts and drives itself (`support/tmux-terminal.ts`), mirrored into the recorded page as
+styled DOM. `CLAUDECODE`/`CLAUDE_CODE_*` env vars are stripped before that session starts, so the
+`claude` process it launches in Act 2 is genuinely independent — not a child of whatever session
+is running this spec.
+
+## Why a separate config, and why this never runs in CI
+
+`playwright.demo-recording.config.ts` assumes the reference app is already running (see
+`support/demo-prereqs-setup.ts` — the opposite of a CI config that spins up its own host). Nothing
+here runs in CI: no `npm run` script or GitHub Actions workflow in this repo references
+`playwright.demo-recording.config.ts`, and the spec's filename doesn't match any CI-facing
+config's `testMatch`.
+
+## Isolation from the packaged NuGet output
+
+This directory is entirely separate from `Wayfinder.Umbraco.Client` (the only piece of this repo
+that actually gets packed into the `Wayfinder.Umbraco` NuGet package, via its `wwwroot/dist`
+build output) and from the repo-root `package.json` (marketplace-doc tooling only). Its own
+`node_modules`/`test-results`/`demo-footage` are gitignored; nothing under `tests/demo/` is
+referenced by any `.csproj`.
+
+## The agent's identity is provisioned at boot, not live during the recording
+
+`ReferenceMcpDemoAgentSeeder` (in `Wayfinder.Umbraco.ReferenceApp`) creates the agent's API user
+(`demo-mcp-agent@wayfinder.local`, admin group) and registers its client credentials
+(`wayfinder-demo-agent` / `DemoAgentLocal!12345`) on every app startup, idempotently — the same
+"provisioned once, ahead of time" framing the historical Umbraco.Prism MCP demo used. This spec
+never creates the agent's identity itself.
+
+That's deliberate, not just a style choice: this Playwright version redacts the live
+`Authorization` header/token value to the literal string `"[redacted]"` on every inspection API
+tried (`request.headers()`, `headerValue()`, even raw CDP `Network.requestWillBeSent`) when the
+traffic is the *page's own* network activity — confirmed live, this makes it unsafe for a
+recording script to capture the interactive backoffice SPA's own bearer token to make
+authenticated Management API calls of its own. Minting the *agent's own* token via a script-
+initiated `curl` call (as Act 1 does, inside the terminal) is unaffected — that's a call this
+script/terminal makes directly, not one it observes.
+
+For a genuinely fresh take (a new `reference-demo` starting point for Act 3, a clean re-run of the
+seeder), reset the reference app's SQLite database first, per step 1 above — the seeder is
+idempotent either way, so re-running without a reset just reuses the same agent identity.

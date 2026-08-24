@@ -40,6 +40,10 @@ builder.CreateUmbracoBuilder()
 
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceBlueprintSeeder>();
+// Scoped, not Singleton like the other two seeders — IBackOfficeUserClientCredentialsManager is
+// itself registered Scoped by Umbraco, and DI validation fails fast on a Singleton consuming a
+// Scoped dependency (confirmed live).
+builder.Services.AddScoped<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceMcpDemoAgentSeeder>();
 
 var app = builder.Build();
 
