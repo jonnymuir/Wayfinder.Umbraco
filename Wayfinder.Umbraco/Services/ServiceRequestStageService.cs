@@ -65,11 +65,20 @@ public class ServiceRequestStageService(
         envelope = envelope.WithFileDownloadUrls(filesPrefix);
         envelope = envelope.WithBulkDatasetApiUrls(bulkDatasetsPrefix);
 
-        // Check-answers is a read-only summary — it has no fields to validate on POST.
-        var stepType = envelope.Render?.StepType ?? string.Empty;
-        var nonceFields = stepType == "check-answers"
-            ? []
-            : envelope.Render?.Components.SelectMany(c => c.Fields).ToList() ?? [];
+        // Always the real rendered fields, regardless of StepType. A prior version special-cased
+        // "check-answers" to an empty list (the reasoning: a check-answers page is a read-only
+        // summary, nothing to validate on POST) — wrong, because ComponentExtensions.InferStepType
+        // classifies a stage as "check-answers" the moment it contains ANY SummaryListComponent
+        // anywhere in its tree, even one that's just a caseworker's note alongside genuinely new,
+        // required input fields (the "request more information" reject-resubmit pattern). That
+        // shortcut silently emptied the nonce's field list for such a stage, so every real
+        // submitted field came back "Unknown field" on POST — confirmed live via a real HTTP
+        // round-trip against a blueprint using exactly this pattern. The special case was also
+        // redundant even for a genuinely pure check-answers stage: its own real fields are already
+        // all ReadOnly (BuildComponents stamps summary-list children ReadOnly = true), which
+        // FieldValueValidator already skips — so just always computing the real list is both
+        // correct and no more expensive for the pure case.
+        var nonceFields = envelope.Render?.Components.SelectMany(c => c.Fields).ToList() ?? [];
 
         var nonce = await nonceService.CreateAsync(nonceFields);
 
