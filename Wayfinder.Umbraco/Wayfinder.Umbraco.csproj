@@ -28,7 +28,7 @@
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <PackageId>Wayfinder.Umbraco</PackageId>
     <Title>Wayfinder for Umbraco</Title>
-    <Version>0.7.5</Version>
+    <Version>0.7.6</Version>
     <Authors>Jonny Muir</Authors>
     <Company>Wayfinder</Company>
     <Description>Umbraco-hosted implementation of Wayfinder service design — a DB-backed, uSync-portable service blueprint store, a backoffice authoring API, and two Block Grid-composable building blocks (a citizen-facing stage journey and a caseworker-facing worklist) for any Umbraco v17+ site. An authoritative in-process engine, real multi-queue support, no multi-tenancy or auth opinions of its own; a host wires its own identity/tenant resolution on top.</Description>
@@ -66,9 +66,9 @@
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="$(UmbracoVersion)" />
-    <PackageReference Include="Wayfinder" Version="0.7.5" />
+    <PackageReference Include="Wayfinder" Version="0.7.6" />
     <PackageReference Include="Wayfinder.Editor" Version="0.2.1" />
-    <PackageReference Include="Wayfinder.Engine" Version="0.7.5" />
+    <PackageReference Include="Wayfinder.Engine" Version="0.7.6" />
     <PackageReference Include="Wayfinder.Rendering.GovUk" Version="0.3.4" />
   </ItemGroup>
 
