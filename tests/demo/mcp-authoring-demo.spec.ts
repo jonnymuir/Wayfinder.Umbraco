@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beat, showSlate, clearSlate, moveNarrationTo, startNarrationTimeline, getNarrationTimeline } from './support/narration';
@@ -491,65 +491,50 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       return body.access_token ?? null;
     }
 
-    // The client-credentials token `claude mcp add` was given (Act 1) is short-lived (~5
-    // minutes) and gets cached in-memory by the already-running `claude` process — it does NOT
-    // pick up a refreshed value from ~/.claude.json on its own. Confirmed live, twice, in a real
-    // take: the agent's own tool calls started failing with an auth error mid-design ("The MCP
-    // connection needs re-authorization") once the original token aged out, and it correctly
-    // stopped and asked for help rather than guessing. The real, working recovery (also
-    // confirmed live): write a freshly-minted token into the stored config, then drive the
-    // session's own `/mcp` → select server → Reconnect flow, which re-reads the config file —
-    // after that a plain nudge lets the agent resume exactly where it left off. This loop does
-    // that proactively, well inside the token's lifetime, so the agent ideally never needs to
-    // stop and ask at all.
-    const claudeConfigPath = path.join(homedir(), '.claude.json');
-    async function refreshStoredMcpToken(): Promise<void> {
-      const token = await mintAgentToken();
-      if (!token) return;
-      const config = JSON.parse(readFileSync(claudeConfigPath, 'utf8'));
-      const project = config.projects?.[scratchDir];
-      if (project?.mcpServers?.['wayfinder-umbraco']) {
-        project.mcpServers['wayfinder-umbraco'].headers.Authorization = `Bearer ${token}`;
-        writeFileSync(claudeConfigPath, JSON.stringify(config));
-      }
-    }
-
-    async function reconnectMcpAndNudge(): Promise<void> {
-      await waitForPaneStable();
-      await sendTerminalText('/mcp');
-      sendTerminalKey('Enter');
-      await page.waitForTimeout(1_500);
-      sendTerminalKey('Enter'); // select the (only) server row
-      await page.waitForTimeout(1_000);
-      sendTerminalKey('Enter'); // select "Reconnect" (first menu item)
-      await page.waitForTimeout(1_500);
-      await waitForPaneStable();
-      await sendTerminalText('Reconnected. Please retry.');
-      sendTerminalKey('Enter');
-      await page.waitForTimeout(1_000);
-    }
+    // A proactive token-refresh + /mcp-Reconnect-and-nudge mechanism used to live here, on the
+    // theory that refreshing well inside the token's ~30-minute lifetime meant the agent would
+    // ideally never need to stop and ask. Removed entirely — confirmed live it was net-harmful,
+    // not just unnecessary: reconnectMcpAndNudge sent "Reconnected. Please retry." unconditionally,
+    // regardless of whether the /mcp reconnect actually succeeded. In one real take the reconnect
+    // itself failed (401, "OAuth fallback is disabled when headers.Authorization is set"), the
+    // false "Reconnected" claim sent the agent retrying into a connection with zero MCP tools
+    // available — strictly worse than doing nothing — and it had to stop and ask for help anyway.
+    // A genuine token expiry is already handled fine without any of this: the agent's own tool
+    // calls fail with a real auth error and it correctly stops and asks rather than guessing, which
+    // is a perfectly good outcome on its own. The token lifetime (confirmed live, ~30 minutes) is
+    // also comfortably longer than a realistic Act 2 conversation now runs, making the proactive
+    // path's original justification moot even before its own bug is considered.
 
     // Real dialogue, not a one-shot paste: the agent may ask genuine clarifying questions before
     // it's done designing, and the "designer" persona should answer in domain language, live. A
     // live agent's exact wording is unpredictable, so this is a pragmatic best-effort check, not
     // an exhaustive one — the same way a human operator playing this role would improvise.
-    let lastAnsweredSnapshot = '';
+    // Tracks answers already SENT, by identity (the exact answer string) — not by pane-snapshot
+    // equality. Confirmed live the old "skip if the pane looks the same as last time" dedup was too
+    // fragile: any small unrelated change elsewhere in the pane (a new tool-call line, a token
+    // count tick) makes the snapshot "different" from last time even though the same question is
+    // still the one actually being asked, and the same answer got sent to it identically five times
+    // in one real take. Checking "have I already sent this exact answer, ever" instead is immune to
+    // that — it only cares whether this specific answer has already been given, not what else is on
+    // screen right now.
+    const answersSent = new Set<string>();
     async function respondToLiveQuestionIfWaiting(): Promise<void> {
       // "esc to interrupt" is Claude Code's own TUI state indicator — present ONLY while it's
       // actively working (a real tool call, or still composing a response), removed the instant
       // it's back at an idle prompt. Confirmed live (both a quick text-only reply and a real
       // multi-second tool call): this is a genuine UI state signal, not a text-content heuristic —
-      // checking it FIRST, before anything content-based, directly fixes the earlier repeat-answer
-      // bug: a stale question that hasn't been overwritten yet by a slow-to-render response can no
-      // longer be mistaken for "waiting on the human," because this check alone is enough to know
-      // Claude is still genuinely mid-turn regardless of what the trailing visible text looks like.
-      // The ⏺ response-marker / spinner-frame approach tried first was abandoned — confirmed live
-      // (both directly and by a second independent check) that character is ambiguous between the
-      // two, not a reliable turn signal.
+      // checking it FIRST, before anything content-based, means this can never send while Claude is
+      // still genuinely mid-turn, regardless of what the trailing visible text looks like. This is
+      // a DIFFERENT concern from answersSent above (that one's "don't repeat an answer already
+      // given"; this one's "don't interrupt a turn in progress") — both are needed, neither
+      // subsumes the other. The ⏺ response-marker / spinner-frame approach tried first for this was
+      // abandoned — confirmed live (both directly and by a second independent check) that character
+      // is ambiguous between a real response marker and a spinner-animation frame, not a reliable
+      // turn signal.
       if (captureTerminal().includes('esc to interrupt')) return;
 
       const current = stripAnsiForMatching(captureTerminal());
-      if (!current.trim() || current === lastAnsweredSnapshot) return;
+      if (!current.trim()) return;
       // Only treat it as "waiting on the human" if the pane has genuinely settled (not mid-stream)
       // AND the tail of the visible content actually ends in a question — a cheap, deliberately
       // imperfect signal, same spirit as a human glancing at the screen to see if it's their turn.
@@ -576,32 +561,22 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         ? match.answer
         : "Good question — use your best judgement on that one, based on how the rest of the " +
           'service works; I trust you to make a sensible call.';
+      if (answersSent.has(answer)) return; // already given this exact answer — don't repeat it
       await waitForPaneStable();
       await sendTerminalText(answer);
       sendTerminalKey('Enter');
-      lastAnsweredSnapshot = settled;
+      answersSent.add(answer);
       await page.waitForTimeout(500);
     }
 
+    // No proactive token-refresh cycle here any more (see the removed refreshStoredMcpToken/
+    // reconnectMcpAndNudge's own remarks above) — just a steady poll for whether the agent is
+    // genuinely waiting on a clarifying-question answer.
     let stopKeepalive = false;
     const keepalive = (async () => {
-      const refreshEveryMs = 4 * 60_000;
       while (!stopKeepalive) {
-        // Poll the stop flag in short slices rather than one long wait — the finally block
-        // below needs this loop to exit promptly once the real poll resolves, not up to
-        // refreshEveryMs late. Also the natural cadence for checking whether the agent is
-        // waiting on a clarifying-question answer — real dialogue needs a much tighter loop than
-        // the 4-minute token-refresh cycle below.
-        for (let waited = 0; waited < refreshEveryMs && !stopKeepalive; waited += 5_000) {
-          await page.waitForTimeout(5_000);
-          await respondToLiveQuestionIfWaiting();
-        }
-        if (stopKeepalive) break;
-        await refreshStoredMcpToken();
-        const recentLog = stripAnsiForMatching(readFileSync(claudeSessionLogPath, 'utf8').slice(-4000));
-        if (/re-?auth|token.{0,20}expir/i.test(recentLog)) {
-          await reconnectMcpAndNudge();
-        }
+        await page.waitForTimeout(5_000);
+        await respondToLiveQuestionIfWaiting();
       }
     })();
 
