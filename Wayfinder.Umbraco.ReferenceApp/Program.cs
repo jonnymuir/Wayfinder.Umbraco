@@ -22,7 +22,7 @@ builder.Services.AddWayfinderUmbraco(options =>
     options.ResolveTenantId = _ => "reference";
     options.ResolveUserId = ctx =>
         ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
-    options.ResolveAccessProfile = ctx => ReferenceAppAuth.ResolveAccessProfile(ctx.User);
+    options.ResolveAccessProfile = ReferenceAppAuth.ResolveAccessProfile;
 });
 
 // AddWayfinderUmbraco() above already registers ServiceBlueprintAuthoringService (the same
