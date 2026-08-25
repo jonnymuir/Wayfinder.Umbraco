@@ -535,12 +535,26 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // an exhaustive one — the same way a human operator playing this role would improvise.
     let lastAnsweredSnapshot = '';
     async function respondToLiveQuestionIfWaiting(): Promise<void> {
+      // "esc to interrupt" is Claude Code's own TUI state indicator — present ONLY while it's
+      // actively working (a real tool call, or still composing a response), removed the instant
+      // it's back at an idle prompt. Confirmed live (both a quick text-only reply and a real
+      // multi-second tool call): this is a genuine UI state signal, not a text-content heuristic —
+      // checking it FIRST, before anything content-based, directly fixes the earlier repeat-answer
+      // bug: a stale question that hasn't been overwritten yet by a slow-to-render response can no
+      // longer be mistaken for "waiting on the human," because this check alone is enough to know
+      // Claude is still genuinely mid-turn regardless of what the trailing visible text looks like.
+      // The ⏺ response-marker / spinner-frame approach tried first was abandoned — confirmed live
+      // (both directly and by a second independent check) that character is ambiguous between the
+      // two, not a reliable turn signal.
+      if (captureTerminal().includes('esc to interrupt')) return;
+
       const current = stripAnsiForMatching(captureTerminal());
       if (!current.trim() || current === lastAnsweredSnapshot) return;
       // Only treat it as "waiting on the human" if the pane has genuinely settled (not mid-stream)
       // AND the tail of the visible content actually ends in a question — a cheap, deliberately
       // imperfect signal, same spirit as a human glancing at the screen to see if it's their turn.
       await waitForPaneStable(1_500);
+      if (captureTerminal().includes('esc to interrupt')) return; // re-check post-settle
       const settled = stripAnsiForMatching(captureTerminal());
       if (settled !== current) return; // still changing — genuinely not settled, skip this tick
 
