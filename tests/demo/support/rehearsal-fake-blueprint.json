@@ -1,0 +1,159 @@
+{
+  "definitionKey": "transfer-juggling-licence",
+  "displayName": "Transfer a Professional Juggling Licence",
+  "version": 0,
+  "description": "Rehearsal fixture — a fake end state matching Act 2's real completion-poll condition (stages.length > 1, gateways.length > 0, a file-upload component present), used only when DEMO_REHEARSAL=1 to validate the other acts without spending a real agent take. Two real engine behaviours confirmed live while building this: (1) EVERY stage route must target a gateway, never another stage directly (GATEWAY_ROUTE_TARGETS_STAGE) — even a plain unconditional hop needs its own single-route pass-through gateway; showWhen still lives on the stage's own routes (see juggling-licence.json's own under-review stage — its route targets there are gateway keys, not stage keys). (2) A boolean/input component never validates on submission when it's a sibling of a summary-list component on the SAME stage (a real 'Unknown field' submission bug, reproduced and isolated live) — the declaration field lives on its own 'declare' stage here, separate from 'review', as the workaround.",
+  "initialStage": "eligibility",
+  "requestPolicy": "single",
+  "stages": [
+    {
+      "stageKey": "eligibility",
+      "displayName": "Do you already hold a licence?",
+      "queueKey": "citizen",
+      "components": [
+        {
+          "type": "boolean",
+          "fieldKey": "hasExistingLicence",
+          "label": "I already hold a valid professional juggling licence from another juggling authority",
+          "required": false
+        }
+      ],
+      "routes": [
+        { "id": "eligibility--submit--to-evidence-split", "target": "to-evidence-split", "trigger": "submit", "label": "Continue", "style": "primary", "showWhen": "hasExistingLicence = true" },
+        { "id": "eligibility--submit--to-not-eligible-split", "target": "to-not-eligible-split", "trigger": "submit", "label": "Continue", "style": "primary", "showWhen": "hasExistingLicence = false" }
+      ]
+    },
+    {
+      "stageKey": "not-eligible",
+      "displayName": "You're not eligible to transfer",
+      "queueKey": "citizen",
+      "components": [
+        { "type": "text", "fieldKey": "notEligibleNotice", "label": "You need an existing valid licence to transfer it.", "required": false }
+      ],
+      "routes": []
+    },
+    {
+      "stageKey": "evidence",
+      "displayName": "Upload your existing licence",
+      "queueKey": "citizen",
+      "components": [
+        { "type": "file-upload", "fieldKey": "evidenceFile", "label": "Upload evidence of your existing licence", "required": true }
+      ],
+      "routes": [
+        { "id": "evidence--submit--to-review-split", "target": "to-review-split", "trigger": "submit", "label": "Continue", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "review",
+      "displayName": "Check your answers",
+      "queueKey": "citizen",
+      "components": [
+        {
+          "type": "summary-list",
+          "fieldKey": "reviewSummary",
+          "label": "Your answers",
+          "children": [
+            { "type": "text", "fieldKey": "hasExistingLicence", "label": "Existing licence", "changeStateKey": "eligibility" },
+            { "type": "text", "fieldKey": "evidenceFile", "label": "Evidence uploaded", "changeStateKey": "evidence" }
+          ]
+        }
+      ],
+      "routes": [
+        { "id": "review--submit--to-declare-split", "target": "to-declare-split", "trigger": "submit", "label": "Continue", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "declare",
+      "displayName": "Declare and submit",
+      "queueKey": "citizen",
+      "components": [
+        { "type": "boolean", "fieldKey": "declaration", "label": "I confirm the information I have given is correct", "required": true }
+      ],
+      "routes": [
+        { "id": "declare--submit--to-caseworker-split", "target": "to-caseworker-split", "trigger": "submit", "label": "Submit transfer request", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "caseworker-review",
+      "displayName": "Review transfer request",
+      "queueKey": "caseworker",
+      "components": [
+        { "type": "text", "fieldKey": "caseworkerNotice", "label": "Confirm the applicant's existing licence is valid.", "required": false }
+      ],
+      "routes": [
+        { "id": "caseworker-review--approve--to-complete-split", "target": "to-complete-split", "trigger": "approve", "label": "Approve", "style": "primary" },
+        { "id": "caseworker-review--reject--to-complete-split", "target": "to-complete-split", "trigger": "reject", "label": "Reject", "style": "secondary" }
+      ]
+    },
+    {
+      "stageKey": "complete",
+      "displayName": "Transfer request complete",
+      "queueKey": "citizen",
+      "components": [
+        { "type": "text", "fieldKey": "completeNotice", "label": "Your transfer request has been submitted.", "required": false }
+      ],
+      "routes": []
+    }
+  ],
+  "gateways": [
+    {
+      "key": "to-evidence-split",
+      "displayName": "To evidence",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-evidence-split--submit--evidence", "target": "evidence", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-not-eligible-split",
+      "displayName": "To not eligible",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-not-eligible-split--submit--not-eligible", "target": "not-eligible", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-review-split",
+      "displayName": "To review",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-review-split--submit--review", "target": "review", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-declare-split",
+      "displayName": "To declare",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-declare-split--submit--declare", "target": "declare", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-caseworker-split",
+      "displayName": "Hand off to caseworker",
+      "gatewayType": "Split",
+      "queueKey": "citizen",
+      "routes": [
+        { "id": "to-caseworker-split--submit--caseworker-review", "target": "caseworker-review", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-complete-split",
+      "displayName": "To complete",
+      "gatewayType": "Split",
+      "queueKey": "caseworker",
+      "routes": [
+        { "id": "to-complete-split--approve--complete", "target": "complete", "trigger": "approve" },
+        { "id": "to-complete-split--reject--complete", "target": "complete", "trigger": "reject" }
+      ]
+    }
+  ],
+  "queues": [
+    { "key": "citizen", "displayName": "Applicant", "actor": "citizen" },
+    { "key": "caseworker", "displayName": "Caseworker", "actor": "caseworker" }
+  ]
+}

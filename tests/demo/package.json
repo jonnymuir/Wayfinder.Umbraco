@@ -1,0 +1,13 @@
+{
+  "name": "wayfinder-umbraco-demo-recording",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo:record": "playwright test -c playwright.demo-recording.config.ts --reporter=line"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.0",
+    "typescript": "~5.9.3"
+  }
+}
