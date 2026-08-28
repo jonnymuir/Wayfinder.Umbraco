@@ -427,43 +427,60 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       "Can you help me design this properly? Ask me anything you need."
     ].join('');
 
-    // A small, prepared set of in-character domain answers — a real live agent's exact clarifying
-    // questions are unpredictable, so this is matched loosely by topic keyword, the same way a
-    // human operator playing this "designer" role would improvise. Answered only in the domain
-    // language a licensing service designer would actually use — never Wayfinder terminology.
-    const designerFaq: Array<{ topics: RegExp; answer: string }> = [
-      {
-        topics: /expir/i,
-        answer: "If their recognised-authority licence has expired, they're not eligible for " +
-          'transfer — they need to apply as a new licence holder instead, same as anyone without a ' +
-          'recognised licence.'
-      },
-      {
-        topics: /order|sequence|before.*document|document.*before|eligib.*(first|before|when)/i,
-        answer: 'The eligibility check should come before we ask for any documents — no point ' +
-          "asking for paperwork from someone who isn't eligible in the first place."
-      },
-      {
-        topics: /identity|proof of who|only.*(licence|certificate)|missing.*document/i,
-        answer: "If they can't provide proof of identity, only the licence certificate, then we " +
-          "can't process the transfer — both documents are required before a caseworker can review it."
-      },
-      {
-        topics: /reject|declin|turn(ed)? down/i,
-        answer: 'If a caseworker rejects the application, the applicant should be told clearly why, ' +
-          'and given the option to apply as a new licence holder instead if that\'s more appropriate.'
-      },
-      {
-        topics: /queue|caseworker.*(team|group|multiple)|how many caseworker/i,
-        answer: "Just one caseworker queue for now — this is a small transfer scheme."
-      },
-      {
-        topics: /save.*(later|progress)|come back|partial|resume/i,
-        answer: "Yes, being able to save and come back later would help — this isn't something " +
-          'people can necessarily finish in one sitting, especially if they need to go find their ' +
-          'documents.'
+    // A small, prepared set of in-character domain answers was tried first here and abandoned —
+    // confirmed live it's the wrong shape entirely, not just imperfectly tuned: its topic-matching
+    // regexes are coarse keyword matches, and a genuinely different question can innocently share a
+    // keyword with an earlier, already-answered one (e.g. "does another system issue the new
+    // certificate? Any new expiry date to show them?" re-matched an /expir/i entry meant for "has
+    // their licence expired") — three separate dedup-keying schemes were tried to work around this
+    // class of false positive, and all three still depended on regex matching being right in the
+    // first place, which it fundamentally can't always be for open-ended real dialogue.
+    //
+    // Replaced with a real model call that generates the designer's answer fresh, in character, for
+    // every question — no pattern matching, so there's no keyword-collision class of bug left to
+    // have. Haiku, not Sonnet: this is a simple, well-specified conversational completion (answer
+    // one question, in character, from a fixed brief) — a good fit, unlike the earlier abandoned
+    // attempt to have Haiku drive the actual MCP-based design work itself (confirmed live to fail
+    // there: it hallucinated tool calls outside its restricted --tools allowlist instead of using
+    // its real MCP tools). No tools at all here (`--tools ""`) — pure text-in/text-out, matching
+    // `-p`'s own non-interactive print-and-exit mode. The prompt positional argument must come
+    // BEFORE `--tools` on the command line — confirmed live, `--tools` is a variadic flag
+    // (`<tools...>`) that otherwise swallows the next argument as an additional (invalid) tool name
+    // and leaves nothing for the prompt itself.
+    async function generateDesignerAnswer(questionTail: string): Promise<string> {
+      const systemPrompt =
+        'You are roleplaying as a service designer at the National Juggling Authority, answering ' +
+        "a software team's clarifying question about a service you commissioned. Answer ONLY in " +
+        'plain domain language. You are not a software engineer and know nothing about how the ' +
+        'underlying system is built — never use or reference implementation terms (routes, ' +
+        'gateways, showWhen, JSON, component types, field keys, or anything like that). Keep it ' +
+        'brief and conversational — 1-4 sentences, like a real chat reply. Stay consistent with ' +
+        "the brief you already gave; if something wasn't specified, make a sensible judgment call " +
+        'as the domain expert.';
+      const userPrompt =
+        `The brief you gave earlier:\n\n${brief}\n\n` +
+        `The team's current question (this may include some surrounding conversation context — ` +
+        `answer whatever they're actually asking now):\n\n${questionTail}`;
+
+      const fallback =
+        "Good question — use your best judgement on that one, based on how the rest of the " +
+        'service works; I trust you to make a sensible call.';
+
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const raw = execFileSync(
+            'claude',
+            ['-p', '--model', 'haiku', '--system-prompt', systemPrompt, userPrompt, '--tools', ''],
+            { encoding: 'utf8', timeout: 30_000 }
+          );
+          const trimmed = raw.trim();
+          if (trimmed) return trimmed;
+        } catch (err) {
+          console.error(`generateDesignerAnswer attempt ${attempt} failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-    ];
+      return fallback; // both attempts failed — a hardcoded safety net, not the primary mechanism
+    }
 
     await waitForPaneStable();
     await sendTerminalText(brief, 12);
@@ -506,28 +523,13 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // path's original justification moot even before its own bug is considered.
 
     // Real dialogue, not a one-shot paste: the agent may ask genuine clarifying questions before
-    // it's done designing, and the "designer" persona should answer in domain language, live. A
-    // live agent's exact wording is unpredictable, so this is a pragmatic best-effort check, not
-    // an exhaustive one — the same way a human operator playing this role would improvise.
-    // Tracks which QUESTIONS have already received a reply — keyed by the qualifying tail text
-    // itself, regardless of whether the reply came from a designerFaq match or the generic
-    // fallback. This went through two earlier, both-wrong keyings before landing here:
-    // (1) keyed by pane-snapshot equality — too fragile, any small unrelated change elsewhere in
-    //     the pane (a new tool-call line, a token count tick) made the snapshot "different" even
-    //     though the same question was still the one being asked; the same answer went out
-    //     identically five times in one real take.
-    // (2) keyed by answer identity (a Set per FAQ entry/the fallback string) — better, but still
-    //     wrong in a different way: designerFaq's regexes are coarse keyword matches (e.g. entry 0
-    //     is /expir/i, meant for "has their licence expired"), and a LATER, genuinely different
-    //     question can innocently contain the same keyword (confirmed live: "does another system
-    //     issue the new certificate? Any new expiry date to show them?" re-matched entry 0 via the
-    //     word "expiry" alone) — the answer-identity key then permanently blocked EVERY future
-    //     tick, since the same stale entry kept "matching" and was already marked used.
-    // Keying by the tail text itself sidesteps both failure modes: a genuinely persisting
-    // unanswered question keeps producing the same (or a stable) tail and is correctly deduped,
-    // while a genuinely new question — even one that happens to trigger the same FAQ regex via a
-    // shared keyword — produces different tail text and gets a real, fresh reply regardless of
-    // which FAQ entry (or the fallback) ends up answering it.
+    // it's done designing, and the "designer" persona should answer in domain language, live, via
+    // generateDesignerAnswer above — a real model call, not pattern matching, so there's no
+    // keyword-collision class of bug to have any more (see that function's own remarks for the
+    // three earlier, all pattern-matching-based approaches this replaced). Dedup is still needed
+    // independently of that, though: keyed by the qualifying tail text itself, so an exact repeat
+    // of the identical question (e.g. a stale re-render) doesn't get a second, possibly-differently
+    // worded model-generated reply for no reason.
     const questionsAnswered = new Set<string>();
     // Returns a short description of what happened this tick, for the keepalive loop to log —
     // every tick, not just errors, so a future stall leaves a real trail instead of silence either
@@ -570,19 +572,13 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       const tail = settled.slice(-3_000);
       if (questionsAnswered.has(tail)) return 'already answered this exact question, skipping';
 
-      const match = designerFaq.find(entry => entry.topics.test(tail));
-      const answer = match
-        ? match.answer
-        : "Good question — use your best judgement on that one, based on how the rest of the " +
-          'service works; I trust you to make a sensible call.';
+      const answer = await generateDesignerAnswer(tail);
       await waitForPaneStable();
       await sendTerminalText(answer);
       sendTerminalKey('Enter');
       questionsAnswered.add(tail);
       await page.waitForTimeout(500);
-      return match
-        ? `matched FAQ entry ${designerFaq.indexOf(match)} — sent`
-        : 'fallback — sent';
+      return `generated answer sent: "${answer}"`;
     }
 
     // No proactive token-refresh cycle here any more (see the removed refreshStoredMcpToken/
