@@ -518,6 +518,17 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // that — it only cares whether this specific answer has already been given, not what else is on
     // screen right now.
     const answersSent = new Set<string>();
+    // Separate dedup for the generic fallback line specifically — keyed by the QUESTION it's
+    // answering (the matched tail text), not by the answer content. Confirmed live this distinction
+    // is load-bearing: the fallback is one fixed string for every unmatched topic, so keying its
+    // dedup off answersSent (answer identity) meant sending it once for ANY unmatched question
+    // marked it "already used" and silently withheld it for every OTHER, genuinely different
+    // unmatched question for the rest of the conversation — the agent then sat waiting for a reply
+    // that would never come, three separate times in one real take (~9-20 minutes stalled each
+    // time) before this was caught. Every distinct unmatched question must get its own fallback
+    // turn; only an exact repeat of the identical question should be deduped against sending the
+    // fallback twice for it.
+    const fallbackQuestionsAnswered = new Set<string>();
     async function respondToLiveQuestionIfWaiting(): Promise<void> {
       // "esc to interrupt" is Claude Code's own TUI state indicator — present ONLY while it's
       // actively working (a real tool call, or still composing a response), removed the instant
@@ -561,11 +572,16 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         ? match.answer
         : "Good question — use your best judgement on that one, based on how the rest of the " +
           'service works; I trust you to make a sensible call.';
-      if (answersSent.has(answer)) return; // already given this exact answer — don't repeat it
+      if (match) {
+        if (answersSent.has(answer)) return; // already given this exact FAQ answer — don't repeat it
+      } else {
+        if (fallbackQuestionsAnswered.has(tail)) return; // already sent the fallback for THIS question
+      }
       await waitForPaneStable();
       await sendTerminalText(answer);
       sendTerminalKey('Enter');
-      answersSent.add(answer);
+      if (match) answersSent.add(answer);
+      else fallbackQuestionsAnswered.add(tail);
       await page.waitForTimeout(500);
     }
 
