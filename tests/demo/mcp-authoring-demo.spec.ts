@@ -879,10 +879,19 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // same stage forever, exhausting the step budget with the request never actually reaching
       // the caseworker queue, the same failure mode the file-upload and Change-button fixes above
       // both hit for their own reasons.
+      //
+      // Short value for text/textarea, not a long sentence — confirmed live this is also load-
+      // bearing: a real design's "licence number" text field declared maxLength: 20 server-side
+      // (GovUkFields.cs's RenderText never emits a client-visible HTML maxlength attribute, so
+      // there's no signal in the DOM to size against), and the old 48-character fixed sentence
+      // failed that validation identically every time, silently re-displaying the same stage until
+      // the step budget ran out with the request never reaching the caseworker queue — the exact
+      // same failure shape as the file-upload/radio/date fixes above, just one more real constraint
+      // an agent-authored form can impose that this generic walk needed to be robust to.
       const typedFills: Array<[string, string]> = [
-        ['input[type="text"]', 'Reference Juggling Authority, licence JGL-4471'],
-        ['input:not([type])', 'Reference Juggling Authority, licence JGL-4471'],
-        ['textarea', 'Reference Juggling Authority, licence JGL-4471'],
+        ['input[type="text"]', 'JL-123456'],
+        ['input:not([type])', 'JL-123456'],
+        ['textarea', 'JL-123456'],
         ['input[type="email"]', 'alex@example.test'],
         ['input[type="tel"]', '07700 900123'],
         ['input[type="number"]', '1']
