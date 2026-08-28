@@ -509,26 +509,26 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // it's done designing, and the "designer" persona should answer in domain language, live. A
     // live agent's exact wording is unpredictable, so this is a pragmatic best-effort check, not
     // an exhaustive one — the same way a human operator playing this role would improvise.
-    // Tracks answers already SENT, by identity (the exact answer string) — not by pane-snapshot
-    // equality. Confirmed live the old "skip if the pane looks the same as last time" dedup was too
-    // fragile: any small unrelated change elsewhere in the pane (a new tool-call line, a token
-    // count tick) makes the snapshot "different" from last time even though the same question is
-    // still the one actually being asked, and the same answer got sent to it identically five times
-    // in one real take. Checking "have I already sent this exact answer, ever" instead is immune to
-    // that — it only cares whether this specific answer has already been given, not what else is on
-    // screen right now.
-    const answersSent = new Set<string>();
-    // Separate dedup for the generic fallback line specifically — keyed by the QUESTION it's
-    // answering (the matched tail text), not by the answer content. Confirmed live this distinction
-    // is load-bearing: the fallback is one fixed string for every unmatched topic, so keying its
-    // dedup off answersSent (answer identity) meant sending it once for ANY unmatched question
-    // marked it "already used" and silently withheld it for every OTHER, genuinely different
-    // unmatched question for the rest of the conversation — the agent then sat waiting for a reply
-    // that would never come, three separate times in one real take (~9-20 minutes stalled each
-    // time) before this was caught. Every distinct unmatched question must get its own fallback
-    // turn; only an exact repeat of the identical question should be deduped against sending the
-    // fallback twice for it.
-    const fallbackQuestionsAnswered = new Set<string>();
+    // Tracks which QUESTIONS have already received a reply — keyed by the qualifying tail text
+    // itself, regardless of whether the reply came from a designerFaq match or the generic
+    // fallback. This went through two earlier, both-wrong keyings before landing here:
+    // (1) keyed by pane-snapshot equality — too fragile, any small unrelated change elsewhere in
+    //     the pane (a new tool-call line, a token count tick) made the snapshot "different" even
+    //     though the same question was still the one being asked; the same answer went out
+    //     identically five times in one real take.
+    // (2) keyed by answer identity (a Set per FAQ entry/the fallback string) — better, but still
+    //     wrong in a different way: designerFaq's regexes are coarse keyword matches (e.g. entry 0
+    //     is /expir/i, meant for "has their licence expired"), and a LATER, genuinely different
+    //     question can innocently contain the same keyword (confirmed live: "does another system
+    //     issue the new certificate? Any new expiry date to show them?" re-matched entry 0 via the
+    //     word "expiry" alone) — the answer-identity key then permanently blocked EVERY future
+    //     tick, since the same stale entry kept "matching" and was already marked used.
+    // Keying by the tail text itself sidesteps both failure modes: a genuinely persisting
+    // unanswered question keeps producing the same (or a stable) tail and is correctly deduped,
+    // while a genuinely new question — even one that happens to trigger the same FAQ regex via a
+    // shared keyword — produces different tail text and gets a real, fresh reply regardless of
+    // which FAQ entry (or the fallback) ends up answering it.
+    const questionsAnswered = new Set<string>();
     // Returns a short description of what happened this tick, for the keepalive loop to log —
     // every tick, not just errors, so a future stall leaves a real trail instead of silence either
     // way (see the keepalive loop's own remarks for why silence alone doesn't distinguish "nothing
@@ -540,12 +540,12 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // multi-second tool call): this is a genuine UI state signal, not a text-content heuristic —
       // checking it FIRST, before anything content-based, means this can never send while Claude is
       // still genuinely mid-turn, regardless of what the trailing visible text looks like. This is
-      // a DIFFERENT concern from answersSent above (that one's "don't repeat an answer already
-      // given"; this one's "don't interrupt a turn in progress") — both are needed, neither
-      // subsumes the other. The ⏺ response-marker / spinner-frame approach tried first for this was
-      // abandoned — confirmed live (both directly and by a second independent check) that character
-      // is ambiguous between a real response marker and a spinner-animation frame, not a reliable
-      // turn signal.
+      // a DIFFERENT concern from questionsAnswered above (that one's "don't repeat a reply already
+      // given for this question"; this one's "don't interrupt a turn in progress") — both are
+      // needed, neither subsumes the other. The ⏺ response-marker / spinner-frame approach tried
+      // first for this was abandoned — confirmed live (both directly and by a second independent
+      // check) that character is ambiguous between a real response marker and a spinner-animation
+      // frame, not a reliable turn signal.
       if (captureTerminal().includes('esc to interrupt')) return 'busy: esc-to-interrupt present';
 
       const current = stripAnsiForMatching(captureTerminal());
@@ -568,30 +568,21 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // once a turn has genuinely ended, an additional content-based gate here was redundant at
       // best and actively wrong for this common phrasing at worst.
       const tail = settled.slice(-3_000);
+      if (questionsAnswered.has(tail)) return 'already answered this exact question, skipping';
 
       const match = designerFaq.find(entry => entry.topics.test(tail));
       const answer = match
         ? match.answer
         : "Good question — use your best judgement on that one, based on how the rest of the " +
           'service works; I trust you to make a sensible call.';
-      if (match) {
-        const matchIndex = designerFaq.indexOf(match);
-        if (answersSent.has(answer)) return `matched FAQ entry ${matchIndex} — already sent, skipping`;
-        await waitForPaneStable();
-        await sendTerminalText(answer);
-        sendTerminalKey('Enter');
-        answersSent.add(answer);
-        await page.waitForTimeout(500);
-        return `matched FAQ entry ${matchIndex} — sent`;
-      } else {
-        if (fallbackQuestionsAnswered.has(tail)) return 'fallback — already sent for this exact question, skipping';
-        await waitForPaneStable();
-        await sendTerminalText(answer);
-        sendTerminalKey('Enter');
-        fallbackQuestionsAnswered.add(tail);
-        await page.waitForTimeout(500);
-        return 'fallback — sent';
-      }
+      await waitForPaneStable();
+      await sendTerminalText(answer);
+      sendTerminalKey('Enter');
+      questionsAnswered.add(tail);
+      await page.waitForTimeout(500);
+      return match
+        ? `matched FAQ entry ${designerFaq.indexOf(match)} — sent`
+        : 'fallback — sent';
     }
 
     // No proactive token-refresh cycle here any more (see the removed refreshStoredMcpToken/
