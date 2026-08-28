@@ -529,7 +529,11 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // turn; only an exact repeat of the identical question should be deduped against sending the
     // fallback twice for it.
     const fallbackQuestionsAnswered = new Set<string>();
-    async function respondToLiveQuestionIfWaiting(): Promise<void> {
+    // Returns a short description of what happened this tick, for the keepalive loop to log —
+    // every tick, not just errors, so a future stall leaves a real trail instead of silence either
+    // way (see the keepalive loop's own remarks for why silence alone doesn't distinguish "nothing
+    // to do" from "the whole mechanism died").
+    async function respondToLiveQuestionIfWaiting(): Promise<string> {
       // "esc to interrupt" is Claude Code's own TUI state indicator — present ONLY while it's
       // actively working (a real tool call, or still composing a response), removed the instant
       // it's back at an idle prompt. Confirmed live (both a quick text-only reply and a real
@@ -542,30 +546,28 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // abandoned — confirmed live (both directly and by a second independent check) that character
       // is ambiguous between a real response marker and a spinner-animation frame, not a reliable
       // turn signal.
-      if (captureTerminal().includes('esc to interrupt')) return;
+      if (captureTerminal().includes('esc to interrupt')) return 'busy: esc-to-interrupt present';
 
       const current = stripAnsiForMatching(captureTerminal());
-      if (!current.trim()) return;
-      // Only treat it as "waiting on the human" if the pane has genuinely settled (not mid-stream)
-      // AND the tail of the visible content actually ends in a question — a cheap, deliberately
-      // imperfect signal, same spirit as a human glancing at the screen to see if it's their turn.
+      if (!current.trim()) return 'empty pane';
+      // Only treat it as "waiting on the human" once the pane has genuinely settled (not
+      // mid-stream) — combined with "esc to interrupt" already confirmed absent above, this alone
+      // is sufficient to mean it's genuinely the human's turn: Claude Code doesn't sit idle at its
+      // own prompt for any other reason.
       await waitForPaneStable(1_500);
-      if (captureTerminal().includes('esc to interrupt')) return; // re-check post-settle
+      if (captureTerminal().includes('esc to interrupt')) return 'busy: esc-to-interrupt appeared during settle wait';
       const settled = stripAnsiForMatching(captureTerminal());
-      if (settled !== current) return; // still changing — genuinely not settled, skip this tick
+      if (settled !== current) return 'not settled: pane still changing';
 
-      // stripAnsiForMatching collapses ALL whitespace, including every newline, into single
-      // spaces — so there's no line structure left to find "the last line of real text" with.
-      // Confirmed live this made the original tight "?" -near-the-very-end check miss a real,
-      // clearly-waiting question: the empty input box's own border plus the footer status bar
-      // (bypass-permissions hint, login-expiry warning, etc.) trails several hundred characters
-      // AFTER the actual question text, so the "?" was already well outside a 500-char tail
-      // window. Search a much wider window for the LAST "?", and accept it if it's within a
-      // margin roughly the size of that trailing chrome — rejecting only if there's clearly a lot
-      // of further prose after it (which would mean still mid-explanation, not genuinely waiting).
+      // No trailing-"?" requirement here any more — deliberately removed, not just relaxed.
+      // Confirmed live it caused a real stall: Claude Code's own "confirm this or correct it"
+      // prompts (a numbered list of proposed defaults, ending in "tell me 'go' or correct any:")
+      // don't reliably end in a literal "?" — the real "?" can be buried mid-message, well before
+      // the true tail, and the phrasing is still genuinely the human's turn even though the last
+      // sentence is a period. Since "esc to interrupt" absent + pane settled already only fires
+      // once a turn has genuinely ended, an additional content-based gate here was redundant at
+      // best and actively wrong for this common phrasing at worst.
       const tail = settled.slice(-3_000);
-      const lastQuestionMark = tail.lastIndexOf('?');
-      if (lastQuestionMark === -1 || tail.length - lastQuestionMark > 600) return;
 
       const match = designerFaq.find(entry => entry.topics.test(tail));
       const answer = match
@@ -573,26 +575,52 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         : "Good question — use your best judgement on that one, based on how the rest of the " +
           'service works; I trust you to make a sensible call.';
       if (match) {
-        if (answersSent.has(answer)) return; // already given this exact FAQ answer — don't repeat it
+        const matchIndex = designerFaq.indexOf(match);
+        if (answersSent.has(answer)) return `matched FAQ entry ${matchIndex} — already sent, skipping`;
+        await waitForPaneStable();
+        await sendTerminalText(answer);
+        sendTerminalKey('Enter');
+        answersSent.add(answer);
+        await page.waitForTimeout(500);
+        return `matched FAQ entry ${matchIndex} — sent`;
       } else {
-        if (fallbackQuestionsAnswered.has(tail)) return; // already sent the fallback for THIS question
+        if (fallbackQuestionsAnswered.has(tail)) return 'fallback — already sent for this exact question, skipping';
+        await waitForPaneStable();
+        await sendTerminalText(answer);
+        sendTerminalKey('Enter');
+        fallbackQuestionsAnswered.add(tail);
+        await page.waitForTimeout(500);
+        return 'fallback — sent';
       }
-      await waitForPaneStable();
-      await sendTerminalText(answer);
-      sendTerminalKey('Enter');
-      if (match) answersSent.add(answer);
-      else fallbackQuestionsAnswered.add(tail);
-      await page.waitForTimeout(500);
     }
 
     // No proactive token-refresh cycle here any more (see the removed refreshStoredMcpToken/
     // reconnectMcpAndNudge's own remarks above) — just a steady poll for whether the agent is
     // genuinely waiting on a clarifying-question answer.
+    //
+    // Logs every tick's outcome, not just errors — confirmed live this is load-bearing, not just
+    // verbose: a real take stalled ~9 minutes with the agent genuinely idle and nothing ever sent,
+    // and the run log showed nothing either way, making it impossible after the fact to tell
+    // "the mechanism correctly decided there was nothing to do" apart from "the mechanism silently
+    // died." try/catch alone doesn't fully cover this either — `keepalive` is a floating promise
+    // nobody calls .catch() on directly, so Node only surfaces an unhandled rejection once
+    // something eventually awaits it (the finally block below), which can be arbitrarily later
+    // than the real failure, or never if the process is killed first. Catching and logging inline,
+    // per tick, means a thrown error shows up in the run log at the moment it actually happens,
+    // and — just as important — the loop keeps going afterward instead of dying permanently on one
+    // bad iteration.
     let stopKeepalive = false;
+    let keepaliveTick = 0;
     const keepalive = (async () => {
       while (!stopKeepalive) {
         await page.waitForTimeout(5_000);
-        await respondToLiveQuestionIfWaiting();
+        keepaliveTick++;
+        try {
+          const outcome = await respondToLiveQuestionIfWaiting();
+          console.log(`[keepalive #${keepaliveTick}] ${outcome}`);
+        } catch (err) {
+          console.error(`[keepalive #${keepaliveTick}] caught error, continuing: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+        }
       }
     })();
 

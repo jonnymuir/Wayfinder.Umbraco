@@ -16,8 +16,15 @@ const SESSION = 'wayfinder-umbraco-demo-terminal';
 export const TERMINAL_COLS = 150;
 export const TERMINAL_ROWS = 36;
 
+// Every tmux subprocess call in this module funnels through here — a single point to guard
+// against a genuine hang (the tmux server itself becoming unresponsive), not just a thrown error.
+// Confirmed live this matters: try/catch around a caller does nothing for an await that never
+// resolves — it just blocks inside the try block forever, identical in effect to no error handling
+// at all. A real tmux IPC call to a local server is normally near-instant; 10s is generous enough
+// to never legitimately fire, but turns a genuine hang into a real, catchable, loggable timeout
+// error instead of infinite silence.
 function tmux(...args: string[]): string {
-  return execFileSync('tmux', ['-L', SOCKET, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('tmux', ['-L', SOCKET, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000 });
 }
 
 /**
