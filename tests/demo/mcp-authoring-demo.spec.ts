@@ -1,11 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beat, showSlate, clearSlate, moveNarrationTo, startNarrationTimeline, getNarrationTimeline } from './support/narration';
+import {
+  beat,
+  showSlate,
+  clearSlate,
+  moveNarrationTo,
+  startNarrationTimeline,
+  getNarrationTimeline,
+  getWaitSegments,
+  markWaitStart,
+  markWaitEnd
+} from './support/narration';
 import { humanClick, humanType } from './support/human-interactions';
+import { compressDeadTime } from './support/compress-dead-time';
 import {
   startDemoTerminalSession,
   sendTerminalText,
@@ -105,6 +116,20 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         path.join(footageDir, 'narration-timeline.json'),
         JSON.stringify(getNarrationTimeline(), null, 2)
       );
+      const waitSegmentsPath = path.join(footageDir, 'wait-segments.json');
+      writeFileSync(waitSegmentsPath, JSON.stringify(getWaitSegments(), null, 2));
+
+      // Compress dead air (see compress-dead-time.ts) from the .mp4 if ffmpeg produced one, else
+      // the raw .webm — a separate, clearly-named output file, never overwriting the raw take.
+      const mp4Path = finalPath.replace(/\.webm$/, '.mp4');
+      const sourceForCompression = existsSync(mp4Path) ? mp4Path : finalPath;
+      const compressedPath = sourceForCompression.replace(/\.(mp4|webm)$/, '.compressed.mp4');
+      try {
+        const result = compressDeadTime(sourceForCompression, waitSegmentsPath, compressedPath);
+        console.log(`Dead-time compression: ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.error(`Dead-time compression failed, raw take is unaffected: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   });
 
@@ -482,10 +507,32 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       return fallback; // both attempts failed — a hardcoded safety net, not the primary mechanism
     }
 
+    // The brief is long enough that typing it into the bounded tmux pane scrolls earlier lines
+    // away before a viewer ever sees the whole thing at once — a terminal-viewport problem, not an
+    // animation-speed one, so a full-screen slate (immune to pane scrolling) shows the complete
+    // text first, held for a genuinely reading-paced duration, before it's sent to the terminal at
+    // all. bodyStyle overrides the slate's default centered/no-wrap styling with left-aligned
+    // pre-wrap so the brief's own paragraph breaks and bullet list render as written.
+    await showSlate(page, {
+      eyebrow: 'THE BRIEF',
+      title: 'What the designer actually asked for',
+      body: brief,
+      bodyStyle: { whiteSpace: 'pre-wrap', textAlign: 'left', maxWidth: '980px', fontSize: '22px' }
+    });
+    await clearSlate(page);
+
     await waitForPaneStable();
     await sendTerminalText(brief, 12);
     await page.waitForTimeout(300);
     sendTerminalKey('Enter');
+
+    // Everything from here until the agent's save is confirmed is real wall-clock time spent
+    // waiting on a live external process (the agent's own design work, plus gaps before the live
+    // "designer" answers a clarifying question) — nothing for a viewer to read, and not something
+    // that can be sped up live without corrupting the take. Bracketed explicitly here rather than
+    // inferred later from video pixels (see WaitSegment's own remarks) so a post-processing pass
+    // can compress just this stretch afterward.
+    markWaitStart('act2-agent-design');
 
     // The real completion signal is the saved definition itself, not anything printed in the
     // terminal — poll the plain REST authoring API (not MCP) for the one fact that can only
@@ -660,6 +707,8 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       stopKeepalive = true;
       await keepalive;
     }
+
+    markWaitEnd();
 
     await beat(
       page,
