@@ -39,16 +39,58 @@ export interface NarrationTimelineEntry {
   holdMs: number;
 }
 
+/**
+ * A genuinely dead-air stretch — no narration beat covering it, nothing for a viewer to read,
+ * real wall-clock time spent waiting on something external (a live agent conversation) that
+ * can't be sped up live without corrupting the take. Recorded explicitly by the spec bracketing
+ * the actual wait with markWaitStart/markWaitEnd, rather than inferred after the fact from video
+ * pixels — a narration slate that happens to hold still for its own reading-paced duration would
+ * be indistinguishable from real dead air to a generic frame-diff/motion detector, but here
+ * there's no ambiguity: only a stretch the spec itself marks as "nothing narrated, waiting on an
+ * external process" is a wait segment.
+ */
+export interface WaitSegment {
+  startMs: number;
+  endMs: number;
+  label: string;
+}
+
 let recordingStartedAt: number | null = null;
 const timeline: NarrationTimelineEntry[] = [];
+const waitSegments: WaitSegment[] = [];
+let openWait: { startMs: number; label: string } | null = null;
 
 export function startNarrationTimeline(): void {
   recordingStartedAt = Date.now();
   timeline.length = 0;
+  waitSegments.length = 0;
+  openWait = null;
 }
 
 export function getNarrationTimeline(): readonly NarrationTimelineEntry[] {
   return timeline;
+}
+
+export function getWaitSegments(): readonly WaitSegment[] {
+  return waitSegments;
+}
+
+/** Marks the start of a genuinely dead-air stretch (see WaitSegment). Must be paired with a
+ * later markWaitEnd() before the recording finishes — an unclosed wait is dropped rather than
+ * guessed at, since guessing its end would risk compressing real narrated content that follows. */
+export function markWaitStart(label: string): void {
+  if (recordingStartedAt === null || openWait !== null) return;
+  openWait = { startMs: Date.now() - recordingStartedAt, label };
+}
+
+/** Marks the end of the most recently started wait segment. A no-op if none is open. */
+export function markWaitEnd(): void {
+  if (recordingStartedAt === null || openWait === null) return;
+  const endMs = Date.now() - recordingStartedAt;
+  if (endMs > openWait.startMs) {
+    waitSegments.push({ startMs: openWait.startMs, endMs, label: openWait.label });
+  }
+  openWait = null;
 }
 
 function recordTimelineEntry(kind: string, text: string, holdMs: number): void {
@@ -174,16 +216,22 @@ export async function clearBeat(page: Page): Promise<void> {
   await page.waitForTimeout(260);
 }
 
-/** Full-screen title slate — cold open and closing recap. */
+/**
+ * Full-screen title slate — cold open and closing recap, and (via bodyStyle) a dense,
+ * multi-paragraph read like the design brief. bodyStyle merges onto the body element's default
+ * styling (centered, no line-break preservation) — the brief call below overrides whiteSpace/
+ * textAlign/maxWidth/fontSize for a genuinely readable left-aligned block; other callers are
+ * unaffected since they don't pass it.
+ */
 export async function showSlate(
   page: Page,
-  opts: { eyebrow?: string; title: string; body: string; holdMs?: number }
+  opts: { eyebrow?: string; title: string; body: string; holdMs?: number; bodyStyle?: Partial<CSSStyleDeclaration> }
 ): Promise<void> {
   const slateHold = opts.holdMs ?? computeHoldMs(`${opts.title} ${opts.body}`) + 1500;
   recordTimelineEntry('slate', `${opts.title}. ${opts.body}`, slateHold);
   await evaluateResilient(
     page,
-    ({ eyebrow, title, body }) => {
+    ({ eyebrow, title, body, bodyStyle }) => {
       const id = 'demo-slate';
       document.getElementById(id)?.remove();
       const slate = document.createElement('div');
@@ -233,6 +281,7 @@ export async function showSlate(
         fontSize: '25px',
         color: '#f4f6f8'
       } satisfies Partial<CSSStyleDeclaration>);
+      Object.assign(bodyEl.style, bodyStyle ?? {});
       slate.appendChild(bodyEl);
 
       document.body.appendChild(slate);
@@ -240,7 +289,7 @@ export async function showSlate(
         slate.style.opacity = '1';
       });
     },
-    { eyebrow: opts.eyebrow, title: opts.title, body: opts.body }
+    { eyebrow: opts.eyebrow, title: opts.title, body: opts.body, bodyStyle: opts.bodyStyle }
   );
   await page.waitForTimeout(slateHold);
 }
