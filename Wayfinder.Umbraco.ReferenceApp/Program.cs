@@ -7,9 +7,14 @@ using Wayfinder.Engine.Mcp;
 using Wayfinder.Rendering.GovUk;
 using Wayfinder.Umbraco;
 using Wayfinder.Umbraco.Extensions;
+using Wayfinder.Umbraco.Mcp;
 using Wayfinder.Umbraco.ReferenceApp;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// The route the MCP-over-HTTP endpoint is mapped at — shared by the endpoint mapping, its OAuth
+// discovery documents, and the 401-challenge middleware so they can't drift apart.
+const string McpEndpointPath = "/wayfinder/service-blueprint-authoring/mcp";
 
 // Local secrets override — gitignored.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
@@ -36,6 +41,13 @@ builder.CreateUmbracoBuilder()
     .AddBackOffice()
     .AddWebsite()
     .AddComposers()
+    // One-click MCP OAuth: an MCP client (Claude Code, etc.) connects by logging into this
+    // site's Umbraco backoffice, rather than a human hand-minting a short-lived bearer token
+    // and pasting it as a header. Registers a pre-configured public PKCE OpenIddict client
+    // (default id "umbraco-back-office-wayfinder-mcp", loopback callback port 33418 in
+    // Development) and, below, the discovery documents + 401 challenge hint the flow needs.
+    // The manual client-credentials flow (README) still works for headless/CI agents.
+    .AddWayfinderUmbracoMcpAuthentication()
     .Build();
 
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
@@ -46,6 +58,14 @@ builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStarte
 builder.Services.AddScoped<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceMcpDemoAgentSeeder>();
 
 var app = builder.Build();
+
+// Outermost middleware, deliberately: it post-processes the finished 401 that the MCP endpoint's
+// own authorization produces (adding the RFC 9728 `resource_metadata` hint so an MCP client can
+// start the OAuth flow). WebApplication auto-inserts UseAuthentication/UseAuthorization near the
+// top of the pipeline for a RequireAuthorization endpoint, and UseAuthorization short-circuits a
+// failure without calling downstream — so this only sees that 401 if it wraps the whole pipeline.
+// Scoped to the MCP path; every other 401 on the site is left exactly as it was.
+app.UseWayfinderUmbracoMcpAuthChallenge(McpEndpointPath);
 
 ReferenceAppAuth.MapDemoLoginRoutes(app);
 
@@ -91,12 +111,20 @@ app.UseUmbraco()
 // Constants.Security.BackOfficeTokenAuthenticationType ("UmbracoBackOfficeToken") — confirmed
 // live: that legacy constant has no registered handler in Umbraco 17 (it moved to OpenIddict's
 // client-credentials grant against the Management API token endpoint — see
-// docs/demos/licence-transfer-mcp-walkthrough.md's historical flow). The interactive backoffice
-// cookie scheme is included too so a signed-in backoffice browser session can call it directly.
-app.MapServiceBlueprintAuthoringMcp().RequireAuthorization(new AuthorizeAttribute
+// docs/demos/licence-transfer-mcp-walkthrough.md's historical flow). Backoffice access tokens
+// are opaque reference tokens, not JWTs, so OpenIddict.Validation is what introspects them —
+// interactive-OAuth tokens and headless client-credentials tokens alike. The interactive
+// backoffice cookie scheme is included too so a signed-in backoffice browser session can call
+// it directly.
+app.MapServiceBlueprintAuthoringMcp(McpEndpointPath).RequireAuthorization(new AuthorizeAttribute
 {
     Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin,
     AuthenticationSchemes = $"{Constants.Security.BackOfficeAuthenticationType},OpenIddict.Validation.AspNetCore",
 });
+
+// The OAuth discovery documents an MCP client walks from the 401 challenge above:
+// /.well-known/oauth-protected-resource (this endpoint), plus an RFC 8414 authorization-server
+// metadata document standing in for Umbraco's backoffice OpenIddict server, which publishes none.
+app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);
 
 await app.RunAsync();

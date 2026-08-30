@@ -148,18 +148,14 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
   });
 
   test('Act 1 — getting the agent real access', async () => {
-    // The agent's API user + client credentials are provisioned by ReferenceMcpDemoAgentSeeder
-    // on app startup, NOT created live here via Management API calls — deliberately, not a
-    // shortcut. The historical Umbraco.Prism MCP demo this one is modelled on used the exact same
-    // "provisioned once, ahead of time, the same way any integration would be" framing. It also
-    // sidesteps a genuine tooling limitation confirmed live in this session: this Playwright
-    // version redacts the live Authorization header/token value to the literal string
-    // "[redacted]" on every inspection API tried (request.headers(), headerValue(), even raw CDP
-    // Network.requestWillBeSent) when the traffic is the *page's own* network activity — so this
-    // script cannot safely capture the interactive backoffice SPA's own bearer token to make
-    // authenticated Management API calls itself. See ReferenceMcpDemoAgentSeeder's own remarks.
+    // The agent authenticates by logging into the Umbraco backoffice — the same OAuth 2.1
+    // (Authorization Code + PKCE) flow the backoffice's own login uses, against the public client
+    // WayfinderMcpOAuthClientInstaller registers at startup. No API user to create, no token to
+    // mint by hand. The one out-of-band thing this script still needs the seeded
+    // ReferenceMcpDemoAgentSeeder credentials for is Act 2's REST poll for "has the agent saved
+    // yet" — never for the demo's own narrative.
 
-    await beat(page, 'setup', "This is the Umbraco backoffice — Settings has a real Users section, same as any Umbraco site.");
+    await beat(page, 'setup', "This is the Umbraco backoffice — a real site, real Settings, real login.");
     await page.goto('/umbraco/login');
     await humanType(page, page.getByLabel(/email/i), adminCredentials.email);
     await humanType(page, page.locator('#password-input'), adminCredentials.password);
@@ -170,16 +166,16 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'intent',
-      "The agent already has a dedicated identity waiting for it — a real API user, in the admin " +
-        'group, provisioned ahead of time the same way any real integration would be, not created ' +
-        'on the fly as a special back door.'
+      "The agent connects by logging into this backoffice — the same OAuth flow the backoffice's " +
+        'own login uses. No special API user, no back door: it gets whatever the person who ' +
+        'authorises it is allowed to do, and nothing more.'
     );
 
     await beat(
       page,
       'intent',
-      "Now, in a real terminal, we'll exchange those credentials for a bearer token and connect " +
-        'Claude to nothing but the MCP endpoint this app exposes.'
+      "In a real terminal, we point Claude at nothing but the MCP endpoint this host exposes, " +
+        'with the OAuth client it registers for exactly this.'
     );
     await moveNarrationTo(page, 'top');
 
@@ -187,98 +183,92 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await showTerminalMirror(page);
     await page.waitForTimeout(800);
 
-    // set +H: interactive bash's history expansion treats a bare "!" as an event reference —
-    // confirmed live, DemoAgentLocal!12345 (the real seeded secret) blew up an otherwise-correct
-    // curl command with "event not found" the first time this ran, well before anything MCP- or
-    // Wayfinder-specific was even reached. NODE_TLS_REJECT_UNAUTHORIZED=0: the Claude CLI's own
-    // Node HTTP client doesn't consult the system/keychain trust store `dotnet dev-certs https
-    // --trust` populates — confirmed live, curl -k and Playwright's ignoreHTTPSErrors were both
-    // happy against this self-signed dev cert while `claude mcp list` still failed
-    // UNABLE_TO_VERIFY_LEAF_SIGNATURE until this was set. Scoped to this one throwaway terminal
-    // session talking only to localhost, not applied anywhere else.
-    // Two separate commands, not one "a; b" line — sendTerminalText's own per-character ";"
-    // escaping (needed so tmux send-keys itself doesn't swallow a bare ";", see that function's
-    // own remarks) turns a literal ";" into "\;" on the wire, which bash then parses as an
-    // escaped literal semicolon CHARACTER, not a command separator — so "set +H; export ..."
-    // silently became one single malformed command and NODE_TLS_REJECT_UNAUTHORIZED was never
-    // actually set. Confirmed live: this was the root cause of a real take where the agent's
-    // `claude mcp add` call silently never persisted a server entry at all (empty mcpServers in
-    // ~/.claude.json for the run's own project path) and every later tool call had nothing to
-    // call — not an MCP or engine bug, a bug in this recording script's own terminal driving.
-    // waitForPaneStable() before EVERY send in this sequence, not just the first — confirmed
-    // live twice, on two different commands ("claude --model sonnet" right after session
-    // creation, and separately "claude mcp add ..." right after an unrelated "claude mcp remove"
-    // had just returned): a send-keys call made before the shell has actually redrawn its prompt
-    // loses its leading character(s) with no visible error. See waitForPaneStable's own remarks.
-    await waitForPaneStable();
-    await sendTerminalText('set +H');
-    sendTerminalKey('Enter');
+    // NODE_TLS_REJECT_UNAUTHORIZED=0: the Claude CLI's own Node HTTP client doesn't consult the
+    // system/keychain trust store `dotnet dev-certs https --trust` populates — confirmed live in
+    // the earlier client-credentials version of this Act, `claude mcp list` failed
+    // UNABLE_TO_VERIFY_LEAF_SIGNATURE against this self-signed dev cert until this was set.
+    // BROWSER=true: `claude mcp add` for an OAuth-protected server would otherwise spawn the
+    // system browser for the login; we drive that login in the *recorded* page instead (below),
+    // from the authorization URL the CLI also prints. `true` is the /usr/bin/true no-op — the
+    // conventional "open nothing" value. Both scoped to this one throwaway localhost session.
+    // waitForPaneStable() before EVERY send, not just the first — a send-keys call made before
+    // bash has redrawn its prompt silently loses leading characters (see that helper's remarks).
     await waitForPaneStable();
     await sendTerminalText('export NODE_TLS_REJECT_UNAUTHORIZED=0');
     sendTerminalKey('Enter');
     await waitForPaneStable();
-
-    const tokenCommand =
-      `curl -sk -X POST https://localhost:44399/umbraco/management/api/v1/security/back-office/token ` +
-      `-d grant_type=client_credentials -d client_id=umbraco-back-office-${mcpAgentClientId} ` +
-      `-d client_secret=${mcpAgentClientSecret} -o /tmp/mcp-token.json && cat /tmp/mcp-token.json`;
-    await sendTerminalText(tokenCommand);
+    await sendTerminalText('export BROWSER=true');
     sendTerminalKey('Enter');
     await waitForPaneStable();
 
-    // Hard verification gate, not a fixed wait: confirmed live this is load-bearing, not just
-    // careful — a run once proceeded straight to launching the real (expensive, ~30-40 minute)
-    // recorded agent process even though `claude mcp list` had just printed "No MCP servers
-    // configured", because nothing actually checked its output before moving on. Retry the whole
-    // remove/add/list sequence (with a freshly-minted token each time) rather than trusting a
-    // single attempt, and fail the test outright — never launch the agent — if it still isn't
-    // connected after real retries.
+    const mcpUrl = 'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp';
+
+    // Hard verification gate, not a fixed wait: confirmed live in the earlier version of this Act
+    // that this is load-bearing — a run once proceeded straight to launching the real (expensive,
+    // 30-40 minute) recorded agent even though `claude mcp list` had just printed a failure,
+    // because nothing checked its output. Retry the whole add/authorise/list sequence, and fail
+    // the test outright — never launch the agent — if it still isn't connected after real retries.
     let mcpConnected = false;
     for (let attempt = 1; attempt <= 3 && !mcpConnected; attempt++) {
-      if (attempt > 1) {
-        // Re-mint — the first token may be stale/consumed by a failed prior attempt.
-        await sendTerminalText(tokenCommand);
-        sendTerminalKey('Enter');
-        await waitForPaneStable();
-      }
-
-      // Idempotent across takes/attempts — a previous registration (possibly against a
-      // since-expired token) would otherwise short-circuit `add` with "already exists" and leave
-      // a dead entry.
-      //
-      // remove, add, and list are sent as ONE atomic command line rather than three separate
-      // sendTerminalText calls with a waitForPaneStable() between each — confirmed live this was a
-      // real race, not resolved by tuning the stability window. waitForPaneStable() only proxies
-      // "the screen looks quiet for ~450ms," not "the previous process has actually exited" — each
-      // of these is a real subprocess with real (if usually brief) wall-clock work, and under the
-      // heavier system load a real recording take runs under (Chromium + video encoding + the
-      // dotnet app all concurrently), it's realistic for the pane to look quiet for 450ms while one
-      // is still genuinely running and bash hasn't yet regained the terminal — so the next
-      // command's keystrokes land on nothing and get silently dropped. Confirmed live, twice: a
-      // real take where `claude mcp add` never appeared in the session log at all after `remove`
-      // (not corrupted, completely absent), and separately a standalone reproduction where `claude
-      // mcp list` vanished the same way after `add`. A lightweight standalone reproduction with no
-      // browser/video overhead never hit either, consistent with a genuine timing race rather than
-      // a logic bug.
-      //
-      // remove is joined with `;`, not `&&` — confirmed live this distinction is load-bearing:
-      // `claude mcp remove` exits 1 (even with 2>/dev/null suppressing its error *message*) when
-      // there's nothing to remove, which is the NORMAL case on every fresh scratch directory this
-      // Act starts from — `&&` after it would silently short-circuit the whole chain before `add`
-      // ever ran, on exactly the common case. add and list ARE joined with `&&`: add succeeding is
-      // the expected case, and if it doesn't, there's nothing useful for list to check anyway.
+      // `remove` joined with `;` not `&&`: it exits 1 when there's nothing to remove (the normal
+      // case on a fresh scratch dir), which `&&` would let short-circuit the whole line.
       await sendTerminalText(
         'claude mcp remove wayfinder-umbraco 2>/dev/null; ' +
-          'claude mcp add --transport http wayfinder-umbraco ' +
-          'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp ' +
-          '--header "Authorization: Bearer $(jq -r .access_token /tmp/mcp-token.json)" && ' +
-          'claude mcp list'
+          `claude mcp add --transport http wayfinder-umbraco ${mcpUrl} ` +
+          '--client-id umbraco-back-office-wayfinder-mcp --callback-port 33418'
       );
       sendTerminalKey('Enter');
-      // "claude mcp list" does its own live health check (visibly takes a beat, per the "Checking
-      // MCP server health…" line) — waitForPaneStable alone isn't a strong enough signal that the
-      // check has actually finished, so poll for the real outcome text directly instead.
-      const listDeadline = Date.now() + 15_000;
+
+      // `claude mcp add` against this OAuth-protected endpoint prints an authorization URL and
+      // starts a loopback listener on --callback-port. Pull that URL off the pane, drive the
+      // backoffice consent in the recorded page, and let the CLI's own listener catch the
+      // redirect and finish the token exchange. The admin session from the login above usually
+      // carries the cookie straight through to a consent step; a login prompt is handled too in
+      // case it doesn't.
+      let authUrl = '';
+      const urlDeadline = Date.now() + 25_000;
+      while (Date.now() < urlDeadline && !authUrl) {
+        const match = stripAnsiForMatching(captureTerminal()).match(
+          /https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?\S+/
+        );
+        if (match) authUrl = match[0].replace(/[)\].,'"]+$/, '');
+        else await page.waitForTimeout(500);
+      }
+
+      if (authUrl) {
+        await beat(
+          page,
+          'note',
+          "There's the authorization request — we approve it with the same backoffice account, " +
+            'in the browser, and the handshake is done.',
+          { position: 'top' }
+        );
+        await page.goto(authUrl);
+        if (await page.locator('#username-input').isVisible({ timeout: 5_000 }).catch(() => false)) {
+          await humanType(page, page.locator('#username-input'), adminCredentials.email);
+          await humanType(page, page.locator('#password-input'), adminCredentials.password);
+          await humanClick(page, page.getByRole('button', { name: /login/i }).first());
+        }
+        const consent = page
+          .getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i })
+          .first();
+        if (await consent.isVisible({ timeout: 8_000 }).catch(() => false)) {
+          await humanClick(page, consent);
+        }
+        // Let the CLI's callback listener receive the code and complete before we look at the pane.
+        await page.waitForTimeout(3_000);
+        await showTerminalMirror(page);
+        await page.waitForTimeout(800);
+      } else {
+        console.log(`MCP connection attempt ${attempt}: no authorization URL appeared on the pane.`);
+      }
+
+      await waitForPaneStable();
+      await sendTerminalText('claude mcp list');
+      sendTerminalKey('Enter');
+      // `claude mcp list` runs its own live health check ("Checking MCP server health…") — poll
+      // for the real outcome text rather than trusting waitForPaneStable alone.
+      const listDeadline = Date.now() + 20_000;
       let listOutcome = '';
       while (Date.now() < listDeadline) {
         listOutcome = stripAnsiForMatching(captureTerminal());
@@ -297,8 +287,8 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'recap',
-      "Connected — a real identity, a real short-lived token, a real MCP session. From here it " +
-        "works exactly like giving a new team member their login.",
+      "Connected — a real backoffice identity, a real OAuth token that refreshes itself, a real " +
+        'MCP session. From here it works exactly like giving a new team member their login.',
       { position: 'top' }
     );
   });
