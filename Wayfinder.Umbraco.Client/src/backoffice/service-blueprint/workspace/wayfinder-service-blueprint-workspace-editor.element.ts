@@ -17,6 +17,7 @@ import { UmbElementMixin } from '@umbraco-cms/backoffice/element-api';
 import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { loadWayfinderElements } from '../wayfinder-elements-bundle.js';
 import { UmbracoWayfinderServiceBlueprintSource } from '../service-blueprint-source.js';
+import { UmbracoWayfinderComponentCatalog } from '../component-catalog-source.js';
 import type { UmbServiceBlueprintWorkspaceContext } from './service-blueprint-workspace.context.js';
 import { UMB_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/workspace';
 
@@ -31,6 +32,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
   @state() private _elementsReady = false;
 
   private _source?: UmbracoWayfinderServiceBlueprintSource;
+  private _componentCatalog?: UmbracoWayfinderComponentCatalog;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -43,6 +45,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
       if (!authContext) return;
 
       this._source = new UmbracoWayfinderServiceBlueprintSource(() => authContext.getLatestToken());
+      this._componentCatalog = new UmbracoWayfinderComponentCatalog(() => authContext.getLatestToken());
       this.requestUpdate();
       void this._loadQueues(authContext);
     });
@@ -84,6 +87,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
       <wayfinder-service-blueprint-editor
         blueprint-key=${this._definitionKey}
         .serviceBlueprintSource=${this._source}
+        .componentCatalog=${this._componentCatalog}
         .availableQueues=${this._availableQueues}
       ></wayfinder-service-blueprint-editor>
     `;
