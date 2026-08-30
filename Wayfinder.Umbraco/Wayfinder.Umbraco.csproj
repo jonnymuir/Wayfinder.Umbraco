@@ -66,10 +66,10 @@
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="$(UmbracoVersion)" />
-    <PackageReference Include="Wayfinder" Version="0.7.6" />
+    <PackageReference Include="Wayfinder" Version="0.7.8" />
     <PackageReference Include="Wayfinder.Editor" Version="0.2.1" />
-    <PackageReference Include="Wayfinder.Engine" Version="0.7.6" />
-    <PackageReference Include="Wayfinder.Rendering.GovUk" Version="0.3.4" />
+    <PackageReference Include="Wayfinder.Engine" Version="0.7.8" />
+    <PackageReference Include="Wayfinder.Rendering.GovUk" Version="0.3.5" />
   </ItemGroup>
 
   <ItemGroup>
