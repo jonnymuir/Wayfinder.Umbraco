@@ -58,6 +58,12 @@ Two ways to authenticate a client, below: **interactive OAuth** (recommended —
 into the backoffice, tokens auto-refresh) and **client credentials** (headless/CI — a hand-minted,
 non-refreshing token passed as a header).
 
+For a full end-to-end sit-down — connect an agent, hand it a plain-language brief, watch it design
+and save a branching "transfer your juggling licence" service, wire it into `/apply`, review it in
+the visual editor, and run it as a citizen and a caseworker — follow
+[`docs/mcp-authoring-walkthrough.md`](../docs/mcp-authoring-walkthrough.md) (the same sequence the
+demo video records).
+
 ### Connecting an MCP client (interactive OAuth — recommended)
 
 This app calls `AddWayfinderUmbracoMcpAuthentication()` (in `Program.cs`), so an MCP client
