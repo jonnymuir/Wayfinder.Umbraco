@@ -5,6 +5,7 @@ using Umbraco.Cms.Api.Management.Controllers;
 using Umbraco.Cms.Api.Management.Routing;
 using Wayfinder.Engine.Services;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Models.ServiceDesign.Components;
 using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.Controllers;
@@ -78,6 +79,18 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     [HttpPost("service-blueprints/validate")]
     public IActionResult ValidateServiceBlueprint([FromBody] ServiceBlueprint blueprint) =>
         Ok(authoringService.Validate(blueprint));
+
+    /// <summary>
+    /// Every registered component type's descriptor — the schema behind the editor's
+    /// properties-panel add/edit UI and the input-field set its client-side validation derives.
+    /// The backoffice editor is mounted with an explicit <c>componentCatalog</c> pointing here
+    /// (see <c>wayfinder-service-blueprint-workspace-editor.element.ts</c>); without it the
+    /// editor's HTTP fallback probes a route this host doesn't expose, the catalog loads empty,
+    /// and the client-side calc-reference check flags every real field as unknown. The REST/MCP
+    /// authoring surface serves the same list at its own <c>/component-types</c> route.
+    /// </summary>
+    [HttpGet("service-blueprints/component-types")]
+    public IActionResult GetComponentTypes() => Ok(ComponentTypeRegistry.All);
 
     /// <summary>
     /// The body's own <c>version</c> (already round-tripped by any client that loaded the
