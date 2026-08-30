@@ -143,6 +143,30 @@ export class UmbracoWayfinderServiceBlueprintSource {
     }
   }
 
+  /**
+   * Runs the backoffice's authoritative validator (ServiceBlueprintAuthoringController's
+   * `POST .../service-blueprints/validate` → ServiceBlueprintAuthoringService.Validate) — the
+   * same check Save enforces and the MCP `validate_service_blueprint` tool reports. The editor
+   * renders this result in its validation rail instead of its own in-browser re-derivation, so
+   * the backoffice, the runtime and the MCP can never disagree.
+   */
+  async validate(
+    _blueprintKey: string,
+    serviceBlueprint: AuthoredServiceBlueprint
+  ): Promise<{ isValid: boolean; diagnostics: unknown[] }> {
+    const { serializeAuthoredServiceBlueprint } = await loadWayfinderElements();
+    const response = await fetch(`${API_BASE}/validate`, {
+      method: 'POST',
+      headers: await this.authHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      credentials: 'same-origin',
+      body: serializeAuthoredServiceBlueprint(serviceBlueprint),
+    });
+    if (!response.ok) {
+      throw new Error(`Validation request failed (${response.status} ${response.statusText}).`);
+    }
+    return (await response.json()) as { isValid: boolean; diagnostics: unknown[] };
+  }
+
   async checkVersion(blueprintKey: string): Promise<number | null> {
     const response = await fetch(`${API_BASE}/${encodeURIComponent(blueprintKey)}/version`, {
       headers: await this.authHeaders({ Accept: 'application/json' }),
