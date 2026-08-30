@@ -58,7 +58,7 @@ public sealed class WayfinderMcpOAuthClientInstaller(
             descriptor.ClientId, descriptor.RedirectUris.Count);
     }
 
-    internal static OpenIddictApplicationDescriptor BuildDescriptor(WayfinderMcpOptions options, IHostEnvironment environment)
+    private static OpenIddictApplicationDescriptor BuildDescriptor(WayfinderMcpOptions options, IHostEnvironment environment)
     {
         var descriptor = new OpenIddictApplicationDescriptor
         {
