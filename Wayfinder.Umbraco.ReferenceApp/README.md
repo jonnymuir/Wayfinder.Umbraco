@@ -51,16 +51,50 @@ wired in this app's own `Program.cs` (`Wayfinder.Engine.Mcp`'s `AddServiceBluepr
 `RequireAuthorization()` onto it). Gated behind `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin`
 — the same policy the backoffice's own "Blueprints" authoring surface uses — so an MCP client needs
 a real backoffice identity in the `admin` group, not an open sandbox endpoint. Confirmed live, both
-ways: an admin-group API user gets a working MCP session; a non-admin one gets a real bearer token
+ways: an admin-group identity gets a working MCP session; a non-admin one gets a real bearer token
 but a `403` from the MCP endpoint itself.
 
-### Connecting an MCP client
+Two ways to authenticate a client, below: **interactive OAuth** (recommended — the client logs
+into the backoffice, tokens auto-refresh) and **client credentials** (headless/CI — a hand-minted,
+non-refreshing token passed as a header).
 
-Umbraco 17's own client-credentials grant on its Management API token endpoint mints the bearer
-token — the same OpenIddict flow the backoffice's own login uses, just `grant_type=client_credentials`
-instead of `authorization_code`. Three steps, done once per agent identity (needs a bearer token
-from your own interactive backoffice session for steps 1-2 — grab it from any authenticated
-request your browser makes to `/umbraco/management/api/...` while logged in):
+### Connecting an MCP client (interactive OAuth — recommended)
+
+This app calls `AddWayfinderUmbracoMcpAuthentication()` (in `Program.cs`), so an MCP client
+connects by logging into the Umbraco backoffice — no token minting by hand:
+
+```bash
+claude mcp add --transport http wayfinder-umbraco \
+  https://localhost:44399/wayfinder/service-blueprint-authoring/mcp \
+  --client-id umbraco-back-office-wayfinder-mcp \
+  --callback-port 33418
+claude mcp list   # a browser opens for the backoffice login, then "✔ Connected"
+```
+
+- `--client-id` is the pre-registered public (PKCE, no secret) OpenIddict client
+  `WayfinderMcpOAuthClientInstaller` creates at every startup.
+- `--callback-port 33418` matches the loopback redirect URI registered **for the Development
+  environment only** (`WayfinderMcpOptions.LocalCallbackPorts`). Claude Code otherwise picks a
+  random port, which wouldn't be a registered redirect URI. For a non-Development deployment,
+  add your client's real callback URL to `Wayfinder:Mcp:RedirectUris` instead.
+- The access token is your own backoffice identity, short-lived, and **refreshed automatically** —
+  no re-auth every few minutes. `BlueprintsAdmin` is then checked against your actual group
+  membership.
+
+How it works: the MCP endpoint answers an unauthenticated call with `401` +
+`WWW-Authenticate: … resource_metadata="…/.well-known/oauth-protected-resource"`; the client
+walks that to `/.well-known/oauth-protected-resource`, then to the RFC 8414 authorization-server
+metadata this package serves on Umbraco's behalf (Umbraco's backoffice OpenIddict server
+publishes none), then runs the standard OAuth 2.1 Authorization Code + PKCE flow against
+`/umbraco/management/api/v1/security/back-office/{authorize,token}`.
+
+### Connecting an MCP client (headless / CI — client credentials)
+
+For a non-interactive agent, the manual client-credentials flow still works. Three steps, once
+per agent identity (steps 1–2 need a bearer token from your own interactive backoffice session —
+grab it from any authenticated `/umbraco/management/api/...` request your browser makes while
+logged in). The reference app also seeds one such identity at startup
+(`ReferenceMcpDemoAgentSeeder`: `wayfinder-demo-agent` / `DemoAgentLocal!12345`).
 
 1. **Create a dedicated API user**, in the `admin` group:
    ```bash
@@ -97,7 +131,7 @@ request your browser makes to `/umbraco/management/api/...` while logged in):
      --header "Authorization: Bearer $(jq -r .access_token mcp-token.json)"
    claude mcp list   # confirm "✔ Connected"
    ```
-   Tokens are short-lived (`expires_in` is ~300 seconds) — re-run step 3 to refresh; steps 1-2 are
+   This token has no refresh — re-run step 3 when it expires (`expires_in` ~1800s). Steps 1–2 are
    one-time per agent identity.
 
 ## Umbraco's generated Imaging HMAC key
