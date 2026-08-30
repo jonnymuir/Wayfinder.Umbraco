@@ -61,6 +61,13 @@
          really on disk (confirmed live: 2.7.5 here throws FileNotFoundException at startup
          against a real Umbraco 17.5.3 host, which ships 2.4.1). -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.4.1" PrivateAssets="all" />
+    <!-- Compiled against for the MCP OAuth client registration + dev transport-security relaxation
+         (Wayfinder.Umbraco.Mcp). Both are already on disk in any Umbraco 17 host transitively via
+         Umbraco.Cms.Api.Management ($(UmbracoVersion) → OpenIddict 7.4.0) — pinned here only to
+         compile against, PrivateAssets="all" so the host's own Umbraco-resolved version wins at
+         runtime, same reasoning as Microsoft.OpenApi above. -->
+    <PackageReference Include="OpenIddict.Abstractions" Version="7.4.0" PrivateAssets="all" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="7.4.0" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" PrivateAssets="all" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoVersion)" />
