@@ -7,6 +7,7 @@ using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 using Wayfinder.Umbraco.Mcp;
+using static OpenIddict.Server.OpenIddictServerEvents;
 
 namespace Wayfinder.Umbraco.Extensions;
 
@@ -71,6 +72,17 @@ public static class WayfinderUmbracoMcpExtensions
                     options.DisableTransportSecurityRequirement = true;
                 }
             });
+
+        // An MCP client must send the RFC 8707 `resource` parameter; Umbraco's OpenIddict server
+        // rejects an unregistered one with `invalid_target` (ID2190). Strip it for the MCP client
+        // so the flow proceeds — the token is validated locally by policy, not by audience.
+        builder.Services.AddOpenIddict().AddServer(options =>
+        {
+            options.AddEventHandler<ExtractAuthorizationRequestContext>(configuration =>
+                configuration.UseScopedHandler<WayfinderMcpDropResourceParameter>().SetOrder(int.MaxValue - 100_000));
+            options.AddEventHandler<ExtractTokenRequestContext>(configuration =>
+                configuration.UseScopedHandler<WayfinderMcpDropResourceParameter>().SetOrder(int.MaxValue - 100_000));
+        });
 
         return builder;
     }
