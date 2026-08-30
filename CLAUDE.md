@@ -90,6 +90,35 @@ same rules apply here.
    `-month` / `-year`. Assert both the `[role="alert"]` summary *and* field-level errors.
 10. **Keep both suites green before every PR.**
 
+### Security — non-negotiable
+
+Adapted from the Umbraco.Prism squad's Copper mandate (tenant-isolation and auth-threat
+reduction). This repo has real backoffice auth, an interactive OAuth flow and discovery
+documents — security correctness is a release gate, not a follow-up, held to the same standing
+as the behavioural-testing rules above.
+
+1. **Auth, token and discovery flows are spec-exact.** OAuth 2.0 / OIDC / PKCE / RFC 8414 /
+   RFC 9207 / RFC 9728 handling follows the RFC — no fabricated issuers or identifiers, no
+   "works for now" shims, no deviation for convenience. Spec vs. convenience conflict → the spec
+   wins or the work stops and the trade-off is raised.
+2. **Review token handling, cache boundaries, claim validation and trust chains** on every
+   change that touches `Mcp/`, auth middleware, or the composer's auth wiring — opaque vs. JWT,
+   audience, issuer, scope, expiry, refresh.
+3. **Deny by default.** Every endpoint carries an explicit policy (`RequireAuthorization`);
+   `AllowAnonymous` only with a written reason in the code. New middleware runs in a known
+   position relative to `UseAuthorization`, and that position is justified where it is wired.
+4. **Dev-only relaxations are gated on injected `IHostEnvironment`, never a build-time flag**,
+   and must be unreachable in a deployed environment (e.g. `DisableTransportSecurityRequirement`,
+   loopback HTTP redirect URIs).
+5. **No secrets in source, committed config, or logs** — including the auto-written
+   `Umbraco:CMS:Imaging:HMACSecretKey` (see above), connection strings and client secrets.
+6. **The package keeps no auth/tenancy opinion** — cross-tenant-relevant behaviour enters via a
+   resolver hook or a host-registered policy, never a hardcoded actor, queue or tenant.
+7. **Ship a security regression check for any boundary you touch** — a behavioural test that
+   goes red if tenant isolation, an authorization policy or a claim check regresses.
+8. **Report security findings plainly.** No minimising language — "just a hack", "edge case".
+   Name the defect and its impact.
+
 ### Branch policy
 
 Feature branches + PRs for substantive changes: `{type}/{kebab-slug}`. Direct commits to `main`
