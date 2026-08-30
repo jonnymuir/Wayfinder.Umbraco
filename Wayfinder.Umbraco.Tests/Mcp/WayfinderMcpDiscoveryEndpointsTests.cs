@@ -65,7 +65,7 @@ public class WayfinderMcpDiscoveryEndpointsTests : IAsyncLifetime
         doc.GetProperty("resource").GetString()
             .Should().Be("https://mcp.council.gov.uk" + McpPath);
         doc.GetProperty("authorization_servers").EnumerateArray().Single().GetString()
-            .Should().Be("https://mcp.council.gov.uk/wayfinder/mcp-auth");
+            .Should().Be("https://mcp.council.gov.uk/");
         doc.GetProperty("bearer_methods_supported").EnumerateArray().Select(e => e.GetString())
             .Should().Contain("header");
     }
@@ -77,15 +77,14 @@ public class WayfinderMcpDiscoveryEndpointsTests : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Theory]
-    [InlineData("/.well-known/oauth-authorization-server/wayfinder/mcp-auth")]
-    [InlineData("/wayfinder/mcp-auth/.well-known/oauth-authorization-server")]
-    [InlineData("/wayfinder/mcp-auth/.well-known/openid-configuration")]
-    public async Task AuthorizationServerMetadata_PointsTheClientAtUmbracosBackofficeLoginAndTokenEndpoints(string path)
+    [Fact]
+    public async Task AuthorizationServerMetadata_PointsTheClientAtUmbracosBackofficeLoginAndTokenEndpoints()
     {
-        var doc = await GetJson(path);
+        var doc = await GetJson("/.well-known/oauth-authorization-server");
 
-        doc.GetProperty("issuer").GetString().Should().Be("https://mcp.council.gov.uk/wayfinder/mcp-auth");
+        // The issuer is the site root, trailing slash and all — it must match, byte for byte,
+        // the `iss` the backoffice OpenIddict server puts on the authorization response (RFC 9207).
+        doc.GetProperty("issuer").GetString().Should().Be("https://mcp.council.gov.uk/");
         doc.GetProperty("authorization_endpoint").GetString()
             .Should().Be("https://mcp.council.gov.uk/umbraco/management/api/v1/security/back-office/authorize");
         doc.GetProperty("token_endpoint").GetString()
@@ -97,11 +96,12 @@ public class WayfinderMcpDiscoveryEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task TheAdvertisedAuthorizationServer_ResolvesToRealMetadata()
     {
-        // The exact walk an MCP client does: PRM -> authorization_servers[0] -> its metadata.
+        // The exact walk an MCP client does: PRM -> authorization_servers[0] -> its metadata,
+        // then check the returned issuer is identical to the one it looked up.
         var prm = await GetJson("/.well-known/oauth-protected-resource");
         var asUrl = prm.GetProperty("authorization_servers").EnumerateArray().First().GetString()!;
 
-        var authServer = await GetJson(new Uri(asUrl).AbsolutePath + "/.well-known/oauth-authorization-server");
+        var authServer = await GetJson(asUrl.TrimEnd('/') + "/.well-known/oauth-authorization-server");
 
         authServer.GetProperty("issuer").GetString().Should().Be(asUrl);
     }

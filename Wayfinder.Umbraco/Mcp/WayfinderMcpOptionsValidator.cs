@@ -18,16 +18,6 @@ public sealed class WayfinderMcpOptionsValidator : IValidateOptions<WayfinderMcp
             failures.Add($"{nameof(WayfinderMcpOptions.ClientId)} must not be empty.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.DiscoveryPathPrefix) || !options.DiscoveryPathPrefix.StartsWith('/'))
-        {
-            failures.Add($"{nameof(WayfinderMcpOptions.DiscoveryPathPrefix)} must be a root-relative path starting with '/'.");
-        }
-
-        if (options.DiscoveryPathPrefix.EndsWith('/'))
-        {
-            failures.Add($"{nameof(WayfinderMcpOptions.DiscoveryPathPrefix)} must not end with '/'.");
-        }
-
         foreach (var (value, label) in Absolutes(options))
         {
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)

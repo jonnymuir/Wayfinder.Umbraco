@@ -4,10 +4,13 @@ namespace Wayfinder.Umbraco.Mcp;
 
 /// <summary>
 /// OAuth 2.0 Authorization Server Metadata (RFC 8414) describing Umbraco's backoffice OpenIddict
-/// server — which publishes no discovery document of its own (its root
-/// <c>/.well-known/openid-configuration</c> belongs to the separate Delivery-API "member"
-/// server). Served by <see cref="WayfinderMcpDiscoveryEndpoints"/> under a path-scoped issuer so
-/// there is no collision with that root document.
+/// server — which publishes no discovery document of its own. Its <c>issuer</c> is the site root
+/// (<c>https://host/</c>): that is the value the backoffice OpenIddict server stamps into the
+/// <c>iss</c> authorization-response parameter (RFC 9207), so an MCP client that checks the two
+/// match will only accept the real one. Served by <see cref="WayfinderMcpDiscoveryEndpoints"/>
+/// at the root <c>/.well-known/oauth-authorization-server</c> — which is free; the separate
+/// Delivery-API "member" OpenIddict server owns only <c>/.well-known/openid-configuration</c>,
+/// and RFC 8414 clients try <c>oauth-authorization-server</c> first.
 /// </summary>
 internal sealed class WayfinderMcpAuthorizationServerMetadata
 {
@@ -95,9 +98,12 @@ internal static class WayfinderMcpOAuthMetadata
     /// the documents are correct behind any host name, port or reverse proxy.
     /// </param>
     public static WayfinderMcpAuthorizationServerMetadata BuildAuthorizationServerMetadata(
-        string siteRootUri, WayfinderMcpOptions options) => new()
+        string siteRootUri) => new()
     {
-        Issuer = siteRootUri + options.DiscoveryPathPrefix,
+        // The backoffice OpenIddict server's issuer IS the site root, trailing slash and all —
+        // that is exactly what it puts in the RFC 9207 `iss` authorization-response parameter,
+        // which an MCP client compares against this value.
+        Issuer = siteRootUri + "/",
         AuthorizationEndpoint = siteRootUri + BackOfficeAuthorizationPath,
         TokenEndpoint = siteRootUri + BackOfficeTokenPath,
         RevocationEndpoint = siteRootUri + BackOfficeRevocationPath,
@@ -109,7 +115,7 @@ internal static class WayfinderMcpOAuthMetadata
     {
         // Canonical resource URI per RFC 8707 / RFC 9728: no trailing slash.
         Resource = siteRootUri + mcpResourcePath.TrimEnd('/'),
-        AuthorizationServers = [siteRootUri + options.DiscoveryPathPrefix],
+        AuthorizationServers = [siteRootUri + "/"],
         ResourceDocumentation = options.ResourceDocumentationUrl,
     };
 }

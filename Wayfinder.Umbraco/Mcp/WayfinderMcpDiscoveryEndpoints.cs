@@ -27,7 +27,6 @@ public static class WayfinderMcpDiscoveryEndpoints
         this IEndpointRouteBuilder endpoints, string mcpResourcePath)
     {
         var options = endpoints.ServiceProvider.GetRequiredService<IOptions<WayfinderMcpOptions>>().Value;
-        var prefix = options.DiscoveryPathPrefix;
 
         // RFC 9728: Protected Resource Metadata. Both the bare well-known path and the
         // path-scoped form (for the resource whose own path is mcpResourcePath) — different MCP
@@ -39,15 +38,13 @@ public static class WayfinderMcpDiscoveryEndpoints
         endpoints.MapGet("/.well-known/oauth-protected-resource", ProtectedResourceMetadata).AllowAnonymous();
         endpoints.MapGet($"/.well-known/oauth-protected-resource{mcpResourcePath}", ProtectedResourceMetadata).AllowAnonymous();
 
-        // RFC 8414: Authorization Server Metadata for the path-scoped issuer
-        // "{siteRoot}{prefix}". Served at every path style a client might derive from that
-        // issuer — well-known-path-insertion, path-append, and the OIDC discovery path.
-        IResult AuthorizationServerMetadata(HttpRequest request) =>
-            Results.Json(WayfinderMcpOAuthMetadata.BuildAuthorizationServerMetadata(SiteRoot(request), options));
-
-        endpoints.MapGet($"/.well-known/oauth-authorization-server{prefix}", AuthorizationServerMetadata).AllowAnonymous();
-        endpoints.MapGet($"{prefix}/.well-known/oauth-authorization-server", AuthorizationServerMetadata).AllowAnonymous();
-        endpoints.MapGet($"{prefix}/.well-known/openid-configuration", AuthorizationServerMetadata).AllowAnonymous();
+        // RFC 8414: Authorization Server Metadata for the backoffice OpenIddict server, whose
+        // issuer is the site root. That makes the metadata location the root
+        // "/.well-known/oauth-authorization-server" — free here; the Delivery-API "member"
+        // server owns only the sibling "/.well-known/openid-configuration", which we leave to it
+        // (RFC 8414 clients try "oauth-authorization-server" first).
+        endpoints.MapGet("/.well-known/oauth-authorization-server", (HttpRequest request) =>
+            Results.Json(WayfinderMcpOAuthMetadata.BuildAuthorizationServerMetadata(SiteRoot(request)))).AllowAnonymous();
 
         return endpoints;
     }

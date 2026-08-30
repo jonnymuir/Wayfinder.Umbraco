@@ -22,15 +22,6 @@ public class WayfinderMcpOptionsValidatorTests
             .Failed.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("wayfinder/mcp-auth")]  // no leading slash
-    [InlineData("/wayfinder/mcp-auth/")] // trailing slash
-    public void MalformedDiscoveryPathPrefix_Fails(string prefix)
-    {
-        _validator.Validate(null, new WayfinderMcpOptions { DiscoveryPathPrefix = prefix })
-            .Failed.Should().BeTrue();
-    }
-
     [Fact]
     public void NonAbsoluteRedirectUri_Fails()
     {

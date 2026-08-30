@@ -68,15 +68,4 @@ public sealed class WayfinderMcpOptions
     /// omits the field.
     /// </summary>
     public string? ResourceDocumentationUrl { get; set; }
-
-    /// <summary>
-    /// Route prefix (relative to the site root, no trailing slash) under which the OAuth
-    /// discovery documents this package serves on Umbraco's behalf are mounted — Umbraco's
-    /// backoffice OpenIddict server publishes no discovery metadata of its own, so an MCP client
-    /// can't find its <c>authorization_endpoint</c>/<c>token_endpoint</c> without this shim. The
-    /// path-scoped issuer this produces (<c>{SiteRoot}{DiscoveryPathPrefix}</c>) deliberately
-    /// avoids the site root, where Umbraco's <em>member</em> (Delivery API) OpenIddict server
-    /// already owns <c>/.well-known/openid-configuration</c>.
-    /// </summary>
-    public string DiscoveryPathPrefix { get; set; } = "/wayfinder/mcp-auth";
 }
