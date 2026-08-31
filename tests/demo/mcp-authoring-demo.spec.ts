@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -36,6 +37,7 @@ import {
 // records one video per Page, so as long as nothing ever opens a second page, "Act 5" is just a
 // later timestamp in the same file as "Act 1", not a separate clip to stitch afterward. Ported
 // structure from Umbraco.Prism's garden-waste-demo.spec.ts / tests/demo/README.md.
+const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const footageDir = path.join(__dirname, 'demo-footage');
 mkdirSync(footageDir, { recursive: true });
@@ -535,20 +537,24 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         'Good question. Use your best judgement on that one, based on how the rest of the ' +
         'service works; I trust you to make a sensible call.';
 
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      // execFile (async), NOT execFileSync: a `claude -p` cold start plus a model round-trip can
+      // take tens of seconds, and a synchronous call blocks Node's event loop for that whole time
+      // — which freezes the tmux-mirror poll and the recorded video with it. 90s timeout (the
+      // earlier 30s hit ETIMEDOUT live while the main agent was also loading the API), 3 attempts.
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const raw = execFileSync(
+          const { stdout } = await execFileAsync(
             'claude',
             ['-p', '--model', 'haiku', '--system-prompt', systemPrompt, userPrompt, '--tools', ''],
-            { encoding: 'utf8', timeout: 30_000 }
+            { encoding: 'utf8', timeout: 90_000, maxBuffer: 10 * 1024 * 1024 }
           );
-          const trimmed = raw.trim();
+          const trimmed = stdout.trim();
           if (trimmed) return trimmed;
         } catch (err) {
           console.error(`generateDesignerAnswer attempt ${attempt} failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
-      return fallback; // both attempts failed — a hardcoded safety net, not the primary mechanism
+      return fallback; // every attempt failed — a hardcoded safety net, not the primary mechanism
     }
 
     // The brief is long enough that typing it into the bounded tmux pane scrolls earlier lines
@@ -580,6 +586,12 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // mirror in lockstep so an exception mid-exchange can't leave a stretch unmarked.
     const DESIGN_CHIP = 'The agent is designing the blueprint';
     const ANSWER_CHIP = 'Waiting for the designer';
+    // Right after the brief is sent the pane sits idle only because the agent hasn't started yet,
+    // not because it's asking anything — treating that as "the designer's turn" injects a spurious
+    // opening exchange (seen live). Wait until the agent has actually been busy once, or ~2 min
+    // have passed, before honouring an idle pane as a real question.
+    const briefSentAt = Date.now();
+    let agentHasBeenBusy = false;
     let openWaitLabel: string | null = null;
     async function enterWait(label: string, chipText: string): Promise<void> {
       if (openWaitLabel) return;
@@ -657,16 +669,25 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       // first for this was abandoned — confirmed live (both directly and by a second independent
       // check) that character is ambiguous between a real response marker and a spinner-animation
       // frame, not a reliable turn signal.
-      if (captureTerminal().includes('esc to interrupt')) return 'busy: esc-to-interrupt present';
+      if (captureTerminal().includes('esc to interrupt')) {
+        agentHasBeenBusy = true;
+        return 'busy: esc-to-interrupt present';
+      }
 
       const current = stripAnsiForMatching(captureTerminal());
       if (!current.trim()) return 'empty pane';
+      if (!agentHasBeenBusy && Date.now() - briefSentAt < 120_000) {
+        return 'agent has not started working on the brief yet';
+      }
       // Only treat it as "waiting on the human" once the pane has genuinely settled (not
       // mid-stream) — combined with "esc to interrupt" already confirmed absent above, this alone
       // is sufficient to mean it's genuinely the human's turn: Claude Code doesn't sit idle at its
       // own prompt for any other reason.
       await waitForPaneStable(1_500);
-      if (captureTerminal().includes('esc to interrupt')) return 'busy: esc-to-interrupt appeared during settle wait';
+      if (captureTerminal().includes('esc to interrupt')) {
+        agentHasBeenBusy = true;
+        return 'busy: esc-to-interrupt appeared during settle wait';
+      }
       const settled = stripAnsiForMatching(captureTerminal());
       if (settled !== current) return 'not settled: pane still changing';
 
@@ -735,6 +756,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       while (!stopKeepalive) {
         await page.waitForTimeout(5_000);
         keepaliveTick++;
+        if (captureTerminal().includes('esc to interrupt')) agentHasBeenBusy = true;
         // If an exception broke the answer/design wait handoff mid-exchange, re-arm the silent
         // design wait so the rest of the stretch is still marked (and still speeds up) rather than
         // recording at full length.
