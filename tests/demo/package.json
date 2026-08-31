@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "demo:record": "playwright test -c playwright.demo-recording.config.ts --reporter=line"
+    "demo:record": "playwright test -c playwright.demo-recording.config.ts --reporter=line",
+    "demo:screenshots": "playwright test -c playwright.screenshots.config.ts --reporter=line"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

@@ -13,7 +13,9 @@ import {
   getNarrationTimeline,
   getWaitSegments,
   markWaitStart,
-  markWaitEnd
+  markWaitEnd,
+  showFastForwardChip,
+  hideFastForwardChip
 } from './support/narration';
 import { humanClick, humanType } from './support/human-interactions';
 import { compressDeadTime } from './support/compress-dead-time';
@@ -136,18 +138,19 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
   test('Cold open — introduce the demo', async () => {
     await showSlate(page, {
       eyebrow: 'WAYFINDER FOR UMBRACO',
-      title: 'Authoring a real public service over MCP',
+      title: 'Design it. See it. Run it.',
       body:
-        "We're going to give an AI agent real, backoffice-authenticated access to Wayfinder.Umbraco's " +
-        'own MCP authoring toolkit — no open sandbox, no shortcut — and watch it design and save a ' +
-        "complete branching service from a single brief. Then we'll wire it into the site, review what " +
-        'it built in the visual editor, and run it end to end as a real citizen and a real caseworker.',
+        'A service blueprint is the shared picture of how a service works: the steps a person takes, ' +
+        'the decisions behind the scenes, and the people who act on them. In the next few minutes a ' +
+        'service designer describes one in plain language, an AI design partner turns it into a ' +
+        'working blueprint through Wayfinder, and we publish it as a page in Umbraco and run it as ' +
+        'an applicant and a caseworker.',
       holdMs: 14_000
     });
     await clearSlate(page);
   });
 
-  test('Act 1 — getting the agent real access', async () => {
+  test('Act 1 — connecting the design partner', async () => {
     // The agent authenticates by logging into the Umbraco backoffice — the same OAuth 2.1
     // (Authorization Code + PKCE) flow the backoffice's own login uses, against the public client
     // WayfinderMcpOAuthClientInstaller registers at startup. No API user to create, no token to
@@ -155,7 +158,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // ReferenceMcpDemoAgentSeeder credentials for is Act 2's REST poll for "has the agent saved
     // yet" — never for the demo's own narrative.
 
-    await beat(page, 'setup', "This is the Umbraco backoffice — a real site, real Settings, real login.");
+    await beat(page, 'setup', 'This is an ordinary Umbraco backoffice: the settings, content and users your team already works with every day.');
     await page.goto('/umbraco/login');
     await humanType(page, page.getByLabel(/email/i), adminCredentials.email);
     await humanType(page, page.locator('#password-input'), adminCredentials.password);
@@ -166,16 +169,16 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'intent',
-      "The agent connects by logging into this backoffice — the same OAuth flow the backoffice's " +
-        'own login uses. No special API user, no back door: it gets whatever the person who ' +
-        'authorises it is allowed to do, and nothing more.'
+      'We are going to connect an AI design partner to it. It signs in with the same backoffice ' +
+        'login your editors use, so its permissions are exactly the permissions of the person who ' +
+        'authorised it.'
     );
 
     await beat(
       page,
       'intent',
-      "In a real terminal, we point Claude at nothing but the MCP endpoint this host exposes, " +
-        'with the OAuth client it registers for exactly this.'
+      'In a terminal, we point the design partner at one thing: the service-blueprint authoring ' +
+        'tools this Umbraco site publishes over MCP.'
     );
     await moveNarrationTo(page, 'top');
 
@@ -239,8 +242,8 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         await beat(
           page,
           'note',
-          "There's the authorization request — we approve it with the same backoffice account, " +
-            'in the browser, and the handshake is done.',
+          'That is the standard backoffice sign-in. Approve it once, and the design partner has a ' +
+            'session that refreshes itself for the rest of the work.',
           { position: 'top' }
         );
         await page.goto(authUrl);
@@ -287,13 +290,13 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'recap',
-      "Connected — a real backoffice identity, a real OAuth token that refreshes itself, a real " +
-        'MCP session. From here it works exactly like giving a new team member their login.',
+      'The design partner is connected. From here it works like any colleague with a login: it can ' +
+        'read and author service blueprints through the same tools a person would use.',
       { position: 'top' }
     );
   });
 
-  test('Act 2 — handing over the brief', async ({ request }) => {
+  test('Act 2 — the brief', async ({ request }) => {
     // Real agent call, doing real iterative validate → fix → re-validate work — observed
     // elsewhere in this product line to need well over an initial short poll budget. Confirmed
     // live: a genuinely good conversation that pauses to ask real clarifying questions (the whole
@@ -339,16 +342,16 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'setup',
-      'This is the Claude CLI, connected through nothing but the MCP toolkit this host exposes — no ' +
-        'special access, no shortcuts.',
+      "This is the design partner. Everything it does from here goes through Wayfinder's " +
+        'service-blueprint authoring tools.',
       { position: 'top' }
     );
     await beat(
       page,
       'intent',
-      'A real service designer is going to describe the problem in their own words — no Wayfinder ' +
-        "terminology, just the juggling-licensing world they actually know — and we'll watch the " +
-        'agent design the whole thing from that, asking questions of its own where it needs to.',
+      'A service designer at a licensing authority is about to describe a problem in their own ' +
+        'words: the user need, the rules, and the standard they hold themselves to. We will watch ' +
+        'the agent shape that into a service.',
       { position: 'top' }
     );
 
@@ -407,8 +410,10 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       await waitForPromptTextGone(/Yes, I accept/i, 5_000);
     }
 
-    // Pure domain language, no Wayfinder vocabulary anywhere — reviewed and approved verbatim by
-    // the real user. This is the entire point of the demo: a service designer who has never heard
+    // Pure domain language, no Wayfinder vocabulary anywhere — reviewed and approved by the real
+    // user (kept em-dash-free to match the video's house style and the walkthrough doc's copy,
+    // which must stay in sync with this). This is the entire point of the demo: a service designer
+    // who has never heard
     // of Wayfinder describes a problem statement, user needs, and constraints in their own terms;
     // the MCP's own resources/skills/prompts are what teach the LLM the implementation mechanics
     // (routes, gateways, showWhen, component types), not this brief. Deliberately does NOT name a
@@ -424,20 +429,20 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       'Hi. I work on licensing for the National Juggling Authority. I need help designing a new service.\n\n',
       'The problem: right now, if someone already holds a current professional juggling licence from ',
       'another recognised juggling authority and wants to work here, they have to apply for a brand ',
-      "new licence from scratch — exactly the same as someone who's never juggled professionally ",
+      "new licence from scratch, exactly the same as someone who's never juggled professionally ",
       "before. That's not fair on them, it duplicates assessment work that's already been done ",
       'properly elsewhere, and it puts off exactly the experienced jugglers we want performing here.\n\n',
       'I want a "transfer your licence" service instead. What I know about how it needs to work:\n',
       '- Only for jugglers who already hold a current licence from a juggling authority we formally ',
-      'recognise — right now that\'s the European Juggling Federation, Async Circle International, ',
+      "recognise. Right now that's the European Juggling Federation, Async Circle International, ",
       "and the Ring Masters Guild. Anyone else isn't eligible for transfer; they need to apply as a ",
       'new licence holder instead, which is a separate existing service.\n',
       '- We need to see their current licence certificate and some proof of who they are.\n',
       '- Before we grant anything, they need to formally declare they\'ll uphold our professional ',
-      'standards — same declaration a new applicant makes.\n',
-      '- A caseworker always has to check the evidence and make the actual decision — this can\'t be ',
+      'standards, the same declaration a new applicant makes.\n',
+      '- A caseworker always has to check the evidence and make the actual decision. This can\'t be ',
       'auto-approved, someone has to look at the documents.\n',
-      '- Same accessibility bar as everything else we ship — WCAG double-A, in line with the GDS ',
+      '- Same accessibility bar as everything else we ship: WCAG double-A, in line with the GDS ',
       'service standard.\n\n',
       "Can you help me design this properly? Ask me anything you need."
     ].join('');
@@ -478,7 +483,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         `answer whatever they're actually asking now):\n\n${questionTail}`;
 
       const fallback =
-        "Good question — use your best judgement on that one, based on how the rest of the " +
+        'Good question. Use your best judgement on that one, based on how the rest of the ' +
         'service works; I trust you to make a sensible call.';
 
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -505,7 +510,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // pre-wrap so the brief's own paragraph breaks and bullet list render as written.
     await showSlate(page, {
       eyebrow: 'THE BRIEF',
-      title: 'What the designer actually asked for',
+      title: "The brief, in the designer's words",
       body: brief,
       bodyStyle: { whiteSpace: 'pre-wrap', textAlign: 'left', maxWidth: '980px', fontSize: '22px' }
     });
@@ -516,13 +521,30 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await page.waitForTimeout(300);
     sendTerminalKey('Enter');
 
-    // Everything from here until the agent's save is confirmed is real wall-clock time spent
-    // waiting on a live external process (the agent's own design work, plus gaps before the live
-    // "designer" answers a clarifying question) — nothing for a viewer to read, and not something
-    // that can be sped up live without corrupting the take. Bracketed explicitly here rather than
-    // inferred later from video pixels (see WaitSegment's own remarks) so a post-processing pass
-    // can compress just this stretch afterward.
-    markWaitStart('act2-agent-design');
+    // Dead-air handling for this act. The agent's silent design stretches are the only genuine
+    // dead air — nothing for a viewer to read, real wall-clock time on a live external process
+    // that can't be sped up live. Those are marked as wait segments (compressed afterward, with a
+    // visible "fast-forwarding" chip so the sped-up frames read as "moving through waiting time").
+    // The clarifying-question exchanges are deliberately NOT marked: the designer's answer is
+    // typed out at real speed, because that plain-language back-and-forth is the design work and
+    // the part worth watching. enterWait/leaveWait keep the marker, the chip, and this local
+    // mirror in lockstep so an exception mid-exchange can't leave a stretch unmarked.
+    const DESIGN_CHIP = 'The agent is designing the blueprint';
+    const ANSWER_CHIP = 'Waiting for the designer';
+    let openWaitLabel: string | null = null;
+    async function enterWait(label: string, chipText: string): Promise<void> {
+      if (openWaitLabel) return;
+      markWaitStart(label);
+      openWaitLabel = label;
+      await showFastForwardChip(page, chipText);
+    }
+    async function leaveWait(): Promise<void> {
+      if (!openWaitLabel) return;
+      markWaitEnd();
+      openWaitLabel = null;
+      await hideFastForwardChip(page);
+    }
+    await enterWait('act2-design', DESIGN_CHIP);
 
     // The real completion signal is the saved definition itself, not anything printed in the
     // terminal — poll the plain REST authoring API (not MCP) for the one fact that can only
@@ -568,6 +590,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // of the identical question (e.g. a stale re-render) doesn't get a second, possibly-differently
     // worded model-generated reply for no reason.
     const questionsAnswered = new Set<string>();
+    let questionBeatsShown = 0;
     // Returns a short description of what happened this tick, for the keepalive loop to log —
     // every tick, not just errors, so a future stall leaves a real trail instead of silence either
     // way (see the keepalive loop's own remarks for why silence alone doesn't distinguish "nothing
@@ -609,12 +632,36 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       const tail = settled.slice(-3_000);
       if (questionsAnswered.has(tail)) return 'already answered this exact question, skipping';
 
+      // A real clarifying-question exchange: stop marking dead air, put a beat on screen, and type
+      // the answer out at real speed so the plain-language back-and-forth is actually watchable.
+      // Only the model call that generates the answer is bracketed as its own short wait.
+      await leaveWait();
+      if (questionBeatsShown === 0) {
+        await beat(
+          page,
+          'note',
+          'The agent has a question for the designer. The answer goes back the same way the brief ' +
+            'came in: plain language, nothing technical. This conversation is the design work.',
+          { position: 'top' }
+        );
+      } else {
+        await beat(
+          page,
+          'note',
+          "Another question, answered the same way: in the designer's own terms.",
+          { position: 'top' }
+        );
+      }
+      questionBeatsShown++;
+      await enterWait('act2-answer', ANSWER_CHIP);
       const answer = await generateDesignerAnswer(tail);
+      await leaveWait();
       await waitForPaneStable();
       await sendTerminalText(answer);
       sendTerminalKey('Enter');
       questionsAnswered.add(tail);
       await page.waitForTimeout(500);
+      await enterWait('act2-design', DESIGN_CHIP);
       return `generated answer sent: "${answer}"`;
     }
 
@@ -639,6 +686,10 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       while (!stopKeepalive) {
         await page.waitForTimeout(5_000);
         keepaliveTick++;
+        // If an exception broke the answer/design wait handoff mid-exchange, re-arm the silent
+        // design wait so the rest of the stretch is still marked (and still speeds up) rather than
+        // recording at full length.
+        if (!openWaitLabel) await enterWait('act2-design', DESIGN_CHIP).catch(() => {});
         try {
           const outcome = await respondToLiveQuestionIfWaiting();
           console.log(`[keepalive #${keepaliveTick}] ${outcome}`);
@@ -696,29 +747,28 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     } finally {
       stopKeepalive = true;
       await keepalive;
+      await leaveWait();
     }
-
-    markWaitEnd();
 
     await beat(
       page,
       'recap',
-      'And there it is — read the style reference, designed a branching flow, wrote real document ' +
-        'upload and a review step, validated it, fixed what it flagged, and saved it back to the ' +
-        'live engine.',
+      'The blueprint is saved to the live engine. Working from the GDS Service Standard and ' +
+        "Wayfinder's own guidance, the agent turned the brief into a sequence of stages, an " +
+        'eligibility decision, a document upload, and a caseworker review.',
       { position: 'top' }
     );
   });
 
-  test('Act 3 — wiring it into the site', async () => {
-    await beat(page, 'intent', "Let's point the site's own Apply page at the service the agent just built — no restart, no redeploy.");
+  test('Act 3 — publishing it to the site', async () => {
+    await beat(page, 'intent', 'The blueprint is content in Umbraco now. Let us put it on the site.');
 
     await page.goto('/umbraco/section/content');
     await page.waitForTimeout(1_500);
     await humanClick(page, page.getByText('Apply', { exact: true }).first());
     await page.waitForTimeout(1_500);
 
-    await beat(page, 'setup', "This block is what renders /apply — right now it points at our seeded placeholder service.");
+    await beat(page, 'setup', 'This block renders the Apply page. Today it points at a placeholder service.');
     await humanClick(page, page.locator('umb-ref-grid-block').first());
     await page.waitForTimeout(1_000);
 
@@ -734,12 +784,12 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'recap',
-      'One field, one publish, and the real /apply page now serves the service the agent designed.'
+      'One field, one publish. Apply now serves the service the designer described.'
     );
   });
 
-  test('Act 4 — reviewing what it built', async () => {
-    await beat(page, 'intent', "Let's see what it actually built, in the same visual editor a human service designer uses.");
+  test('Act 4 — the blueprint in the visual editor', async () => {
+    await beat(page, 'intent', 'Same blueprint, opened in the visual editor a service designer would use. Let us see what the words became.');
 
     await page.goto('/umbraco/section/settings');
     await page.waitForTimeout(1_500);
@@ -755,15 +805,15 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await expect(page.getByRole('heading', { name: newDisplayName, level: 1 })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('application', { name: /graph canvas/i })).toBeVisible({ timeout: 30_000 });
 
-    await beat(page, 'setup', 'The full graph — every stage, gateway, and route the agent wrote.');
+    await beat(page, 'setup', 'Every stage, every decision, and every route the agent wrote.');
     await humanClick(page, page.getByRole('button', { name: 'Fit to screen' }));
     await page.waitForTimeout(600);
 
     await beat(
       page,
       'recap',
-      'The eligibility branch, the document upload stage, and the review-and-declare flow — all ' +
-        'there, all saved, all real.'
+      'The eligibility decision, the document upload, and the review and declaration step: each ' +
+        'one traces back to a line in the brief.'
     );
 
     // Translate Wayfinder's implementation back to the domain requirement it satisfies — never
@@ -786,10 +836,9 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         await beat(
           page,
           'note',
-          'You said only jugglers from a recognised authority can transfer — here, each outgoing ' +
-            'route has its own "Available when" condition, which is exactly where Wayfinder ' +
-            'implemented that eligibility rule as real routing logic, evaluated before the ' +
-            "applicant even reaches the rest of the form.",
+          'The designer said only jugglers from a recognised authority can transfer. Here that ' +
+            'rule is a decision point: each route out of this step carries its own condition, ' +
+            'checked before the applicant goes any further.',
           { position: 'top' }
         );
         await page.waitForTimeout(1_000);
@@ -799,28 +848,32 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'note',
-      'And the document upload and the caseworker review, further round the graph, are the other ' +
-        "two requirements from the brief — the evidence you asked to see, and the decision you " +
-        'said always needs a person, not an automatic approval.'
+      'Further round the graph, the document upload holds the evidence they asked to see, and the ' +
+        'caseworker review holds the decision they said a person must always make.'
     );
 
     await humanClick(page, page.getByRole('tab', { name: /validation/i }));
     await page.waitForTimeout(800);
-    await beat(page, 'note', 'And the validation tab confirms it — a clean, valid definition, exactly as the agent left it.');
+    await beat(
+      page,
+      'note',
+      'The blueprint is valid and complete. This is the picture a team would sketch on a wall to ' +
+        'agree how a service works. Here it is running.'
+    );
   });
 
-  test('Act 5 — running it end to end', async () => {
+  test('Act 5 — running the service', async () => {
     // The default 5-minute config timeout isn't enough for a multi-step generic walk (up to 8
     // stages, each with real human-paced typing/clicks) plus the caseworker half of the act —
     // confirmed live, the default budget ran out mid-walk.
     test.setTimeout(10 * 60_000);
 
-    await beat(page, 'setup', "Now let's be an actual applicant.");
+    await beat(page, 'setup', 'Now as an applicant.');
     await page.goto('/demo/login');
     await humanClick(page, page.getByRole('button', { name: /Alex Applicant/i }));
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
-    await beat(page, 'intent', "We'll click through the real journey the agent designed — the way any applicant actually would.");
+    await beat(page, 'intent', 'We will walk the journey the agent designed, the way a member of the public would.');
     await humanClick(page, page.getByRole('link', { name: 'Apply', exact: true }));
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
@@ -843,7 +896,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       const fileInputs = main.locator('input[type="file"]');
       const fileInputCount = await fileInputs.count();
       if (fileInputCount > 0) {
-        await beat(page, 'note', "Here's the real document upload the agent added — a genuine file, not a mocked step.");
+        await beat(page, 'note', 'The document upload the designer asked for, working.');
         for (let i = 0; i < fileInputCount; i++) {
           await fileInputs.nth(i).setInputFiles(evidencePdfPath);
         }
@@ -980,16 +1033,16 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       if (stillHasForm === 0) break;
     }
 
-    await beat(page, 'recap', "Submitted — eligibility, evidence, review, and declaration, the exact flow the agent designed.");
+    await beat(page, 'recap', 'Submitted: eligibility, evidence, review, and declaration, in the order the designer set out.');
 
-    await beat(page, 'setup', "Now let's be the caseworker who picks it up.");
+    await beat(page, 'setup', 'And now as the caseworker who picks it up.');
     await humanClick(page, page.getByRole('button', { name: 'Sign out', exact: true }).or(page.locator('button', { hasText: 'Sign out' })).first());
     await page.waitForTimeout(500);
     await page.goto('/demo/login');
     await humanClick(page, page.getByRole('button', { name: /Casey Caseworker/i }));
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
-    await beat(page, 'intent', "And there's the caseworker queue — the agent's own routing put this request right where it belongs.");
+    await beat(page, 'intent', "This is the caseworker queue. The blueprint's own routing sent the request straight here.");
     await humanClick(page, page.getByRole('link', { name: 'Caseworker queue', exact: true }));
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
     await expect(page.getByText(newDisplayName).first()).toBeVisible({ timeout: 15_000 });
@@ -997,19 +1050,20 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await beat(
       page,
       'recap',
-      "A real request, in a real queue, ready to be picked up — built by an agent from one brief, " +
-        'over nothing but a documented MCP toolkit.'
+      'One brief, one conversation, a working service: described in plain language, published in ' +
+        'Umbraco, and run by real people.'
     );
   });
 
   test('Closing slate', async () => {
     await showSlate(page, {
       eyebrow: 'WAYFINDER FOR UMBRACO',
-      title: "That's the whole loop",
+      title: 'Design it. See it. Run it.',
       body:
-        'A real backoffice identity, a real MCP connection, an AI-authored branching service — wired ' +
-        'into the live site, reviewed in the visual editor, and run end to end by a real applicant ' +
-        'and a real caseworker. Thanks for watching.'
+        'A service designer described what they needed. An AI design partner built it with ' +
+        "Wayfinder's authoring tools. Umbraco put it on the site, and real people used it. That is " +
+        'the point of Wayfinder for Umbraco: good service design, made real on the platform your ' +
+        'team already runs.'
     });
   });
 });
