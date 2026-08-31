@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -80,18 +80,23 @@ const claudeSessionLogPath = '/tmp/wayfinder-umbraco-demo-claude-session.log';
 const scratchDir = path.join(tmpdir(), 'wayfinder-umbraco-demo-scratch');
 mkdirSync(scratchDir, { recursive: true });
 
-// A minimal but genuinely valid one-page PDF — small enough to inline as a literal, real enough
-// that a browser file-upload input and a server-side content-type check both accept it as a real
-// PDF, not a text file wearing a .pdf extension.
-const MINIMAL_PDF = Buffer.from(
-  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
-    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
-    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n' +
-    'trailer<</Root 1 0 R>>\n%%EOF',
-  'utf8'
-);
-const evidencePdfPath = path.join(scratchDir, 'juggling-licence-evidence.pdf');
-writeFileSync(evidencePdfPath, MINIMAL_PDF);
+// Minimal but genuinely valid one-page PDFs — small enough to inline as literals, real enough
+// that a browser file-upload input and a server-side content-type check both accept them as real
+// PDFs. Two distinct files (different names AND bytes) so the applicant's licence certificate and
+// their proof of identity don't read as "the same file uploaded twice" on camera.
+function makePdf(caption: string): Buffer {
+  return Buffer.from(
+    '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]>>endobj\n' +
+      `% ${caption}\ntrailer<</Root 1 0 R>>\n%%EOF`,
+    'utf8'
+  );
+}
+const licenceCertificatePath = path.join(scratchDir, 'juggling-licence-certificate.pdf');
+const proofOfIdentityPath = path.join(scratchDir, 'proof-of-identity.pdf');
+writeFileSync(licenceCertificatePath, makePdf('Current juggling licence certificate'));
+writeFileSync(proofOfIdentityPath, makePdf('Passport photo page'));
 
 test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
   let page: Page;
@@ -819,8 +824,22 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     } finally {
       stopKeepalive = true;
       await keepalive;
-      await leaveWait();
     }
+
+    // The save has landed in the engine, but the agent is usually still finishing its wrap-up
+    // message in the terminal. Let its turn actually end — "esc to interrupt" gone and the pane
+    // settled — before cutting to the backoffice, so the recording never leaves it visibly
+    // mid-sentence. Still inside the design wait, so this stretch stays compressed.
+    const turnEndDeadline = Date.now() + 120_000;
+    while (Date.now() < turnEndDeadline) {
+      if (!captureTerminal().includes('esc to interrupt')) {
+        await waitForPaneStable(3_000);
+        if (!captureTerminal().includes('esc to interrupt')) break;
+      }
+      await page.waitForTimeout(3_000);
+    }
+    await page.waitForTimeout(2_000);
+    await leaveWait();
 
     await beat(
       page,
@@ -935,10 +954,10 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
   });
 
   test('Act 5 — running the service', async () => {
-    // The default 5-minute config timeout isn't enough for a multi-step generic walk (up to 8
-    // stages, each with real human-paced typing/clicks) plus the caseworker half of the act —
-    // confirmed live, the default budget ran out mid-walk.
-    test.setTimeout(10 * 60_000);
+    // The default 5-minute config timeout isn't enough for a multi-step generic walk (up to 9
+    // applicant stages, each with real human-paced typing/clicks), plus the caseworker picking it
+    // up and deciding it, plus the applicant checking back for the outcome.
+    test.setTimeout(14 * 60_000);
 
     await beat(page, 'setup', 'Now as an applicant.');
     await page.goto('/demo/login');
@@ -959,58 +978,109 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     // mid-walk and stalling the rest of the act for its entire budget waiting on a "Sign out"
     // button that no longer exists once already signed out.
     const main = page.locator('#main-content');
-    for (let stepGuard = 0; stepGuard < 8; stepGuard++) {
+
+    // The agent's stage order, labels and field keys aren't fixed ahead of time, so the walk is
+    // generic: on each stage fill whatever inputs it finds with contextually plausible values
+    // (chosen from the field's own label, so the recording never shows "JL-123456" in every box),
+    // then submit.
+    async function signOut(): Promise<void> {
+      await humanClick(
+        page,
+        page
+          .getByRole('button', { name: 'Sign out', exact: true })
+          .or(page.locator('button', { hasText: 'Sign out' }))
+          .first()
+      );
       await page.waitForTimeout(500);
-      // Fill EVERY file input on the stage, not just the first — confirmed live, a real design
-      // with two separate required uploads (e.g. licence evidence + proof of identity) silently
-      // failed validation and re-displayed the same stage forever when only the first was filled,
-      // exhausting the step budget with the request never actually reaching the caseworker queue.
-      const fileInputs = main.locator('input[type="file"]');
-      const fileInputCount = await fileInputs.count();
-      if (fileInputCount > 0) {
-        await beat(page, 'note', 'The document upload the designer asked for, working.');
-        for (let i = 0; i < fileInputCount; i++) {
-          await fileInputs.nth(i).setInputFiles(evidencePdfPath);
-        }
-        await page.waitForTimeout(600);
+    }
+
+    async function labelHintFor(field: Locator): Promise<string> {
+      const id = await field.getAttribute('id').catch(() => null);
+      const name = (await field.getAttribute('name').catch(() => null)) ?? '';
+      let label = '';
+      if (id) label = await page.locator(`label[for="${id}"]`).first().innerText().catch(() => '');
+      if (!label) {
+        label = await field
+          .evaluate(el => {
+            const grp = el.closest('.govuk-form-group, .govuk-fieldset, fieldset');
+            return grp?.querySelector('label, legend')?.textContent?.trim() ?? '';
+          })
+          .catch(() => '');
+      }
+      return `${label} ${name}`.toLowerCase();
+    }
+
+    function plausibleValue(hint: string, type: string): string {
+      if (type === 'email' || /e-?mail/.test(hint)) return 'alex.applicant@example.com';
+      if (type === 'tel' || /phone|telephone|mobile/.test(hint)) return '07700 900123';
+      if (type === 'number') return '1';
+      if (/full name|your name|applicant'?s? name|name of applicant/.test(hint)) return 'Alex Applicant';
+      if (/first name|forename|given name/.test(hint)) return 'Alex';
+      if (/last name|surname|family name/.test(hint)) return 'Applicant';
+      // Registration/licence number BEFORE the "licensing body" name check: "your registration
+      // number with your current licensing body" contains "licensing body" but wants a number.
+      if (
+        /registration number|licence number|license number|membership number|licence reference|reference number/.test(hint)
+      ) {
+        return /\bnew\b|issued by us|national juggling|record the|record this|on our register/.test(hint)
+          ? 'NJA-2026-0417'
+          : 'EJF-2021-44718';
+      }
+      if (
+        /(name of|which) .{0,30}(licensing body|licensing authority|issuing authority|awarding body|federation|guild)|issuing authority|current licensing body/.test(
+          hint
+        )
+      )
+        return 'European Juggling Federation';
+      if (
+        /reason|why|explain|\bnote\b|\bdetails?\b|describe|comments?|more information|what.*(provide|need)|evidence requested|caseworker note/.test(
+          hint
+        )
+      )
+        return 'The certificate matches the register and the licence is current, so this can proceed.';
+      if (/registration/.test(hint)) return 'NJA-2026-0417';
+      if (/postcode|post code/.test(hint)) return 'SW1A 1AA';
+      if (/address|street/.test(hint)) return '10 Rehearsal Lane, London';
+      return 'Alex Applicant';
+    }
+
+    async function fillVisibleFields(scope: Locator): Promise<void> {
+      // Files: the licence certificate vs proof of identity, decided by each input's own label,
+      // and two genuinely different files so it doesn't read as one upload used twice.
+      const fileInputs = scope.locator('input[type="file"]');
+      for (let i = 0, n = await fileInputs.count(); i < n; i++) {
+        const fi = fileInputs.nth(i);
+        const hint = await labelHintFor(fi);
+        await fi.setInputFiles(
+          /identit|passport|driving licence|photo id|proof of who/.test(hint) ? proofOfIdentityPath : licenceCertificatePath
+        );
       }
 
-      const checkboxes = main.locator('input[type="checkbox"]');
-      const checkboxCount = await checkboxes.count();
-      for (let i = 0; i < checkboxCount; i++) {
+      // Checkboxes: tick anything not already ticked (eligibility, the declaration).
+      const checkboxes = scope.locator('input[type="checkbox"]');
+      for (let i = 0, n = await checkboxes.count(); i < n; i++) {
         const box = checkboxes.nth(i);
         if (!(await box.isChecked())) await humanClick(page, box);
       }
 
-      // Wayfinder's "radio" component is a real GOV.UK radio group — never handled by this walk
-      // at all until now. Confirmed live this is load-bearing, not cosmetic: a real design's
-      // eligibility question ("Which authority issued your current licence?") rendered as a radio
-      // group as its very first stage, so leaving it unanswered meant every later stage was
-      // unreachable and the request never reached the caseworker queue — the walk quietly
-      // exhausted its whole step budget stuck on stage one. Group by `name` (GOV.UK radios in one
-      // question always share it) and pick one option per group — preferring an option whose own
-      // label doesn't read as a negative/opt-out choice ("none of these", "none of the above",
-      // "not sure"), so the happy path stays eligible rather than randomly bailing out into a
-      // rejection branch.
-      const radios = main.locator('input[type="radio"]');
-      const radioCount = await radios.count();
-      if (radioCount > 0) {
-        const radioGroupNames = new Set<string>();
-        for (let i = 0; i < radioCount; i++) {
-          const name = await radios.nth(i).getAttribute('name');
-          if (name) radioGroupNames.add(name);
+      // Radios: one per group, avoiding a negative/opt-out option so the happy path stays eligible.
+      const radios = scope.locator('input[type="radio"]');
+      if ((await radios.count()) > 0) {
+        const names = new Set<string>();
+        for (let i = 0, n = await radios.count(); i < n; i++) {
+          const nm = await radios.nth(i).getAttribute('name');
+          if (nm) names.add(nm);
         }
-        for (const name of radioGroupNames) {
-          const group = main.locator(`input[type="radio"][name="${name}"]`);
-          if (await group.locator(':checked').count() > 0) continue;
-          const optionCount = await group.count();
+        for (const nm of names) {
+          const group = scope.locator(`input[type="radio"][name="${nm}"]`);
+          if ((await group.locator(':checked').count()) > 0) continue;
           let chosen = group.first();
-          for (let i = 0; i < optionCount; i++) {
-            const option = group.nth(i);
-            const id = await option.getAttribute('id');
-            const labelText = id ? await page.locator(`label[for="${id}"]`).innerText().catch(() => '') : '';
-            if (!/none of these|none of the above|not sure|don'?t know/i.test(labelText)) {
-              chosen = option;
+          for (let i = 0, n = await group.count(); i < n; i++) {
+            const opt = group.nth(i);
+            const id = await opt.getAttribute('id');
+            const lt = id ? await page.locator(`label[for="${id}"]`).innerText().catch(() => '') : '';
+            if (!/none of these|none of the above|not sure|don'?t know|not listed/i.test(lt)) {
+              chosen = opt;
               break;
             }
           }
@@ -1018,129 +1088,188 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         }
       }
 
-      // Wayfinder's "select" component renders a real <select> (e.g. "Which identity document?").
-      // Confirmed live this is load-bearing: a required unselected dropdown silently re-displays
-      // its stage forever, so the request never reaches the caseworker queue — the same failure
-      // shape as the radio/date/file fixes. Pick the first option with a non-empty value.
-      const selects = main.locator('select');
-      const selectCount = await selects.count();
-      for (let i = 0; i < selectCount; i++) {
+      // <select> dropdowns (e.g. "Which identity document?"): the first real option.
+      const selects = scope.locator('select');
+      for (let i = 0, n = await selects.count(); i < n; i++) {
         const sel = selects.nth(i);
-        if ((await sel.inputValue().catch(() => ''))) continue;
+        if (await sel.inputValue().catch(() => '')) continue;
         const values: string[] = await sel
           .locator('option')
           .evaluateAll(opts => opts.map(o => (o as HTMLOptionElement).value).filter(v => v !== ''));
         if (values.length) await sel.selectOption(values[0]);
       }
 
-      // Wayfinder's "date" component renders as GOV.UK's real day/month/year triple-input
-      // pattern (name="{fieldKey}-day" etc, all type="text") — NOT a native <input type="date">.
-      // Confirmed live this must run BEFORE the generic text-fill pass below: an earlier attempt
-      // let the generic pass match these (they genuinely are type="text") and stuff the same long
-      // free-text value into a 2-digit day box, failing "must be a valid date" and silently
-      // re-displaying the same stage forever. Filling these first, with real values, means the
-      // generic pass below then skips them (its own empty-value check no longer matches). A future
-      // year: a "licence expiry date" that is in the past reads as an expired licence and blocks
-      // the happy path (confirmed live), and no date field in this domain needs to be in the past.
-      const dateFieldSuffixes: Array<[string, string]> = [['-day', '1'], ['-month', '6'], ['-year', '2030']];
-      for (const [suffix, value] of dateFieldSuffixes) {
-        const fields = main.locator(`input[name$="${suffix}"]`);
-        const count = await fields.count();
-        for (let i = 0; i < count; i++) {
-          const field = fields.nth(i);
-          if ((await field.inputValue().catch(() => '')) === '') {
-            await humanType(page, field, value);
-          }
+      // GOV.UK day/month/year triple inputs: a future date. A past "licence expiry" reads as an
+      // expired licence and blocks the happy path, and no date in this domain needs to be past.
+      for (const [suffix, value] of [
+        ['-day', '1'],
+        ['-month', '6'],
+        ['-year', '2030']
+      ] as Array<[string, string]>) {
+        const fields = scope.locator(`input[name$="${suffix}"]`);
+        for (let i = 0, n = await fields.count(); i < n; i++) {
+          const f = fields.nth(i);
+          if ((await f.inputValue().catch(() => '')) === '') await humanType(page, f, value);
         }
       }
 
-      // A generic, plausible value per HTML5 input type — confirmed live this needs to be
-      // comprehensive, not just plain text: a real design with an email field and a date field
-      // (neither matching a text-only selector) silently failed validation and re-displayed the
-      // same stage forever, exhausting the step budget with the request never actually reaching
-      // the caseworker queue, the same failure mode the file-upload and Change-button fixes above
-      // both hit for their own reasons.
-      //
-      // Short value for text/textarea, not a long sentence — confirmed live this is also load-
-      // bearing: a real design's "licence number" text field declared maxLength: 20 server-side
-      // (GovUkFields.cs's RenderText never emits a client-visible HTML maxlength attribute, so
-      // there's no signal in the DOM to size against), and the old 48-character fixed sentence
-      // failed that validation identically every time, silently re-displaying the same stage until
-      // the step budget ran out with the request never reaching the caseworker queue — the exact
-      // same failure shape as the file-upload/radio/date fixes above, just one more real constraint
-      // an agent-authored form can impose that this generic walk needed to be robust to.
-      const typedFills: Array<[string, string]> = [
-        ['input[type="text"]', 'JL-123456'],
-        ['input:not([type])', 'JL-123456'],
-        ['textarea', 'JL-123456'],
-        ['input[type="email"]', 'alex@example.test'],
-        ['input[type="tel"]', '07700 900123'],
-        ['input[type="number"]', '1']
-      ];
-      for (const [selector, value] of typedFills) {
-        const fields = main.locator(selector);
-        const count = await fields.count();
-        for (let i = 0; i < count; i++) {
-          const field = fields.nth(i);
-          if ((await field.inputValue().catch(() => '')) === '') {
-            await humanType(page, field, value);
-          }
+      // Text / email / tel / number / textarea: a plausible value picked from the field's label.
+      for (const selector of [
+        'input[type="text"]',
+        'input:not([type])',
+        'textarea',
+        'input[type="email"]',
+        'input[type="tel"]',
+        'input[type="number"]'
+      ]) {
+        const fields = scope.locator(selector);
+        for (let i = 0, n = await fields.count(); i < n; i++) {
+          const f = fields.nth(i);
+          if ((await f.inputValue().catch(() => '')) !== '') continue;
+          const type = (await f.getAttribute('type')) ?? 'text';
+          await humanType(page, f, plausibleValue(await labelHintFor(f), type));
         }
       }
 
-      // Native <input type="date"> ignores/misinterprets literal keystroke typing of a
-      // dash-separated string (segment-based input, locale-dependent) — .fill() sets the ISO
-      // value directly and correctly instead, trading the humanized-typing flourish for a value
-      // that's actually accepted.
-      const dateInputs = main.locator('input[type="date"]');
-      const dateCount = await dateInputs.count();
-      for (let i = 0; i < dateCount; i++) {
-        const field = dateInputs.nth(i);
-        if ((await field.inputValue().catch(() => '')) === '') {
-          await humanClick(page, field);
-          await field.fill('2030-06-01');
+      // Native <input type="date">: .fill() the ISO value (keystroke typing misparses it).
+      const dateInputs = scope.locator('input[type="date"]');
+      for (let i = 0, n = await dateInputs.count(); i < n; i++) {
+        const f = dateInputs.nth(i);
+        if ((await f.inputValue().catch(() => '')) === '') {
+          await humanClick(page, f);
+          await f.fill('2030-06-01');
         }
       }
+    }
 
-      // Confirmed live this exclusion is load-bearing: a summary-list's own per-row "Change"
-      // button is also a real <button> inside a <form>, and renders BEFORE the page's actual
-      // continue/submit button — an unfiltered "first form button" pick clicked "Change" instead,
-      // silently looping the walk back to an earlier stage over and over.
+    let fileBeatShown = false;
+    for (let stepGuard = 0; stepGuard < 9; stepGuard++) {
+      await page.waitForTimeout(500);
+      if (!fileBeatShown && (await main.locator('input[type="file"]').count()) > 0) {
+        await beat(
+          page,
+          'note',
+          'The two documents the designer asked for: the licence certificate and proof of identity.'
+        );
+        fileBeatShown = true;
+      }
+      await fillVisibleFields(main);
+
+      // A summary-list's own per-row "Change" button is also a <button> in a <form> and renders
+      // before the real continue button — exclude it or the walk loops back a stage.
       const submit = main
         .locator('form button[type="submit"], form button')
         .filter({ hasNotText: /change/i })
         .first();
-      if (await submit.count() === 0) break;
+      if ((await submit.count()) === 0) break;
       await humanClick(page, submit);
       await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-      // Confirmed live this margin is load-bearing in headed mode (not just belt-and-braces):
-      // checking main.locator('form').count() immediately after networkidle raced the DOM still
-      // settling post-navigation, reading 0 forms and breaking the walk one stage early —
-      // reproduced consistently in the full headed run, never in a faster headless script.
+      // A short settle: checking main.locator('form').count() straight after networkidle can race
+      // the post-navigation DOM and read 0 forms, ending the walk a stage early (headed only).
       await page.waitForTimeout(500);
-      const stillHasForm = await main.locator('form').count();
-      if (stillHasForm === 0) break;
+      if ((await main.locator('form').count()) === 0) break;
     }
-
-    await beat(page, 'recap', 'Submitted: eligibility, evidence, review, and declaration, in the order the designer set out.');
-
-    await beat(page, 'setup', 'And now as the caseworker who picks it up.');
-    await humanClick(page, page.getByRole('button', { name: 'Sign out', exact: true }).or(page.locator('button', { hasText: 'Sign out' })).first());
-    await page.waitForTimeout(500);
-    await page.goto('/demo/login');
-    await humanClick(page, page.getByRole('button', { name: /Casey Caseworker/i }));
-    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-
-    await beat(page, 'intent', "This is the caseworker queue. The blueprint's own routing sent the request straight here.");
-    await humanClick(page, page.getByRole('link', { name: 'Caseworker queue', exact: true }));
-    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-    await expect(page.getByText(newDisplayName).first()).toBeVisible({ timeout: 15_000 });
 
     await beat(
       page,
       'recap',
-      'One brief, one conversation, a working service: described in plain language, published in ' +
-        'Umbraco, and run by real people.'
+      'Submitted: eligibility, the licence and identity documents, a check of the answers, and the declaration.'
+    );
+
+    await beat(page, 'setup', 'And now the caseworker who picks it up.');
+    await signOut();
+    await page.goto('/demo/login');
+    await humanClick(page, page.getByRole('button', { name: /Casey Caseworker/i }));
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+
+    await beat(
+      page,
+      'intent',
+      "This is the caseworker queue. The blueprint's own routing sent the request straight here."
+    );
+    await humanClick(page, page.getByRole('link', { name: 'Caseworker queue', exact: true }));
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(1_200);
+    await expect(main.getByText(newDisplayName).first()).toBeVisible({ timeout: 20_000 });
+
+    // Pick it up and work it through to a decision. The brief said a person always makes this
+    // call, so the demo has to actually make it, not just show that the request arrived.
+    await humanClick(page, page.getByRole('button', { name: /pick ?up/i }).first());
+    await page.waitForLoadState('load', { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(1_500);
+    // The picked row exposes a link carrying ?instanceId= — that opens the item's current stage
+    // form (the review). Its visible text is the stage's own name, so match it by the href.
+    const openPicked = main.locator('a[href*="instanceId="]').first();
+    if ((await openPicked.count()) > 0) {
+      await humanClick(page, openPicked);
+      await page.waitForLoadState('load', { timeout: 15_000 }).catch(() => {});
+      await page.waitForTimeout(1_500);
+    }
+    await beat(
+      page,
+      'setup',
+      "Casey has the applicant's answers and both documents they sent. Now the decision."
+    );
+
+    let approveBeatShown = false;
+    for (let step = 0; step < 5; step++) {
+      await page.waitForTimeout(500);
+      // Prefer the approve action, and take it without filling the review stage's optional
+      // "what more do you need?" boxes — that is the request-more-info path, not this one.
+      const approveBtn = main.getByRole('button', { name: /approve/i }).first();
+      if ((await approveBtn.count()) > 0 && (await approveBtn.isVisible().catch(() => false))) {
+        if (!approveBeatShown) {
+          await beat(
+            page,
+            'intent',
+            "Casey approves the transfer. The designer said this is always a person's call, never " +
+              'an automatic yes.',
+            { position: 'top' }
+          );
+          approveBeatShown = true;
+        }
+        await humanClick(page, approveBtn);
+        await page.waitForLoadState('load', { timeout: 15_000 }).catch(() => {});
+        await page.waitForTimeout(1_200);
+        continue;
+      }
+      // A follow-on stage that does need input before its primary action.
+      const primary = main
+        .locator('form button[type="submit"], form button')
+        .filter({
+          hasNotText: /change|reject|request|decline|refuse|send back|more evidence|more information|put back|back to worklist/i
+        })
+        .first();
+      if ((await primary.count()) === 0) break;
+      await fillVisibleFields(main);
+      await humanClick(page, primary);
+      await page.waitForLoadState('load', { timeout: 15_000 }).catch(() => {});
+      await page.waitForTimeout(1_200);
+    }
+
+    // The approved request has moved to the applicant's queue, so lingering on its URL as the
+    // caseworker shows an "access denied" panel — go back to the (now clear) worklist instead.
+    await page.goto('/caseworker-queue');
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await beat(page, 'recap', 'Approved, and the request has left the queue.');
+
+    await beat(page, 'setup', 'The applicant checks back.');
+    await signOut();
+    await page.goto('/demo/login');
+    await humanClick(page, page.getByRole('button', { name: /Alex Applicant/i }));
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await humanClick(page, page.getByRole('link', { name: 'Apply', exact: true }));
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    // Tight on purpose: if the caseworker walk didn't actually approve it, the applicant would
+    // still see "awaiting a decision" here, and this take should fail rather than ship that.
+    await expect(main).toContainText(/approv|granted|transferr?ed|on the register/i, { timeout: 15_000 });
+
+    await beat(
+      page,
+      'recap',
+      'The transfer is done: the service the designer described in plain language, published in ' +
+        'Umbraco, and run from the first question to the final decision by real people.'
     );
   });
 
