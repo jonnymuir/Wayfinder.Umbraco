@@ -1,5 +1,6 @@
 import { test, request as apiRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +26,18 @@ const fixture = JSON.parse(
 );
 const blueprintKey: string = fixture.definitionKey;
 const displayName: string = fixture.displayName;
+
+// A minimal but genuinely valid one-page PDF, for the file-upload stage of the applicant walk
+// that populates the caseworker queue (same literal the recording spec uses).
+const MINIMAL_PDF = Buffer.from(
+  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n' +
+    'trailer<</Root 1 0 R>>\n%%EOF',
+  'utf8'
+);
+const evidencePdfPath = path.join(tmpdir(), 'wayfinder-umbraco-screenshot-evidence.pdf');
+writeFileSync(evidencePdfPath, MINIMAL_PDF);
 
 async function mintToken(api: APIRequestContext): Promise<string> {
   for (let i = 0; i < 10; i++) {
@@ -67,9 +80,21 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
   test.beforeAll(async ({ browser }) => {
     api = await apiRequest.newContext({ baseURL: 'https://localhost:44399', ignoreHTTPSErrors: true });
     const token = await mintToken(api);
+    const auth = { Authorization: `Bearer ${token}` };
+
+    // The authoring API is optimistic-concurrency: a PUT carries the version it was loaded at.
+    // On a fresh database the blueprint doesn't exist and version 0 is right; on a re-run it's
+    // already there at a higher version, so read the current one and PUT against that.
+    const existing = await api
+      .get(`/umbraco/management/api/v1/wayfinder/service-blueprints/${blueprintKey}`, { headers: auth })
+      .catch(() => null);
+    if (existing?.ok()) {
+      const body = await existing.json();
+      fixture.version = typeof body.version === 'number' ? body.version : fixture.version;
+    }
     const put = await api.put(
       `/umbraco/management/api/v1/wayfinder/service-blueprints/${blueprintKey}`,
-      { headers: { Authorization: `Bearer ${token}` }, data: fixture }
+      { headers: auth, data: fixture }
     );
     if (!put.ok()) throw new Error(`seeding the blueprint failed (${put.status()}): ${await put.text()}`);
 
@@ -130,8 +155,12 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
     await page.getByRole('button', { name: 'Fit to screen' }).click();
     await page.waitForTimeout(800);
     try {
+      // Anchor at the start so this matches the stage node ("Do you already hold a licence?,
+      // Applicant queue") and not the transition edge chips ("Transition submit, Do you already
+      // hold a licence? to ...").
+      const stageName = String(fixture.stages[0].displayName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const canvas = page.getByRole('application', { name: /graph canvas/i });
-      await canvas.getByRole('button', { name: new RegExp(fixture.stages[0].displayName, 'i') }).click();
+      await canvas.getByRole('button', { name: new RegExp('^' + stageName, 'i') }).click();
       await page.waitForTimeout(800);
       await page.screenshot({ path: path.join(outDir, 'visual-editor-decision-point.png') });
     } catch (err) {
@@ -148,6 +177,42 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
     await page.locator('#main-content').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(outDir, 'applicant-journey.png') });
+  });
+
+  test('submit an applicant request', async () => {
+    // Walk Alex through the journey so the caseworker queue has a real row to show. Generic on
+    // purpose (tick every checkbox, fill every file input, submit) so it survives small changes to
+    // the seeded fixture. Best-effort: a warning, not a failure, if a stage shape defeats it.
+    try {
+      await page.goto('/demo/login');
+      await page.getByRole('button', { name: /Alex Applicant/i }).click();
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      await page.getByRole('link', { name: 'Apply', exact: true }).click();
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      const main = page.locator('#main-content');
+      for (let step = 0; step < 6; step++) {
+        await page.waitForTimeout(400);
+        const files = main.locator('input[type="file"]');
+        for (let f = 0; f < (await files.count()); f++) await files.nth(f).setInputFiles(evidencePdfPath);
+        const boxes = main.locator('input[type="checkbox"]');
+        for (let b = 0; b < (await boxes.count()); b++) {
+          const cb = boxes.nth(b);
+          if (!(await cb.isChecked())) await cb.check();
+        }
+        const submit = main
+          .locator('form button[type="submit"], form button')
+          .filter({ hasNotText: /change/i })
+          .first();
+        if ((await submit.count()) === 0) break;
+        await submit.click();
+        await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+        await page.waitForTimeout(400);
+        if ((await main.locator('form').count()) === 0) break;
+      }
+      await page.getByRole('button', { name: 'Sign out', exact: true }).click().catch(() => {});
+    } catch (err) {
+      console.warn(`Could not complete the applicant walk: ${err instanceof Error ? err.message : String(err)}`);
+    }
   });
 
   test('caseworker worklist', async () => {
