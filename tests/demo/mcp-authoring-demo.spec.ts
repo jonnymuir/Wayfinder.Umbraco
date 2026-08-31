@@ -1017,14 +1017,31 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         }
       }
 
+      // Wayfinder's "select" component renders a real <select> (e.g. "Which identity document?").
+      // Confirmed live this is load-bearing: a required unselected dropdown silently re-displays
+      // its stage forever, so the request never reaches the caseworker queue — the same failure
+      // shape as the radio/date/file fixes. Pick the first option with a non-empty value.
+      const selects = main.locator('select');
+      const selectCount = await selects.count();
+      for (let i = 0; i < selectCount; i++) {
+        const sel = selects.nth(i);
+        if ((await sel.inputValue().catch(() => ''))) continue;
+        const values: string[] = await sel
+          .locator('option')
+          .evaluateAll(opts => opts.map(o => (o as HTMLOptionElement).value).filter(v => v !== ''));
+        if (values.length) await sel.selectOption(values[0]);
+      }
+
       // Wayfinder's "date" component renders as GOV.UK's real day/month/year triple-input
       // pattern (name="{fieldKey}-day" etc, all type="text") — NOT a native <input type="date">.
       // Confirmed live this must run BEFORE the generic text-fill pass below: an earlier attempt
       // let the generic pass match these (they genuinely are type="text") and stuff the same long
       // free-text value into a 2-digit day box, failing "must be a valid date" and silently
       // re-displaying the same stage forever. Filling these first, with real values, means the
-      // generic pass below then skips them (its own empty-value check no longer matches).
-      const dateFieldSuffixes: Array<[string, string]> = [['-day', '1'], ['-month', '1'], ['-year', '2020']];
+      // generic pass below then skips them (its own empty-value check no longer matches). A future
+      // year: a "licence expiry date" that is in the past reads as an expired licence and blocks
+      // the happy path (confirmed live), and no date field in this domain needs to be in the past.
+      const dateFieldSuffixes: Array<[string, string]> = [['-day', '1'], ['-month', '6'], ['-year', '2030']];
       for (const [suffix, value] of dateFieldSuffixes) {
         const fields = main.locator(`input[name$="${suffix}"]`);
         const count = await fields.count();
@@ -1080,7 +1097,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         const field = dateInputs.nth(i);
         if ((await field.inputValue().catch(() => '')) === '') {
           await humanClick(page, field);
-          await field.fill('2020-01-01');
+          await field.fill('2030-06-01');
         }
       }
 
