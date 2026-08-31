@@ -523,11 +523,12 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         'You are roleplaying as a service designer at the National Juggling Authority, answering ' +
         "a software team's clarifying question about a service you commissioned. Answer ONLY in " +
         'plain domain language. You are not a software engineer and know nothing about how the ' +
-        'underlying system is built — never use or reference implementation terms (routes, ' +
+        'underlying system is built; never use or reference implementation terms (routes, ' +
         'gateways, showWhen, JSON, component types, field keys, or anything like that). Keep it ' +
-        'brief and conversational — 1-4 sentences, like a real chat reply. Stay consistent with ' +
-        "the brief you already gave; if something wasn't specified, make a sensible judgment call " +
-        'as the domain expert.';
+        'brief, friendly and direct: 1 to 3 short sentences, like a real chat reply. Do not use ' +
+        'dashes; use separate sentences. Do not be pedantic about the team repeating a question; ' +
+        "just answer it. Stay consistent with the brief you already gave; if something wasn't " +
+        'specified, make a sensible judgment call as the domain expert.';
       const userPrompt =
         `The brief you gave earlier:\n\n${brief}\n\n` +
         `The team's current question (this may include some surrounding conversation context — ` +
