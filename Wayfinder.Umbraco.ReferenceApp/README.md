@@ -74,8 +74,13 @@ claude mcp add --transport http wayfinder-umbraco \
   https://localhost:44399/wayfinder/service-blueprint-authoring/mcp \
   --client-id umbraco-back-office-wayfinder-mcp \
   --callback-port 33418
-claude mcp list   # a browser opens for the backoffice login, then "✔ Connected"
+claude mcp login wayfinder-umbraco   # browser opens for the backoffice login; add --no-browser on SSH
+claude mcp list                      # wayfinder-umbraco  ✔ Connected
 ```
+
+`claude mcp add` only registers the server; `claude mcp login` runs the OAuth handshake. With
+`--no-browser` the CLI prints the authorize URL and waits for you to paste the
+`localhost:33418/callback?...` URL back.
 
 - `--client-id` is the pre-registered public (PKCE, no secret) OpenIddict client
   `WayfinderMcpOAuthClientInstaller` creates at every startup.

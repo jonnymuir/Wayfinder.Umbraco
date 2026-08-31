@@ -48,8 +48,8 @@ backoffice's own login uses. Its permissions are the permissions of the person w
 1. **Log into the backoffice** at `https://localhost:44399/umbraco` (`admin@example.test` /
    `Wayfinder123!`). Leave the tab open. Acts 3 and 4 reuse this session.
 
-2. **In a terminal**, from a directory outside this repo (so you are working only through the MCP
-   tools):
+2. **Register the server**, from a directory outside this repo (so you are working only through
+   the MCP tools):
 
    ```bash
    cd "$(mktemp -d)"
@@ -67,9 +67,16 @@ backoffice's own login uses. Its permissions are the permissions of the person w
      environment. Claude Code otherwise picks a random port, which would not be a registered
      redirect URI.
 
-3. **Authorise in the browser** that opens, or visit the URL the CLI prints. Because you are
-   already signed into the backoffice, this goes straight through a consent step and back. The CLI
-   reports the connection once the callback lands.
+3. **Authorise:**
+
+   ```bash
+   claude mcp login wayfinder-umbraco
+   ```
+
+   Your browser opens on the backoffice authorize page. Because you are already signed in, it
+   goes straight through the consent step and redirects back to `localhost:33418`, where the CLI
+   is listening. On a machine with no browser (SSH), add `--no-browser`: the CLI prints the URL,
+   you open it elsewhere, and paste the `localhost:33418/callback?...` URL back when prompted.
 
 4. **Confirm:**
 
