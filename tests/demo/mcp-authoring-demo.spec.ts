@@ -187,15 +187,13 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await page.waitForTimeout(800);
 
     // NODE_TLS_REJECT_UNAUTHORIZED=0: the Claude CLI's own Node HTTP client doesn't consult the
-    // system/keychain trust store `dotnet dev-certs https --trust` populates — confirmed live in
-    // the earlier client-credentials version of this Act, `claude mcp list` failed
-    // UNABLE_TO_VERIFY_LEAF_SIGNATURE against this self-signed dev cert until this was set.
-    // BROWSER=true: `claude mcp add` for an OAuth-protected server would otherwise spawn the
-    // system browser for the login; we drive that login in the *recorded* page instead (below),
-    // from the authorization URL the CLI also prints. `true` is the /usr/bin/true no-op — the
-    // conventional "open nothing" value. Both scoped to this one throwaway localhost session.
-    // waitForPaneStable() before EVERY send, not just the first — a send-keys call made before
-    // bash has redrawn its prompt silently loses leading characters (see that helper's remarks).
+    // system/keychain trust store `dotnet dev-certs https --trust` populates — confirmed live,
+    // `claude mcp` calls fail UNABLE_TO_VERIFY_LEAF_SIGNATURE against this self-signed dev cert
+    // until this is set. BROWSER=true (the /usr/bin/true no-op) belt-and-braces stops any browser
+    // spawn; the OAuth step below uses `claude mcp login --no-browser`, which prints the authorize
+    // URL rather than opening one, and we drive that URL in the recorded page. Both scoped to this
+    // throwaway localhost session. waitForPaneStable() before EVERY send, not just the first — a
+    // send-keys call made before bash has redrawn its prompt silently loses leading characters.
     await waitForPaneStable();
     await sendTerminalText('export NODE_TLS_REJECT_UNAUTHORIZED=0');
     sendTerminalKey('Enter');
@@ -205,12 +203,19 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     await waitForPaneStable();
 
     const mcpUrl = 'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp';
+    // Read the authorize URL from the full session log (script -F), never the wrapped pane: the
+    // query string is ~400 chars and the pane is 150 cols, so a pane scrape truncates it at the
+    // first wrap. `g` flag so we can take the most recent match after each attempt.
+    const authorizeUrlPattern =
+      /https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?\S+/g;
+    const readSessionLog = (): string =>
+      existsSync(claudeSessionLogPath) ? readFileSync(claudeSessionLogPath, 'utf8') : '';
 
     // Hard verification gate, not a fixed wait: confirmed live in the earlier version of this Act
     // that this is load-bearing — a run once proceeded straight to launching the real (expensive,
     // 30-40 minute) recorded agent even though `claude mcp list` had just printed a failure,
-    // because nothing checked its output. Retry the whole add/authorise/list sequence, and fail
-    // the test outright — never launch the agent — if it still isn't connected after real retries.
+    // because nothing checked its output. Retry the whole add/login/list sequence, and fail the
+    // test outright — never launch the agent — if it still isn't connected after real retries.
     let mcpConnected = false;
     for (let attempt = 1; attempt <= 3 && !mcpConnected; attempt++) {
       // `remove` joined with `;` not `&&`: it exits 1 when there's nothing to remove (the normal
@@ -221,20 +226,21 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
           '--client-id umbraco-back-office-wayfinder-mcp --callback-port 33418'
       );
       sendTerminalKey('Enter');
+      await waitForPaneStable();
 
-      // `claude mcp add` against this OAuth-protected endpoint prints an authorization URL and
-      // starts a loopback listener on --callback-port. Pull that URL off the pane, drive the
-      // backoffice consent in the recorded page, and let the CLI's own listener catch the
-      // redirect and finish the token exchange. The admin session from the login above usually
-      // carries the cookie straight through to a consent step; a login prompt is handled too in
-      // case it doesn't.
+      // `claude mcp add` only registers the server (Claude Code 2.1.x). `claude mcp login
+      // --no-browser` runs the OAuth 2.1 + PKCE handshake: it prints the authorize URL, then
+      // blocks on stdin waiting for the redirect URL to be pasted back.
+      const logOffset = readSessionLog().length;
+      await sendTerminalText('claude mcp login wayfinder-umbraco --no-browser');
+      sendTerminalKey('Enter');
+
       let authUrl = '';
-      const urlDeadline = Date.now() + 25_000;
+      const urlDeadline = Date.now() + 30_000;
       while (Date.now() < urlDeadline && !authUrl) {
-        const match = stripAnsiForMatching(captureTerminal()).match(
-          /https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?\S+/
-        );
-        if (match) authUrl = match[0].replace(/[)\].,'"]+$/, '');
+        const since = stripAnsiForMatching(readSessionLog().slice(logOffset));
+        const matches = since.match(authorizeUrlPattern);
+        if (matches?.length) authUrl = matches[matches.length - 1].replace(/[)\].,'"]+$/, '');
         else await page.waitForTimeout(500);
       }
 
@@ -246,24 +252,67 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
             'session that refreshes itself for the rest of the work.',
           { position: 'top' }
         );
-        await page.goto(authUrl);
-        if (await page.locator('#username-input').isVisible({ timeout: 5_000 }).catch(() => false)) {
-          await humanType(page, page.locator('#username-input'), adminCredentials.email);
-          await humanType(page, page.locator('#password-input'), adminCredentials.password);
-          await humanClick(page, page.getByRole('button', { name: /login/i }).first());
+        // The CLI's redirect URI (http://localhost:33418/callback) has nothing listening in
+        // --no-browser mode: the browser nav to it fails, but the request URL carries ?code=.
+        // Capture it with a predicate started before navigating, then paste it back to the prompt.
+        const callbackRequest = page
+          .waitForRequest(r => r.url().startsWith('http://localhost:33418/callback'), { timeout: 30_000 })
+          .catch(() => null);
+        await page.goto(authUrl, { waitUntil: 'commit' }).catch(() => {});
+
+        // If the backoffice needs a fresh login or shows a consent page, handle it; on an
+        // already-signed-in admin session the redirect to the loopback callback fires straight
+        // away and there's no UI to touch.
+        const raced = await Promise.race([
+          callbackRequest.then(r => ({ pending: false as const, req: r })),
+          page.waitForTimeout(2_000).then(() => ({ pending: true as const, req: null }))
+        ]);
+        let callbackReq = raced.req;
+        if (raced.pending) {
+          if (await page.locator('#username-input').isVisible({ timeout: 4_000 }).catch(() => false)) {
+            await humanType(page, page.locator('#username-input'), adminCredentials.email);
+            await humanType(page, page.locator('#password-input'), adminCredentials.password);
+            await humanClick(page, page.getByRole('button', { name: /login/i }).first());
+          }
+          const consent = page
+            .getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i })
+            .first();
+          if (await consent.isVisible({ timeout: 6_000 }).catch(() => false)) {
+            await humanClick(page, consent);
+          }
+          callbackReq = await callbackRequest;
         }
-        const consent = page
-          .getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i })
-          .first();
-        if (await consent.isVisible({ timeout: 8_000 }).catch(() => false)) {
-          await humanClick(page, consent);
-        }
-        // Let the CLI's callback listener receive the code and complete before we look at the pane.
-        await page.waitForTimeout(3_000);
+        const redirectUrl = callbackReq?.url() ?? '';
+
         await showTerminalMirror(page);
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(500);
+        await waitForPaneStable();
+        if (redirectUrl) {
+          await sendTerminalText(redirectUrl);
+          sendTerminalKey('Enter');
+          // Wait for `claude mcp login` to consume the pasted URL and finish the token exchange,
+          // then clear the pane: the tty tends to echo a copy of the long URL onto the bash line
+          // once login exits, and the URL's own `&` chars are shell job-control if bash runs it.
+          const authDeadline = Date.now() + 25_000;
+          while (Date.now() < authDeadline) {
+            const tail = stripAnsiForMatching(readSessionLog().slice(logOffset));
+            if (/Authenticated with|tools are now available|Couldn't complete authentication/i.test(tail)) break;
+            await page.waitForTimeout(500);
+          }
+          await page.waitForTimeout(1_000);
+          sendTerminalKey('C-c');
+          await waitForPaneStable();
+          await sendTerminalText('clear');
+          sendTerminalKey('Enter');
+          await waitForPaneStable();
+        } else {
+          console.log(`MCP connection attempt ${attempt}: no loopback callback captured from the authorize redirect.`);
+          sendTerminalKey('C-c');
+          await page.waitForTimeout(1_000);
+        }
       } else {
-        console.log(`MCP connection attempt ${attempt}: no authorization URL appeared on the pane.`);
+        console.log(`MCP connection attempt ${attempt}: no authorization URL appeared in the session log.`);
+        sendTerminalKey('C-c');
       }
 
       await waitForPaneStable();
@@ -275,7 +324,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       let listOutcome = '';
       while (Date.now() < listDeadline) {
         listOutcome = stripAnsiForMatching(captureTerminal());
-        if (/wayfinder-umbraco.*(Connected|Failed to connect|needs authentication)/i.test(listOutcome)) break;
+        if (/wayfinder-umbraco.*(Connected|Failed to connect|[Nn]eeds authentication)/i.test(listOutcome)) break;
         await page.waitForTimeout(500);
       }
       mcpConnected = /wayfinder-umbraco.*Connected/i.test(listOutcome);
