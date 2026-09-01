@@ -95,10 +95,9 @@ Install the package and call `AddWayfinderUmbraco()`:
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
 
-<p>
-  <img src="assets/screenshots/applicant-journey.png" width="49%" alt="The stage block rendering the first step of a GOV.UK-styled journey">
-  <img src="assets/screenshots/caseworker-worklist.png" width="49%" alt="The worklist block with a submitted request waiting to be picked up">
-</p>
+![The stage block rendering the first step of a GOV.UK-styled journey](assets/screenshots/applicant-journey.png)
+
+![The worklist block with a submitted request waiting to be picked up](assets/screenshots/caseworker-worklist.png)
 
 ## What a host still owns
 
