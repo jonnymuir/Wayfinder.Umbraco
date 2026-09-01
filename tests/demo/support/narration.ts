@@ -303,3 +303,49 @@ export async function clearSlate(page: Page): Promise<void> {
   await page.waitForTimeout(340);
   await evaluateResilient(page, () => document.getElementById('demo-slate')?.remove(), undefined);
 }
+
+/**
+ * A small persistent corner chip shown for the length of a dead-air stretch (see WaitSegment) —
+ * so once the post-processing pass speeds that stretch up, the sped-up frames read clearly as
+ * "we're moving through waiting time" rather than a glitch. Distinct from the narration bar: it
+ * carries no story, just a status, and it stays put until hideFastForwardChip() removes it. Sits
+ * bottom-right, clear of the narration bar's top/bottom anchors.
+ */
+export async function showFastForwardChip(page: Page, text: string): Promise<void> {
+  await evaluateResilient(page, label => {
+    const id = 'demo-fastforward';
+    let chip = document.getElementById(id) as HTMLDivElement | null;
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = id;
+      Object.assign(chip.style, {
+        position: 'fixed',
+        right: '32px',
+        bottom: '32px',
+        background: 'rgba(180, 83, 9, 0.92)',
+        color: '#fff7ed',
+        font: '600 18px/1 -apple-system, "Segoe UI", system-ui, sans-serif',
+        padding: '12px 18px',
+        borderRadius: '999px',
+        zIndex: '2147483646',
+        boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+        pointerEvents: 'none',
+        opacity: '0',
+        transition: 'opacity 200ms ease'
+      } satisfies Partial<CSSStyleDeclaration>);
+      document.body.appendChild(chip);
+    }
+    chip.textContent = `⏩  ${label}`;
+    requestAnimationFrame(() => {
+      chip!.style.opacity = '1';
+    });
+  }, text);
+}
+
+/** Remove the fast-forward chip. A no-op if none is showing. */
+export async function hideFastForwardChip(page: Page): Promise<void> {
+  await evaluateResilient(page, () => {
+    const chip = document.getElementById('demo-fastforward');
+    if (chip) chip.remove();
+  }, undefined);
+}
