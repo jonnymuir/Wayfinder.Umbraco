@@ -35,11 +35,19 @@ Umbraco as their platform. It helps you:
 - **Give caseworkers a real queue**, on the same access rules and rendering pipeline as the
   citizen-facing side.
 
-It follows established practice rather than inventing its own: service blueprints as
-[Nielsen Norman Group describe them](https://www.nngroup.com/articles/service-blueprints-definition/)
-(the people, the steps, and the evidence behind a user journey), journeys built to the
+It follows established practice rather than inventing its own. The model is the service blueprint
+as the [Nielsen Norman Group defines it](https://www.nngroup.com/articles/service-blueprints-definition/)
+(Sarah Gibbons, 2017): a user journey laid out across customer actions, frontstage, backstage, and
+support processes, divided by the lines of interaction, visibility, and internal interaction. Those
+horizontal lanes are the `queues` in a Wayfinder blueprint, each a lane of work owned by a team or
+system, which the caseworker worklist block renders. Journeys are built to the
 [GDS Service Standard](https://www.gov.uk/service-manual/service-standard), and components rendered
 with the real GOV.UK Design System to [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/).
+
+![Wayfinder's service blueprint model: NN/g's horizontal lanes and three lines of separation, mapped onto a blueprint's queues, stages, and gateways.](https://raw.githubusercontent.com/jonnymuir/Wayfinder.Umbraco/main/assets/service-blueprint-model.svg)
+
+*The model is the [Nielsen Norman Group service blueprint](https://www.nngroup.com/articles/service-blueprints-definition/)
+(Sarah Gibbons, 2017). See the article for Gibbons' own worked example.*
 
 ## Design in conversation, over MCP
 
