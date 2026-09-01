@@ -64,7 +64,7 @@ the visual editor, and run it as a citizen and a caseworker, follow
 [`docs/mcp-authoring-walkthrough.md`](../docs/mcp-authoring-walkthrough.md) (the same sequence the
 demo video records).
 
-### Connecting an MCP client (interactive OAuth, recommended)
+### Connecting an MCP client (interactive OAuth: recommended)
 
 This app calls `AddWayfinderUmbracoMcpAuthentication()` (in `Program.cs`), so an MCP client
 connects by logging into the Umbraco backoffice, no token minting by hand:
@@ -99,7 +99,7 @@ metadata this package serves on Umbraco's behalf (Umbraco's backoffice OpenIddic
 publishes none), then runs the standard OAuth 2.1 Authorization Code + PKCE flow against
 `/umbraco/management/api/v1/security/back-office/{authorize,token}`.
 
-### Connecting an MCP client (headless / CI, client credentials)
+### Connecting an MCP client (headless / CI: client credentials)
 
 For a non-interactive agent, the manual client-credentials flow still works. Three steps, once
 per agent identity (steps 1–2 need a bearer token from your own interactive backoffice session,
