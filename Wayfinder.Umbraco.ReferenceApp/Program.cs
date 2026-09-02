@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Umbraco.Automate.Extensions;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
@@ -43,13 +42,14 @@ builder.Services.AddServiceBlueprintAuthoringMcp();
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
     .AddWebsite()
+    // Umbraco Automate (MIT) registers itself through its own UmbracoAutomateComposer, picked up
+    // by AddComposers() below — a bare package reference is enough, no explicit AddUmbracoAutomate()
+    // call (that would double-register WorkflowCore). The NJF Coaching Standards support system
+    // (appsettings.json Wayfinder:SupportSystems) POSTs each invocation to an Automate webhook
+    // automation on this same site; the automation does the work and calls back
+    // /wayfinder/support-systems/callbacks (mapped below). Nothing Wayfinder ships knows about
+    // Automate — it is a plain webhook consumer. See docs/automate-support-system-walkthrough.md.
     .AddComposers()
-    // Umbraco Automate (MIT). The NJF Coaching Standards support system (appsettings.json
-    // Wayfinder:SupportSystems) POSTs each invocation to an Automate webhook automation on this
-    // same site; the automation does the work and calls back /wayfinder/support-systems/callbacks
-    // (mapped below). Nothing Wayfinder ships knows about Automate — it is a plain webhook
-    // consumer. See docs/automate-support-system-walkthrough.md.
-    .AddUmbracoAutomate()
     // One-click MCP OAuth: an MCP client (Claude Code, etc.) connects by logging into this
     // site's Umbraco backoffice, rather than a human hand-minting a short-lived bearer token
     // and pasting it as a header. Registers a pre-configured public PKCE OpenIddict client
@@ -144,7 +144,7 @@ app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);
 // supplies it); with no secret set it logs a warning and trusts the loopback network, matching
 // this reference app's documented minimal-auth posture.
 app.MapWebhookSupportSystemCallbacks(
-        app.Services.GetRequiredService<UmbracoProcessManagerEngine>(),
+        () => app.Services.GetRequiredService<UmbracoProcessManagerEngine>(),
         sharedSecret: builder.Configuration["NJF_STANDARDS_CALLBACK_SECRET"])
     .AllowAnonymous();
 

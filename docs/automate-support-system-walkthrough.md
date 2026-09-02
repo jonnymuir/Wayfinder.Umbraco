@@ -57,9 +57,13 @@ unauthenticated loopback (the config default is `auth.type: "none"`, which logs 
 - **`service-blueprints/njf-coaching-register.json`** is the blueprint. Its `standards-validation`
   stage carries the `support-system-call` action; the calling gateway's routes are
   `accredited` / `provisional` / `referred`.
-- **`Program.cs`** calls `.AddUmbracoAutomate()` and maps
-  `MapWebhookSupportSystemCallbacks` at `POST /wayfinder/support-systems/callbacks/{invocationId}`
-  (`AllowAnonymous`, gated by the `X-Webhook-Secret` header when a callback secret is set).
+- **Umbraco Automate** registers through its own composer (a bare package reference plus
+  `AddComposers()`), and `appsettings.json` sets `Umbraco:Automate:UseNamedConnectionString` to
+  `umbracoDbDSN` so it shares the CMS database rather than needing its own.
+- **`Program.cs`** maps `MapWebhookSupportSystemCallbacks` at
+  `POST /wayfinder/support-systems/callbacks/{invocationId}` (`AllowAnonymous`, gated by the
+  `X-Webhook-Secret` header when a callback secret is set). It passes an engine *accessor*, not
+  an instance, because the Umbraco engine reads the database in its constructor.
 - The AppHost generates a per-run HMAC signing key and callback secret and passes both to the
   reference app as `NJF_STANDARDS_SIGNING_KEY` / `NJF_STANDARDS_CALLBACK_SECRET`, and switches the
   webhook to `auth.type: hmac-sha256`.
