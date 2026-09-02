@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
+using Wayfinder.Engine.Extensions;
 using Wayfinder.Umbraco.Extensions;
 
 namespace Wayfinder.Umbraco;
@@ -40,6 +41,14 @@ public class WayfinderUmbracoComposer : IComposer
 
         builder.Services.AddWayfinderUmbraco(_ => { });
         builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();
+
+        // Any host that declares a `Wayfinder:SupportSystems` section gets its support systems
+        // (NN/g's third service-blueprint lane) registered from configuration alone — descriptor
+        // plus a keyed outbound-webhook client — with no bespoke ISupportSystemClient. A no-op
+        // when the section is absent, and idempotent. See docs/guides/support-systems.md in the
+        // Wayfinder repo. The inbound callback route is the host's to map (Program.cs), the same
+        // way GetCurrent/Advance and the MCP surface are.
+        builder.Services.AddConfiguredSupportSystems(builder.Config);
 
         // Self-contained, unlike WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling: a
         // host needs no wiring for this one (see WayfinderAdminHandler's own remarks).

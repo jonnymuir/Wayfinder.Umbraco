@@ -32,4 +32,11 @@
     <ProjectReference Include="../Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
   </ItemGroup>
 
+  <!-- The reference app's own committed config + blueprint, linked so a test can assert the two
+       actually agree (see ConfiguredSupportSystemBlueprintTests). -->
+  <ItemGroup>
+    <None Include="../Wayfinder.Umbraco.ReferenceApp/appsettings.json" Link="Fixtures/referenceapp.appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Wayfinder.Umbraco.ReferenceApp/service-blueprints/njf-coaching-register.json" Link="Fixtures/njf-coaching-register.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
