@@ -10,7 +10,14 @@ namespace Wayfinder.Umbraco.Services.Sanitization;
 /// Register as singleton — HtmlSanitizer is thread-safe for concurrent Sanitize calls
 /// when its configuration is not mutated after construction.
 /// </summary>
-internal sealed class ServiceContentSanitizer : IServiceContentSanitizer
+/// <remarks>
+/// Public: the GDS allowlist is a reusable security boundary, and a host (or its security
+/// regression tests) needs a concrete <see cref="IServiceContentSanitizer"/> to hand to
+/// <c>ProcessManagerEngine</c> without reaching for <c>InternalsVisibleTo</c>. Instantiable via
+/// the parameterless constructor; <c>AddWayfinderUmbraco</c> registers it as the default
+/// <see cref="IServiceContentSanitizer"/>.
+/// </remarks>
+public sealed class ServiceContentSanitizer : IServiceContentSanitizer
 {
     // GDS allowlist §4.3 — block-level and inline tags only.
     // No <div>, <table>, <form>, <input>, <img>, <video>, <svg>, <math>, <script>, <style>, <iframe>, etc.
