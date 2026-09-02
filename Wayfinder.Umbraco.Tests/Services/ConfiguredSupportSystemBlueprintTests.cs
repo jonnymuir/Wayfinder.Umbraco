@@ -31,6 +31,10 @@ public sealed class ConfiguredSupportSystemBlueprintTests : IClassFixture<Config
         {
             var config = new ConfigurationBuilder()
                 .AddJsonFile(Path.Combine(FixturesDir, "referenceapp.appsettings.json"))
+                // The reference app's webhook is HMAC-signed; Program.cs supplies this key at
+                // runtime (the AppHost, or an ephemeral one). Supply a stand-in so binding the
+                // committed config here doesn't fail on the unresolved secretRef.
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["NJF_STANDARDS_SIGNING_KEY"] = "test-signing-key" })
                 .Build();
             new ServiceCollection().AddLogging().AddConfiguredSupportSystems(config);
         }

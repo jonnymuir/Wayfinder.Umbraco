@@ -71,7 +71,14 @@ public sealed class AutomateCoachingStandardsSeeder(
         var automationService = scope.ServiceProvider.GetRequiredService<IAutomationService>();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
 
-        var signingKey = configuration["NJF_STANDARDS_SIGNING_KEY"];
+        // Mirror whatever the config-driven WebhookSupportSystemClient will actually send, so the
+        // seeded trigger's authenticator and the client's outbound signature always agree. The
+        // client reads Wayfinder:SupportSystems[0].endpoint.auth; if it says hmac-sha256, it signs
+        // with the resolved secretRef value. Anything else and it sends no signature.
+        const string authSection = "Wayfinder:SupportSystems:0:endpoint:auth";
+        var signingKey = string.Equals(configuration[$"{authSection}:type"], "hmac-sha256", StringComparison.OrdinalIgnoreCase)
+            ? configuration[configuration[$"{authSection}:secretRef"] ?? "NJF_STANDARDS_SIGNING_KEY"]
+            : null;
 
 
         // Automate has no default workspace on a fresh install; an automation must belong to one,

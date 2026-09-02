@@ -21,6 +21,13 @@ const string McpEndpointPath = "/wayfinder/service-blueprint-authoring/mcp";
 // Local secrets override — gitignored.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+// The NJF Coaching Standards webhook is always HMAC-signed (appsettings.json). The AppHost
+// supplies a per-run signing key; a bare `dotnet run` gets an ephemeral one here so the config
+// -driven client and the seeded Automate trigger both have a key to agree on, with nothing
+// secret in committed config.
+builder.Configuration["NJF_STANDARDS_SIGNING_KEY"] ??=
+    Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+
 // The demo cookie authentication scheme itself is registered as the app-wide default in
 // ReferenceAppComposer, not here — see that class's own remarks for why it must be a composer.
 

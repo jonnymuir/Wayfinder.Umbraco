@@ -28,6 +28,15 @@ public static class ReferenceAppAuth
     // share a name in this reference app's own simple two-persona model, nothing more.
     public const string CaseworkerRole = "caseworker";
 
+    // The team that owns njf-coaching-register.json's "registrar" queue (assignmentPolicy
+    // "team-tray"). Both caseworker personas are members, so either can pick up a new coaching
+    // application; once picked up it stays with that person through the whole send-to-standards
+    // -and-wait round trip (team-tray ownership lives in ServiceRequest.QueueAssignments, which
+    // survives the Split/Join the support-system call crosses — see docs/guides/team-assignment.md
+    // in the Wayfinder repo). A plain no-policy queue would drop the assignment at the gateway
+    // and drop the case back into the queue to be re-picked-up.
+    public const string CoachingRegistrarsTeam = "njf-coaching-registrars";
+
     private sealed record DemoUser(string Email, string DisplayName, string Role);
 
     private static readonly DemoUser Citizen = new("alex@example.test", "Alex Applicant", "citizen");
@@ -51,7 +60,8 @@ public static class ReferenceAppAuth
                 VisibleQueues = QueueKeysForActor(store, "caseworker"),
                 StartableQueues = [],
                 ActionableQueues = QueueKeysForActor(store, "caseworker"),
-                RestrictToInstanceOwner = false
+                RestrictToInstanceOwner = false,
+                TeamIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CoachingRegistrarsTeam }
             },
             // Citizen, or not-yet-signed-in — a citizen's own journey is always
             // owner-restricted (see docs/guides/work-allocation.md's own mandatory-pickup rule

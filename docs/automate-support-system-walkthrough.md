@@ -39,9 +39,9 @@ Wait for `referenceapp` to finish its unattended install.
 | **Backoffice login** | `admin@example.test` / `Wayfinder123!` |
 | **Demo personas** | `/demo/login` on the site: a coach (citizen) and a registrar (caseworker) |
 
-`dotnet run --project Wayfinder.Umbraco.ReferenceApp` directly also works, but without Mailpit the
-"Send Email" step has nowhere to deliver, and without `NJF_STANDARDS_SIGNING_KEY` the seeded
-webhook trigger accepts unauthenticated POSTs (a trusted-loopback demo fallback).
+`dotnet run --project Wayfinder.Umbraco.ReferenceApp` directly also works. Without Mailpit the
+"Send Email" step has nowhere to deliver (the run continues), and if `NJF_STANDARDS_SIGNING_KEY`
+is unset the app generates an ephemeral one at startup so the signed webhook still round-trips.
 
 ---
 
@@ -60,11 +60,12 @@ webhook trigger accepts unauthenticated POSTs (a trusted-loopback demo fallback)
   `AddComposers()`); `appsettings.json` sets `Umbraco:Automate:UseNamedConnectionString` to
   `umbracoDbDSN` so it shares the CMS database.
 - **`AutomateCoachingStandardsSeeder`** (a `BackgroundService`) builds and **publishes** the
-  automation via `IAutomationService` on every boot: a webhook trigger (HMAC-SHA256 when a
-  signing key is present), an **If** branch on the applicant's own data, a **Send Email** to the
-  standards officer, a **Request Approval**, and a `ResolveSupportSystemOutcome` step per outcome.
-  It also creates an Automate workspace if none exists, using this reference app's own admin as
-  the workspace service account (a single-tenant demo shortcut).
+  automation via `IAutomationService` on every boot: an HMAC-SHA256 webhook trigger (keyed off
+  the same `Wayfinder:SupportSystems` auth config the outbound client uses, so the two always
+  agree), an **If** branch on the applicant's own data, a **Send Email** to the standards
+  officer, a **Request Approval**, and a `ResolveSupportSystemOutcome` step per outcome. It also
+  creates an Automate workspace if none exists, using this reference app's own admin as the
+  workspace service account (a single-tenant demo shortcut).
 - **`ResolveSupportSystemOutcomeAction`** is a custom Automate `[Action]` in this reference app.
   It calls `ProcessManagerEngine.ResolveSupportSystemOutcome(...)` **in process**. Automate's
   built-in HTTP Request action has non-configurable SSRF protection that blocks loopback, so an
@@ -72,9 +73,9 @@ webhook trigger accepts unauthenticated POSTs (a trusted-loopback demo fallback)
   out-of-process consumer (Zapier, a remote service) the HTTP callback route
   (`MapWebhookSupportSystemCallbacks`, mapped in `Program.cs`) is the seam; this in-process
   action is the same-box equivalent.
-- The AppHost generates a per-run `NJF_STANDARDS_SIGNING_KEY` and sets the webhook to
-  `auth.type: hmac-sha256`. The config-driven `WebhookSupportSystemClient` signs its outbound
-  POST with the same key.
+- The webhook is always `auth.type: hmac-sha256` (`appsettings.json`). The AppHost supplies a
+  per-run `NJF_STANDARDS_SIGNING_KEY`; a bare `dotnet run` generates an ephemeral one. The
+  config-driven `WebhookSupportSystemClient` signs its outbound POST with that key.
 
 There is nothing to build by hand.
 
@@ -90,9 +91,11 @@ There is nothing to build by hand.
 3. **In Mailpit**, the "needs review" email to the standards officer has arrived.
 4. **In the backoffice Automate section**, open the run for the automation and its **Pending
    approvals**; approve. The run history shows the **Resolve: provisional** step completing.
-5. **Back as the registrar**, the wait screen releases into **Confirm the outcome**, showing
-   `coachingStandardsOutcome` = `provisional` and the standards officer's note. Click **Record and
-   notify the applicant**.
+5. **Back as the registrar**, the case is still yours (the `registrar` queue is `team-tray`, so
+   pickup ownership survives the send-and-wait round trip) — it shows **With you**, not as a
+   fresh pick-up. The wait screen has released into **Confirm the outcome**, showing
+   `coachingStandardsOutcome` = `provisional` and the standards officer's note. Click **Record
+   and notify the applicant**.
 6. **As the coach**, the wait screen releases into **Application complete**, showing the outcome
    and the note.
 

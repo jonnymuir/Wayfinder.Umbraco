@@ -7,7 +7,13 @@
   "requestPolicy": "single",
   "queues": [
     { "key": "applicant", "displayName": "Coach", "actor": "citizen" },
-    { "key": "registrar", "displayName": "NJF registrar", "actor": "caseworker" },
+    {
+      "key": "registrar",
+      "displayName": "NJF registrar",
+      "actor": "caseworker",
+      "assignmentPolicy": "team-tray",
+      "owningTeamId": "njf-coaching-registrars"
+    },
     { "key": "standards", "displayName": "NJF Coaching Standards", "actor": "system" }
   ],
   "stages": [

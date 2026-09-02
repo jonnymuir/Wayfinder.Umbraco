@@ -29,10 +29,10 @@ var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
     .WithEndpoint(port: 1025, targetPort: 1025, name: "smtp");
 
 // Per-run ephemeral secrets — regenerated every launch, never committed. The config-driven
-// webhook client signs the outbound invocation with the signing key (HMAC-SHA256); the Automate
-// webhook trigger's authenticator validates it with the same key; the callback endpoint and the
-// automation's HTTP step share the callback secret. The reference app's AutomateAutomationSeeder
-// stamps both into the seeded automation on boot.
+// webhook client signs the outbound invocation with the signing key (HMAC-SHA256); the seeded
+// Automate webhook trigger's authenticator validates it with the same key. A bare `dotnet run`
+// generates its own key in Program.cs; this just makes the AppHost run reproducible within a
+// session. The callback secret gates the out-of-process HTTP callback route.
 var signingKey = Guid.NewGuid().ToString("N");
 var callbackSecret = Guid.NewGuid().ToString("N");
 
@@ -45,9 +45,6 @@ builder.AddProject<Projects.Wayfinder_Umbraco_ReferenceApp>(
     .WithEnvironment("Umbraco__CMS__Global__Smtp__Port", "1025")
     .WithEnvironment("Umbraco__CMS__Global__Smtp__From", "njf-coaching-standards@example.test")
     .WithEnvironment("Umbraco__CMS__Global__Smtp__DeliveryMethod", "Network")
-    // Upgrade the appsettings default (auth "none", trusted-loopback) to a signed webhook.
-    .WithEnvironment("Wayfinder__SupportSystems__0__endpoint__auth__type", "hmac-sha256")
-    .WithEnvironment("Wayfinder__SupportSystems__0__endpoint__auth__secretRef", "NJF_STANDARDS_SIGNING_KEY")
     .WithEnvironment("NJF_STANDARDS_SIGNING_KEY", signingKey)
     .WithEnvironment("NJF_STANDARDS_CALLBACK_SECRET", callbackSecret);
 

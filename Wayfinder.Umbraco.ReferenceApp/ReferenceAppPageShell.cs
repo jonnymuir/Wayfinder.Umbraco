@@ -33,35 +33,101 @@ public static class ReferenceAppPageShell
     /// regardless of which branch runs). Plain .cs files don't have this problem.
     /// </summary>
     public const string HomePageBody = """
-        <h1 class="govuk-heading-l">Wayfinder.Umbraco reference app</h1>
+        <h1 class="govuk-heading-xl">Wayfinder.Umbraco reference app</h1>
+        <p class="govuk-body-l">
+          A real, bootable Umbraco 17 site that proves
+          <a class="govuk-link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">Wayfinder.Umbraco</a>
+          end to end. Every service below is an ordinary Umbraco page with a Wayfinder Block Grid
+          block on it, backed by a real in-process workflow engine. Nothing is mocked.
+        </p>
         <p class="govuk-body">
-          This is a real, bootable Umbraco 17 site proving <a class="govuk-link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">Wayfinder.Umbraco</a>
-          end to end — the citizen-facing stage block and the caseworker-facing worklist block,
-          composed onto ordinary Umbraco pages via Block Grid, backed by a real in-process
-          workflow engine (pickup/putback, access control, a join gateway with a live wait
-          screen). Nothing here is mocked.
+          Wayfinder's model is the
+          <a class="govuk-link" href="https://www.nngroup.com/articles/service-blueprints-definition/">Nielsen Norman Group service blueprint</a>
+          made executable: a citizen journey, a backstage caseworker queue, and support processes,
+          separated by the lines of interaction and visibility.
         </p>
 
-        <div class="govuk-button-group">
-          <a class="govuk-button" data-module="govuk-button" href="/apply">Apply for something</a>
-          <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/caseworker-queue">View the caseworker queue</a>
+        <h2 class="govuk-heading-l govuk-!-margin-top-8">Start here: pick who you are</h2>
+        <p class="govuk-body">
+          Every journey needs a signed-in persona. <a class="govuk-link" href="/demo/login">Choose a demo persona</a>
+          (no password), then open one of the services below. Switch personas any time from the
+          same page.
+        </p>
+        <table class="govuk-table">
+          <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+              <th scope="col" class="govuk-table__header">Persona</th>
+              <th scope="col" class="govuk-table__header">Role</th>
+              <th scope="col" class="govuk-table__header">Use for</th>
+            </tr>
+          </thead>
+          <tbody class="govuk-table__body">
+            <tr class="govuk-table__row">
+              <td class="govuk-table__cell">Alex Applicant</td>
+              <td class="govuk-table__cell">Citizen</td>
+              <td class="govuk-table__cell">Submitting an application on any service</td>
+            </tr>
+            <tr class="govuk-table__row">
+              <td class="govuk-table__cell">Casey Caseworker</td>
+              <td class="govuk-table__cell">Caseworker / NJF registrar</td>
+              <td class="govuk-table__cell">Reviewing and deciding applications</td>
+            </tr>
+            <tr class="govuk-table__row">
+              <td class="govuk-table__cell">Jordan Caseworker</td>
+              <td class="govuk-table__cell">Caseworker / NJF registrar</td>
+              <td class="govuk-table__cell">A second caseworker — shows team pickup / hand-off</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2 class="govuk-heading-l govuk-!-margin-top-8">The services</h2>
+
+        <div class="govuk-!-margin-bottom-8">
+          <h3 class="govuk-heading-m govuk-!-margin-bottom-1">Reference demo</h3>
+          <p class="govuk-body-s govuk-!-margin-bottom-2"><strong>Shows off:</strong> the two Block Grid blocks, mandatory pickup / putback, access control, and a join gateway with a live "we're reviewing your request" wait screen.</p>
+          <p class="govuk-body">
+            A deliberately tiny two-actor service. A citizen submits a free-text request; a
+            caseworker approves or rejects it. The smallest thing that exercises the whole engine.
+          </p>
+          <div class="govuk-button-group">
+            <a class="govuk-button" data-module="govuk-button" href="/apply">Apply <span class="govuk-visually-hidden">on the reference demo</span> (as a citizen)</a>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/caseworker-queue">Caseworker queue</a>
+          </div>
         </div>
 
-        <h2 class="govuk-heading-m">Try it as different people</h2>
-        <p class="govuk-body">
-          <a class="govuk-link" href="/demo/login">Pick a demo persona</a> — a citizen
-          (Alex Applicant) or a caseworker (Casey or Jordan Caseworker). No password needed.
-        </p>
+        <div class="govuk-!-margin-bottom-8">
+          <h3 class="govuk-heading-m govuk-!-margin-bottom-1">Register as a juggling coach</h3>
+          <p class="govuk-body-s govuk-!-margin-bottom-2"><strong>Shows off:</strong> NN/g's <em>support processes</em> lane as a <strong>configuration-only webhook support system</strong> — an external check wired up with one block of <code>appsettings.json</code> and <strong>no bespoke code</strong>.</p>
+          <p class="govuk-body">
+            A coach applies to join the National Juggling Federation coaching register. An NJF
+            registrar reviews the application, then runs a coaching-standards check against an
+            external body. That check is an <strong>Umbraco Automate</strong> automation, seeded
+            and published in code: it branches on the applicant's own data, emails a standards
+            officer, waits for a human <em>accredited / provisional / referred</em> decision, then
+            resolves the registrar's wait screen. The registrar keeps the case through the whole
+            send-and-wait round trip.
+          </p>
+          <div class="govuk-inset-text">
+            Enter <strong>2 or more</strong> years of experience <strong>and</strong> a safeguarding
+            disclosure reference to see the automation auto-accredit. Otherwise it routes to a human,
+            who approves it in the backoffice <strong>Automate</strong> section.
+          </div>
+          <div class="govuk-button-group">
+            <a class="govuk-button" data-module="govuk-button" href="/apply-to-coach">Apply to coach (as a citizen)</a>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/coaching-register-queue">Coaching register queue</a>
+          </div>
+        </div>
 
-        <h2 class="govuk-heading-m">See how it's put together</h2>
+        <h2 class="govuk-heading-l govuk-!-margin-top-8">Behind the scenes</h2>
+        <ul class="govuk-list govuk-list--bullet">
+          <li><a class="govuk-link" href="/umbraco">Umbraco backoffice</a> — sign in with <code>admin@example.test</code> / <code>Wayfinder123!</code>. The pages, the Block Grid blocks, the service blueprints and the seeded Automate automation are all real content and configuration you can inspect and edit.</li>
+          <li><strong>Blueprints</strong> (Settings section of the backoffice) — the JSON behind each service, with a visual editor.</li>
+          <li><strong>Automate</strong> section — the "NJF Coaching Standards" automation, its run history, and pending approvals.</li>
+          <li><a class="govuk-link" href="https://localhost:8025">Mailpit</a> — the mailbox the coaching-standards automation sends to (only when the app is launched via the Aspire host).</li>
+        </ul>
         <p class="govuk-body">
-          Everything on this site — the pages, the two Block Grid blocks, the demo service
-          blueprint — is real Umbraco content and configuration, viewable and editable in the
-          backoffice.
-        </p>
-        <p class="govuk-body">
-          <a class="govuk-link" href="/umbraco">Sign in to the backoffice</a> with
-          <code>admin@example.test</code> / <code>Wayfinder123!</code>.
+          Full walkthrough:
+          <a class="govuk-link" href="https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/docs/automate-support-system-walkthrough.md">docs/automate-support-system-walkthrough.md</a>.
         </p>
         """;
 
