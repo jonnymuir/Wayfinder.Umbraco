@@ -230,16 +230,21 @@ public sealed class AutomateCoachingStandardsSeeder(
                 "Referred to the NJF safeguarding lead. The applicant will be contacted directly.", 320),
         };
 
+        // SourceHandle is the canvas node's output handle id; for a branching step it is the same
+        // string as Outcome (see RequestApprovalAction: "the named outcome ... doubles as the
+        // source handle id"). Setting only Outcome routes the engine correctly but draws every
+        // edge from the node's first handle in the editor, so a later "Save and publish" from the
+        // canvas would re-serialise them all onto that one handle. Set both.
         var connections = new List<StepConnection>
         {
             // The trigger is step Guid.Empty in the graph; the compiler BFSes from it to find the
             // entry step, so the first real step must be wired to it or nothing is reachable.
             new() { SourceStepId = Guid.Empty, TargetStepId = checkExperience },
-            new() { SourceStepId = checkExperience, TargetStepId = autoAccredit, Outcome = "true" },
-            new() { SourceStepId = checkExperience, TargetStepId = emailOfficer, Outcome = "false" },
+            new() { SourceStepId = checkExperience, TargetStepId = autoAccredit, SourceHandle = "true", Outcome = "true" },
+            new() { SourceStepId = checkExperience, TargetStepId = emailOfficer, SourceHandle = "false", Outcome = "false" },
             new() { SourceStepId = emailOfficer, TargetStepId = requestApproval },
-            new() { SourceStepId = requestApproval, TargetStepId = resolveProvisional, Outcome = "approved" },
-            new() { SourceStepId = requestApproval, TargetStepId = resolveReferred, Outcome = "rejected" },
+            new() { SourceStepId = requestApproval, TargetStepId = resolveProvisional, SourceHandle = "approved", Outcome = "approved" },
+            new() { SourceStepId = requestApproval, TargetStepId = resolveReferred, SourceHandle = "rejected", Outcome = "rejected" },
         };
 
         var trigger = new TriggerConfiguration

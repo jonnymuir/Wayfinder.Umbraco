@@ -8,9 +8,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Mailpit — a real SMTP sink with a web UI, so the Umbraco Automate "Send Email" step in the NJF
-// coaching-standards automation actually delivers something a person can look at. Its own "web"
-// endpoint gets a dashboard link.
-var mailpit = builder.AddContainer("mailpit", "axllent/mailpit")
+// coaching-standards automation actually delivers something a person can look at. The "web"
+// endpoint gets a dashboard link; it serves plain HTTP (Mailpit has no TLS), so open it as
+// http://127.0.0.1:8025 — a browser with HTTPS-First (Safari) will otherwise try https and fail.
+var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
     .WithHttpEndpoint(port: 8025, targetPort: 8025, name: "web")
     .WithEndpoint(port: 1025, targetPort: 1025, name: "smtp");
 
