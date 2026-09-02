@@ -1,16 +1,16 @@
 # A support system driven by Umbraco Automate: a walkthrough
 
-**Configure it. Draw it. Run it.** A support process (Nielsen Norman Group's third
-service-blueprint lane) is added to a Wayfinder.Umbraco site with **no bespoke C#**: one block of
+**Configure it. Run it.** A support process (Nielsen Norman Group's third service-blueprint lane)
+is added to a Wayfinder.Umbraco site with **no bespoke support-system C#**: one block of
 `appsettings.json`, and an [Umbraco Automate](https://docs.umbraco.com/umbraco-automate)
-automation drawn on the backoffice canvas that does the actual work.
+automation that this reference app builds and publishes for you in code.
 
 **What you end up with:** a "Register as a juggling coach" service. A coach applies, an NJF
 registrar reviews, and the registrar's review stage runs a coaching-standards check. That check
 is a configuration-only webhook support system: Wayfinder POSTs the invocation to an Automate
-webhook automation on the same site, the automation runs some logic, emails the standards
-officer, waits for a human accredited / provisional / referred decision, and calls back to
-release the registrar's wait screen.
+webhook automation on the same site; the automation runs some logic, emails the standards
+officer, waits for a human accredited / provisional / referred decision, and resolves the
+registrar's wait screen.
 
 The generic mechanism lives in the `Wayfinder` repo
 ([`docs/guides/support-systems.md`](https://github.com/jonnymuir/Wayfinder/blob/main/docs/guides/support-systems.md),
@@ -22,7 +22,7 @@ Automate. Zapier, Make, n8n or a small service would satisfy the same contract.
 ## Before you start
 
 Boot the reference app through its Aspire host, so Mailpit (a real mailbox with a web UI) and the
-signing secrets are wired for you:
+signing key are wired for you:
 
 ```bash
 cd Wayfinder.Umbraco.Client && npm ci && npm run build && cd ..
@@ -33,90 +33,49 @@ The Aspire dashboard lists two resources: **referenceapp** (`https://localhost:4
 **mailpit** (its `web` endpoint, the mailbox UI). Wait for `referenceapp` to finish its
 unattended install.
 
-You need:
-
 | | |
 |---|---|
 | **Backoffice login** | `admin@example.test` / `Wayfinder123!` |
 | **Demo personas** | `/demo/login` on the site: a coach (citizen) and a registrar (caseworker) |
 
-Running `dotnet run --project Wayfinder.Umbraco.ReferenceApp` directly also works, but without
-Mailpit the "Send Email" step has nowhere to deliver, and the webhook falls back to
-unauthenticated loopback (the config default is `auth.type: "none"`, which logs a warning).
+`dotnet run --project Wayfinder.Umbraco.ReferenceApp` directly also works, but without Mailpit the
+"Send Email" step has nowhere to deliver, and without `NJF_STANDARDS_SIGNING_KEY` the seeded
+webhook trigger accepts unauthenticated POSTs (a trusted-loopback demo fallback).
 
 ---
 
-## What is already wired
+## What is already wired (all in code and config)
 
 - **`appsettings.json` -> `Wayfinder:SupportSystems`** declares the `njf-coaching-standards`
   support system and its `check-coaching-standards` capability: four field-ref inputs
   (`applicantName`, `yearsCoaching`, `disclosureReference`, `firstAidExpiry`), two outputs
   (`coachingStandardsOutcome`, `coachingStandardsNote`), three outcomes (`accredited`,
   `provisional`, `referred`), webhook completion. `WayfinderUmbracoComposer` calls
-  `AddConfiguredSupportSystems` so this registers on boot.
+  `AddConfiguredSupportSystems`, so this registers on boot.
 - **`service-blueprints/njf-coaching-register.json`** is the blueprint. Its `standards-validation`
   stage carries the `support-system-call` action; the calling gateway's routes are
   `accredited` / `provisional` / `referred`.
 - **Umbraco Automate** registers through its own composer (a bare package reference plus
-  `AddComposers()`), and `appsettings.json` sets `Umbraco:Automate:UseNamedConnectionString` to
-  `umbracoDbDSN` so it shares the CMS database rather than needing its own.
-- **`Program.cs`** maps `MapWebhookSupportSystemCallbacks` at
-  `POST /wayfinder/support-systems/callbacks/{invocationId}` (`AllowAnonymous`, gated by the
-  `X-Webhook-Secret` header when a callback secret is set). It passes an engine *accessor*, not
-  an instance, because the Umbraco engine reads the database in its constructor.
-- The AppHost generates a per-run HMAC signing key and callback secret and passes both to the
-  reference app as `NJF_STANDARDS_SIGNING_KEY` / `NJF_STANDARDS_CALLBACK_SECRET`, and switches the
-  webhook to `auth.type: hmac-sha256`.
+  `AddComposers()`); `appsettings.json` sets `Umbraco:Automate:UseNamedConnectionString` to
+  `umbracoDbDSN` so it shares the CMS database.
+- **`AutomateCoachingStandardsSeeder`** (a `BackgroundService`) builds and **publishes** the
+  automation via `IAutomationService` on every boot: a webhook trigger (HMAC-SHA256 when a
+  signing key is present), an **If** branch on the applicant's own data, a **Send Email** to the
+  standards officer, a **Request Approval**, and a `ResolveSupportSystemOutcome` step per outcome.
+  It also creates an Automate workspace if none exists, using this reference app's own admin as
+  the workspace service account (a single-tenant demo shortcut).
+- **`ResolveSupportSystemOutcomeAction`** is a custom Automate `[Action]` in this reference app.
+  It calls `ProcessManagerEngine.ResolveSupportSystemOutcome(...)` **in process**. Automate's
+  built-in HTTP Request action has non-configurable SSRF protection that blocks loopback, so an
+  automation on the same box as Wayfinder cannot call the site back over HTTP. For a genuinely
+  out-of-process consumer (Zapier, a remote service) the HTTP callback route
+  (`MapWebhookSupportSystemCallbacks`, mapped in `Program.cs`) is the seam; this in-process
+  action is the same-box equivalent.
+- The AppHost generates a per-run `NJF_STANDARDS_SIGNING_KEY` and sets the webhook to
+  `auth.type: hmac-sha256`. The config-driven `WebhookSupportSystemClient` signs its outbound
+  POST with the same key.
 
-The one thing you build by hand, once, is the automation itself.
-
----
-
-## Build the automation (once)
-
-In the backoffice (`https://localhost:44399/umbraco`), open the **Automate** section and create a
-new automation. Give it the fixed id the config expects: **`6f1c0000-0000-0000-0000-00000000c0de`**
-(the "Advanced" panel on the automation lets you set the id; or import
-`automate/coaching-standards.automation.json` once it is committed to this repo, which carries
-that id already).
-
-**Trigger: Webhook**
-
-- Method: `POST`.
-- Authentication: **HMAC-SHA256**. Signing key: reference the config value the AppHost injects.
-  In the key field, use `$NJF_STANDARDS_SIGNING_KEY` (Automate resolves a `$`-prefixed value from
-  configuration). The webhook URL Automate shows you must match the one in `appsettings.json`
-  (`.../umbraco/automate/webhook/6f1c0000-0000-0000-0000-00000000c0de`).
-
-**Steps**
-
-1. **Set Variable** `invocationId` = `${trigger.body.invocationId}` (and, for readability,
-   `yearsCoaching` = `${trigger.body.inputs.yearsCoaching}`, `firstAidExpiry` =
-   `${trigger.body.inputs.firstAidExpiry}`, `disclosureReference` =
-   `${trigger.body.inputs.disclosureReference}`).
-2. **Condition** `yearsCoaching >= 2` AND `disclosureReference` is not empty AND `firstAidExpiry`
-   is in the future.
-   - **True (auto path):** **HTTP Request** ->
-     `POST https://localhost:44399/wayfinder/support-systems/callbacks/${invocationId}`,
-     header `X-Webhook-Secret: $NJF_STANDARDS_CALLBACK_SECRET`, body
-     `{ "outcomeKey": "accredited", "resultPayload": { "coachingStandardsOutcome": "accredited", "coachingStandardsNote": "Auto-accredited: two or more years' experience, a valid disclosure reference and an in-date first-aid certificate." } }`.
-   - **False (review path):**
-     a. **Send Email** to a fixed address, e.g. `standards-officer@example.test` (this lands in
-        Mailpit), subject "Coaching register application needs review", body carrying the
-        applicant name and the reason.
-     b. **Request Approval**, prompt "Accredit this coach, mark provisional, or refer?", timeout
-        72 hours.
-        - **Approved handle -> HTTP Request** callback with `outcomeKey: "provisional"` and a note.
-        - **Rejected handle -> HTTP Request** callback with `outcomeKey: "referred"` and a note.
-
-**Publish** the automation (the webhook endpoint returns 409 until it is published).
-
-The applicant-facing email is sent by Wayfinder itself once the outcome resolves, not by
-Automate, so the automation never emails an address taken from the request body.
-
-Then export it (**... -> Export**) and commit the JSON as
-`Wayfinder.Umbraco.ReferenceApp/automate/coaching-standards.automation.json` so the next person
-can import it in one step.
+There is nothing to build by hand.
 
 ---
 
@@ -128,34 +87,38 @@ can import it in one step.
 2. **As the registrar**, open **Coaching register queue**, pick up the application, open **Review
    application**, and click **Run coaching-standards check**. The stage shows a waiting screen.
 3. **In Mailpit**, the "needs review" email to the standards officer has arrived.
-4. **In the backoffice Automate section**, open **Pending approvals** and approve. The automation's
-   run history shows the **HTTP Request** step posting the callback.
+4. **In the backoffice Automate section**, open the run for the automation and its **Pending
+   approvals**; approve. The run history shows the **Resolve: provisional** step completing.
 5. **Back as the registrar**, the wait screen releases into **Confirm the outcome**, showing
    `coachingStandardsOutcome` = `provisional` and the standards officer's note. Click **Record and
    notify the applicant**.
 6. **As the coach**, the wait screen releases into **Application complete**, showing the outcome
    and the note.
 
-Re-run with `yearsCoaching` = `5` and a future first-aid date to see the auto-`accredited` path
-resolve without a human step.
+Re-run with `yearsCoaching` = `5` and a disclosure reference to see the auto-`accredited` path
+resolve with no human step (the **If** branch takes the true edge straight to a
+`ResolveSupportSystemOutcome` step).
 
 ---
 
 ## What to check for security
 
 - The invocation envelope Wayfinder POSTs carries `invocationId` but **no callback URL**. The
-  automation's HTTP Request step targets a fixed URL you typed; only the `{invocationId}` path
-  segment comes from the trigger body. A leaked signing key therefore cannot redirect the
-  callback anywhere.
+  in-process resolve step reads `invocationId` from the trigger body and nothing else; the HTTP
+  callback route (used by out-of-process consumers) likewise takes only the `{invocationId}` path
+  segment. A leaked signing key cannot redirect a resolution anywhere.
 - The webhook trigger's HMAC-SHA256 authenticator rejects any POST not signed with
-  `NJF_STANDARDS_SIGNING_KEY`. Try `curl -X POST .../umbraco/automate/webhook/6f1c...c0de -d '{}'`
-  and see a 401.
-- The callback endpoint rejects a missing or wrong `X-Webhook-Secret` with 401. A replayed
-  callback for an already-resolved invocation returns `200 {"status":"no-op"}` and does not
-  advance the cursor a second time. An outcome key outside `accredited/provisional/referred`
-  returns 400.
-- The signing key and callback secret are regenerated on every AppHost launch and are never
-  committed. In a real deployment they would be long-lived secrets in the host's secret store.
+  `NJF_STANDARDS_SIGNING_KEY`:
+  `curl -k -X POST https://localhost:44399/automate/webhook/6f1c0000-0000-0000-0000-00000000c0de -d '{}'`
+  returns 401.
+- `ResolveSupportSystemOutcome` marks an invocation resolved before advancing, so a second
+  delivery for the same invocation is a safe no-op. The engine also rejects an outcome key
+  outside `accredited/provisional/referred`.
+- The out-of-process HTTP callback route (`MapWebhookSupportSystemCallbacks`) additionally
+  requires the `X-Webhook-Secret` header when a callback secret is configured, and returns
+  `200 {"status":"no-op"}` for an unknown or already-resolved invocation.
+- The signing key is regenerated on every AppHost launch and is never committed. In a real
+  deployment it would be a long-lived secret in the host's secret store.
 
 ---
 
