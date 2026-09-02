@@ -66,8 +66,16 @@ public class ReferenceContentSeeder(
         // on the citizen's own page, and "Return to home" from the apply journey looping back to
         // the apply form itself rather than an actual home.
         EnsureContent(homeType, "Home", citizenArea: false, caseworkerArea: false);
-        EnsureContent(homeType, "Apply", citizenArea: true, caseworkerArea: false);
-        EnsureContent(homeType, "Caseworker queue", citizenArea: false, caseworkerArea: true);
+        EnsureContent(homeType, "Apply", ReferenceBlueprintSeeder.DefinitionKey, citizenArea: true, caseworkerArea: false);
+        EnsureContent(homeType, "Caseworker queue", ReferenceBlueprintSeeder.DefinitionKey, citizenArea: false, caseworkerArea: true);
+
+        // The NJF coaching-register demo (config-only webhook support system, resolved by an
+        // Umbraco Automate automation) gets its own citizen and caseworker pages, bound to its
+        // own blueprint — the worklist block shows every actionable blueprint's queue for the
+        // signed-in persona, so one caseworker page would do, but a dedicated pair keeps the two
+        // demos visually separate on the site.
+        EnsureContent(homeType, "Apply to coach", ReferenceBlueprintSeeder.CoachingRegisterDefinitionKey, citizenArea: true, caseworkerArea: false);
+        EnsureContent(homeType, "Coaching register queue", ReferenceBlueprintSeeder.CoachingRegisterDefinitionKey, citizenArea: false, caseworkerArea: true);
 
         logger.LogInformation("REFERENCE CONTENT SEEDER: complete");
     }
@@ -155,7 +163,10 @@ public class ReferenceContentSeeder(
         // there on a fresh clone; nothing further to do here.
     }
 
-    private void EnsureContent(IContentType homeType, string name, bool citizenArea, bool caseworkerArea)
+    private void EnsureContent(IContentType homeType, string name, bool citizenArea, bool caseworkerArea) =>
+        EnsureContent(homeType, name, ReferenceBlueprintSeeder.DefinitionKey, citizenArea, caseworkerArea);
+
+    private void EnsureContent(IContentType homeType, string name, string blueprintKey, bool citizenArea, bool caseworkerArea)
     {
         var existing = contentService.GetRootContent().FirstOrDefault(c =>
             c.ContentType.Alias == HomeAlias && string.Equals(c.Name, name, StringComparison.Ordinal));
@@ -175,7 +186,7 @@ public class ReferenceContentSeeder(
         // the PUT endpoint happens to also accept leniently.
         if (citizenArea)
         {
-            node.SetValue("citizenArea", BuildStageBlockGridValue());
+            node.SetValue("citizenArea", BuildStageBlockGridValue(blueprintKey));
         }
 
         if (caseworkerArea)
@@ -197,12 +208,12 @@ public class ReferenceContentSeeder(
         logger.LogInformation("REFERENCE CONTENT SEEDER: created and published {Name} content node.", name);
     }
 
-    private static string BuildStageBlockGridValue()
+    private static string BuildStageBlockGridValue(string blueprintKey)
     {
         var blockKey = Guid.NewGuid();
         return BuildBlockGridValueJson(StageElementTypeKey, blockKey,
         [
-            new BlockPropertyValue("blueprintKey", "Umbraco.TextBox", ReferenceBlueprintSeeder.DefinitionKey)
+            new BlockPropertyValue("blueprintKey", "Umbraco.TextBox", blueprintKey)
         ]);
     }
 

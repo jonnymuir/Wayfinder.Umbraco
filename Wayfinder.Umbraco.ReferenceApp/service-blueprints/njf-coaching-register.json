@@ -1,0 +1,178 @@
+{
+  "definitionKey": "njf-coaching-register",
+  "displayName": "Register as a juggling coach",
+  "version": 1,
+  "description": "A juggling coach applies to join the National Juggling Federation (NJF) coaching register. An NJF registrar reviews the application, then runs a coaching-standards check against an external standards body. That check is a configuration-only webhook support system (docs/guides/support-systems.md), driven here by an Umbraco Automate automation that does some logic, emails the standards officer, waits for a human decision, and calls back with accredited / provisional / referred.",
+  "initialStage": "apply",
+  "requestPolicy": "single",
+  "queues": [
+    { "key": "applicant", "displayName": "Coach", "actor": "citizen" },
+    {
+      "key": "registrar",
+      "displayName": "NJF registrar",
+      "actor": "caseworker",
+      "assignmentPolicy": "team-tray",
+      "owningTeamId": "njf-coaching-registrars"
+    },
+    { "key": "standards", "displayName": "NJF Coaching Standards", "actor": "system" }
+  ],
+  "stages": [
+    {
+      "stageKey": "apply",
+      "displayName": "Apply to join the coaching register",
+      "queueKey": "applicant",
+      "components": [
+        { "type": "panel", "heading": "Apply to join the NJF coaching register" },
+        { "type": "body", "content": "Tell us about your coaching experience and your safeguarding checks. An NJF registrar will review your application." },
+        { "type": "text", "fieldKey": "applicantName", "label": "Full name", "required": true },
+        { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "required": true },
+        { "type": "number", "fieldKey": "yearsCoaching", "label": "Years of coaching experience", "required": true },
+        { "type": "text", "fieldKey": "disclosureReference", "label": "Safeguarding disclosure reference", "hint": "The reference number from your background disclosure certificate.", "required": true },
+        { "type": "date", "fieldKey": "firstAidExpiry", "label": "First-aid certificate expiry date", "required": true }
+      ],
+      "routes": [
+        { "id": "apply--submit--to-review", "target": "to-review", "trigger": "submit", "label": "Submit application", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "review",
+      "displayName": "Review application",
+      "queueKey": "registrar",
+      "components": [
+        { "type": "panel", "heading": "Review application" },
+        { "type": "body", "content": "Check the application below, then run the coaching-standards check." },
+        {
+          "type": "summary-list",
+          "title": "Application details",
+          "children": [
+            { "type": "text", "fieldKey": "applicantName", "label": "Full name", "changeStateKey": "apply" },
+            { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "changeStateKey": "apply" },
+            { "type": "number", "fieldKey": "yearsCoaching", "label": "Years of coaching experience", "changeStateKey": "apply" },
+            { "type": "text", "fieldKey": "disclosureReference", "label": "Safeguarding disclosure reference", "changeStateKey": "apply" },
+            { "type": "date", "fieldKey": "firstAidExpiry", "label": "First-aid certificate expiry date", "changeStateKey": "apply" }
+          ]
+        }
+      ],
+      "routes": [
+        { "id": "review--run-standards-check--to-standards-check", "target": "to-standards-check", "trigger": "run-standards-check", "label": "Run coaching-standards check", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "standards-validation",
+      "displayName": "Coaching-standards check",
+      "queueKey": "standards",
+      "components": [
+        { "type": "panel", "heading": "Awaiting the NJF Coaching Standards decision" }
+      ],
+      "actions": [
+        {
+          "type": "support-system-call",
+          "timing": "onEnter",
+          "params": {
+            "supportSystemKey": "njf-coaching-standards",
+            "capabilityKey": "check-coaching-standards",
+            "inputs": {
+              "applicantName": "applicantName",
+              "yearsCoaching": "yearsCoaching",
+              "disclosureReference": "disclosureReference",
+              "firstAidExpiry": "firstAidExpiry"
+            }
+          }
+        }
+      ],
+      "routes": [
+        { "id": "standards-validation--accredited--standards-check-complete", "target": "standards-check-complete", "trigger": "accredited" },
+        { "id": "standards-validation--provisional--standards-check-complete", "target": "standards-check-complete", "trigger": "provisional" },
+        { "id": "standards-validation--referred--standards-check-complete", "target": "standards-check-complete", "trigger": "referred" }
+      ]
+    },
+    {
+      "stageKey": "registrar-decision",
+      "displayName": "Confirm the outcome",
+      "queueKey": "registrar",
+      "components": [
+        { "type": "panel", "heading": "Confirm the outcome" },
+        { "type": "body", "content": "The NJF Coaching Standards check has completed. Confirm the outcome to notify the applicant." },
+        {
+          "type": "summary-list",
+          "title": "Coaching-standards decision",
+          "children": [
+            { "type": "text", "fieldKey": "applicantName", "label": "Full name" },
+            { "type": "text", "fieldKey": "coachingStandardsOutcome", "label": "Outcome" },
+            { "type": "text", "fieldKey": "coachingStandardsNote", "label": "Standards officer's note" }
+          ]
+        }
+      ],
+      "routes": [
+        { "id": "registrar-decision--record-outcome--decision-made", "target": "decision-made", "trigger": "record-outcome", "label": "Record and notify the applicant", "style": "primary" }
+      ]
+    },
+    {
+      "stageKey": "outcome",
+      "displayName": "Application complete",
+      "stageType": "Confirmation",
+      "queueKey": "applicant",
+      "components": [
+        { "type": "panel", "heading": "Your coaching register application is complete" },
+        {
+          "type": "summary-list",
+          "title": "Outcome",
+          "children": [
+            { "type": "text", "fieldKey": "coachingStandardsOutcome", "label": "Outcome" },
+            { "type": "text", "fieldKey": "coachingStandardsNote", "label": "What this means" }
+          ]
+        }
+      ]
+    }
+  ],
+  "gateways": [
+    {
+      "key": "to-review",
+      "displayName": "Hand off to the registrar",
+      "gatewayType": "Split",
+      "queueKey": "applicant",
+      "routes": [
+        { "id": "to-review--submit--decision-made", "target": "decision-made", "trigger": "submit" },
+        { "id": "to-review--submit--review", "target": "review", "trigger": "submit" }
+      ]
+    },
+    {
+      "key": "to-standards-check",
+      "displayName": "Run the coaching-standards check",
+      "gatewayType": "Split",
+      "queueKey": "registrar",
+      "routes": [
+        { "id": "to-standards-check--run-standards-check--standards-check-complete", "target": "standards-check-complete", "trigger": "run-standards-check" },
+        { "id": "to-standards-check--run-standards-check--standards-validation", "target": "standards-validation", "trigger": "run-standards-check" }
+      ]
+    },
+    {
+      "key": "standards-check-complete",
+      "displayName": "Awaiting the coaching-standards decision",
+      "gatewayType": "Join",
+      "queueKey": "registrar",
+      "routes": [
+        { "id": "standards-check-complete--accredited--registrar-decision", "target": "registrar-decision", "trigger": "accredited" },
+        { "id": "standards-check-complete--provisional--registrar-decision", "target": "registrar-decision", "trigger": "provisional" },
+        { "id": "standards-check-complete--referred--registrar-decision", "target": "registrar-decision", "trigger": "referred" }
+      ],
+      "waitingContent": "The NJF Coaching Standards team is reviewing this application. This page updates once a decision is made.",
+      "waitingExpectedSeconds": 120,
+      "waitingPollIntervalMs": 5000,
+      "requiredIncomingQueues": ["registrar", "standards"]
+    },
+    {
+      "key": "decision-made",
+      "displayName": "Application decided",
+      "gatewayType": "Join",
+      "queueKey": "applicant",
+      "routes": [
+        { "id": "decision-made--record-outcome--outcome", "target": "outcome", "trigger": "record-outcome" }
+      ],
+      "waitingContent": "The NJF is reviewing your application to join the coaching register. We'll update this page once a decision is made.",
+      "waitingExpectedSeconds": 180,
+      "waitingPollIntervalMs": 5000,
+      "requiredIncomingQueues": ["applicant", "registrar"]
+    }
+  ]
+}

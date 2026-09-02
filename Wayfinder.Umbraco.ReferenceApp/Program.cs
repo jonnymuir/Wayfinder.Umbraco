@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
+using Wayfinder.Engine.Http;
 using Wayfinder.Engine.Mcp;
 using Wayfinder.Rendering.GovUk;
 using Wayfinder.Umbraco;
 using Wayfinder.Umbraco.Extensions;
 using Wayfinder.Umbraco.Mcp;
 using Wayfinder.Umbraco.ReferenceApp;
+using Wayfinder.Umbraco.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,13 @@ const string McpEndpointPath = "/wayfinder/service-blueprint-authoring/mcp";
 
 // Local secrets override — gitignored.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+// The NJF Coaching Standards webhook is always HMAC-signed (appsettings.json). The AppHost
+// supplies a per-run signing key; a bare `dotnet run` gets an ephemeral one here so the config
+// -driven client and the seeded Automate trigger both have a key to agree on, with nothing
+// secret in committed config.
+builder.Configuration["NJF_STANDARDS_SIGNING_KEY"] ??=
+    Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
 // The demo cookie authentication scheme itself is registered as the app-wide default in
 // ReferenceAppComposer, not here — see that class's own remarks for why it must be a composer.
@@ -40,6 +49,13 @@ builder.Services.AddServiceBlueprintAuthoringMcp();
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
     .AddWebsite()
+    // Umbraco Automate (MIT) registers itself through its own UmbracoAutomateComposer, picked up
+    // by AddComposers() below — a bare package reference is enough, no explicit AddUmbracoAutomate()
+    // call (that would double-register WorkflowCore). The NJF Coaching Standards support system
+    // (appsettings.json Wayfinder:SupportSystems) POSTs each invocation to an Automate webhook
+    // automation on this same site; the automation does the work and calls back
+    // /wayfinder/support-systems/callbacks (mapped below). Nothing Wayfinder ships knows about
+    // Automate — it is a plain webhook consumer. See docs/automate-support-system-walkthrough.md.
     .AddComposers()
     // One-click MCP OAuth: an MCP client (Claude Code, etc.) connects by logging into this
     // site's Umbraco backoffice, rather than a human hand-minting a short-lived bearer token
@@ -52,6 +68,10 @@ builder.CreateUmbracoBuilder()
 
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceBlueprintSeeder>();
+// Builds and publishes the "NJF Coaching Standards" Automate automation in code, so the
+// config-only webhook support system has a real automation ready and waiting. A BackgroundService
+// (not a startup notification) because it must run after Automate has created its default workspace.
+builder.Services.AddHostedService<AutomateCoachingStandardsSeeder>();
 // Scoped, not Singleton like the other two seeders — IBackOfficeUserClientCredentialsManager is
 // itself registered Scoped by Umbraco, and DI validation fails fast on a Singleton consuming a
 // Scoped dependency (confirmed live).
@@ -126,5 +146,17 @@ app.MapServiceBlueprintAuthoringMcp(McpEndpointPath).RequireAuthorization(new Au
 // /.well-known/oauth-protected-resource (this endpoint), plus an RFC 8414 authorization-server
 // metadata document standing in for Umbraco's backoffice OpenIddict server, which publishes none.
 app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);
+
+// The inbound half of the config-only webhook support system: the callback the NJF Coaching
+// Standards Automate automation posts to resolve a waiting registrar cursor. AllowAnonymous is
+// deliberate and required — this is a server-to-server webhook, not a browser/backoffice call,
+// so it must not challenge the demo cookie or the backoffice scheme. Its own gate is the
+// X-Webhook-Secret header when NJF_STANDARDS_CALLBACK_SECRET is set (user-secrets / the AppHost
+// supplies it); with no secret set it logs a warning and trusts the loopback network, matching
+// this reference app's documented minimal-auth posture.
+app.MapWebhookSupportSystemCallbacks(
+        () => app.Services.GetRequiredService<UmbracoProcessManagerEngine>(),
+        sharedSecret: builder.Configuration["NJF_STANDARDS_CALLBACK_SECRET"])
+    .AllowAnonymous();
 
 await app.RunAsync();

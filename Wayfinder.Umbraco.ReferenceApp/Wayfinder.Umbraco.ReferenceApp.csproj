@@ -11,6 +11,11 @@
   <ItemGroup>
     <PackageReference Include="Umbraco.Cms" Version="$(UmbracoVersion)" />
     <PackageReference Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="$(UmbracoVersion)" />
+    <!-- Umbraco Automate (MIT) — the worked example of a configuration-only webhook support
+         system. Version tracks the Umbraco major; 17.3.0 is the current 17.x line. Only in this
+         reference app, never in the Wayfinder.Umbraco package itself. -->
+    <PackageReference Include="Umbraco.Automate" Version="17.3.0" />
+    <PackageReference Include="Umbraco.Automate.Persistence.Sqlite" Version="17.3.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +27,10 @@
          Wayfinder.ReferenceApp does in the core repo, chaining its own RequireAuthorization()
          onto it (WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin) instead of leaving it
          anonymous. -->
-    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.7.8" />
+    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.8.1" />
+    <!-- MapWebhookSupportSystemCallbacks — the inbound half of the config-driven webhook
+         support system (Wayfinder.Umbraco itself has no runtime-route opinion, same as MCP). -->
+    <PackageReference Include="Wayfinder.Engine.Http" Version="0.2.1" />
   </ItemGroup>
 
   <ItemGroup>
