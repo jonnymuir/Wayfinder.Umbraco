@@ -5,14 +5,27 @@
 // This exists so the reference app shows up on the Aspire dashboard with a real, clickable URL
 // (see feedback_aspire_launchsettings.md) and, now, so the NJF coaching-standards demo has a real
 // mailbox to deliver into and real secrets to sign with.
+using System.Diagnostics;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
+// Serve Mailpit's web UI over HTTPS with the machine's trusted ASP.NET Core dev certificate, so
+// the Aspire dashboard link opens with no warning. Mailpit does not do TLS on its own and has no
+// cert of its own, so export the dev cert to PEM once and bind-mount it; `dotnet dev-certs`
+// writes the key 0600, and the container runs as a non-root user, so widen it to 0644.
+var tlsDir = Path.Combine(Path.GetTempPath(), "wayfinder-mailpit-tls");
+Directory.CreateDirectory(tlsDir);
+var tlsCert = Path.Combine(tlsDir, "mailpit.pem");
+var tlsKey = Path.Combine(tlsDir, "mailpit.key");
+ExportDevCertPem(tlsCert, tlsKey);
+
 // Mailpit — a real SMTP sink with a web UI, so the Umbraco Automate "Send Email" step in the NJF
-// coaching-standards automation actually delivers something a person can look at. The "web"
-// endpoint gets a dashboard link; it serves plain HTTP (Mailpit has no TLS), so open it as
-// http://127.0.0.1:8025 — a browser with HTTPS-First (Safari) will otherwise try https and fail.
+// coaching-standards automation actually delivers something a person can look at.
 var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
-    .WithHttpEndpoint(port: 8025, targetPort: 8025, name: "web")
+    .WithBindMount(tlsDir, "/tls", isReadOnly: true)
+    .WithEnvironment("MP_UI_TLS_CERT", "/tls/mailpit.pem")
+    .WithEnvironment("MP_UI_TLS_KEY", "/tls/mailpit.key")
+    .WithHttpsEndpoint(port: 8025, targetPort: 8025, name: "web")
     .WithEndpoint(port: 1025, targetPort: 1025, name: "smtp");
 
 // Per-run ephemeral secrets — regenerated every launch, never committed. The config-driven
@@ -39,3 +52,40 @@ builder.AddProject<Projects.Wayfinder_Umbraco_ReferenceApp>(
     .WithEnvironment("NJF_STANDARDS_CALLBACK_SECRET", callbackSecret);
 
 builder.Build().Run();
+
+// Exports the trusted ASP.NET Core HTTPS dev certificate as a PEM cert + key pair. `dotnet
+// dev-certs https --export-path X.pem --format Pem` writes the cert to X.pem and the key to
+// X.key. Reuses an existing export; a stale one (the dev cert rotates yearly) is fixed by
+// deleting the temp dir.
+static void ExportDevCertPem(string certPath, string keyPath)
+{
+    if (File.Exists(certPath) && File.Exists(keyPath))
+    {
+        return;
+    }
+
+    var psi = new ProcessStartInfo("dotnet",
+        $"dev-certs https --export-path \"{certPath}\" --format Pem --no-password")
+    {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+    };
+
+    using var proc = Process.Start(psi);
+    proc?.WaitForExit(TimeSpan.FromSeconds(30));
+
+    if (!OperatingSystem.IsWindows())
+    {
+        const UnixFileMode readable = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+        if (File.Exists(certPath))
+        {
+            File.SetUnixFileMode(certPath, readable);
+        }
+
+        if (File.Exists(keyPath))
+        {
+            File.SetUnixFileMode(keyPath, readable);
+        }
+    }
+}

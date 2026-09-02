@@ -30,8 +30,9 @@ dotnet run --project Wayfinder.Umbraco.AppHost
 ```
 
 The Aspire dashboard lists two resources: **referenceapp** (`https://localhost:44399`) and
-**mailpit** (its `web` endpoint, the mailbox UI). Wait for `referenceapp` to finish its
-unattended install.
+**mailpit** (`https://localhost:8025`, the mailbox UI — served with the machine's trusted
+ASP.NET Core dev certificate, so `dotnet dev-certs https --trust` must have been run once).
+Wait for `referenceapp` to finish its unattended install.
 
 | | |
 |---|---|
