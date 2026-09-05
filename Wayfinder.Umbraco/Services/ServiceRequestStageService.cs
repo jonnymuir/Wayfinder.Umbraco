@@ -30,6 +30,21 @@ public class ServiceRequestStageService(
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
     private const string FieldPrefix = "field:";
 
+    /// <summary>
+    /// Renders the current (or a specific) stage of a citizen's service request — the GET-side
+    /// entry point both the <c>wayfinderServiceRequestStage</c> Block Grid partial and any custom
+    /// host surface call. Resolves the caller's tenant/user/<c>ActorProfile</c> from
+    /// <see cref="WayfinderServiceDesignOptions"/>, asks the engine for the current envelope, mints
+    /// a fresh nonce bound to this instance/user for the eventual whole-page submission, and never
+    /// throws — an unexpected failure comes back as the same <c>ResponseState == "error"</c> shape
+    /// the engine's own expected failures use (see this method's own <c>catch</c> for why).
+    /// </summary>
+    /// <param name="ctx">The current request, used to resolve identity and build stage-relative URLs.</param>
+    /// <param name="blueprintKey">Which service blueprint to render.</param>
+    /// <param name="instanceId">A specific instance to resume, or <see langword="null"/> to resolve the caller's current/latest one.</param>
+    /// <param name="action">An explicit transition to take on load (rare — most stages render via a plain GET).</param>
+    /// <param name="problems">Validation problems carried over from a failed POST (PRG pattern), if any.</param>
+    /// <param name="formValues">Submitted values to repopulate the form with, alongside <paramref name="problems"/>.</param>
     public async Task<ServiceRequestStageRenderResult> RenderCurrentAsync(
         HttpContext ctx,
         string blueprintKey,
@@ -37,6 +52,46 @@ public class ServiceRequestStageService(
         string? action,
         IReadOnlyList<ServiceRequestProblem>? problems = null,
         IReadOnlyDictionary<string, string>? formValues = null)
+    {
+        try
+        {
+            return await RenderCurrentCoreAsync(ctx, blueprintKey, instanceId, action, problems, formValues);
+        }
+        catch (Exception ex) when (ex is not (OperationCanceledException or StackOverflowException or OutOfMemoryException))
+        {
+            // A stage page is citizen-facing GOV.UK content — an unhandled exception here (a
+            // corrupt stored instance, a calculation error, a null-resolver bug) must never
+            // surface as a raw ASP.NET Core error page. Render it through the exact same
+            // ResponseState == "error" envelope shape GetCurrent/Advance already produce for an
+            // *expected* failure, so the Block Grid partial has exactly one error-rendering path
+            // regardless of which kind of failure it was.
+            logger.LogError(ex, "Unhandled exception rendering stage {BlueprintKey}/{InstanceId}", blueprintKey, instanceId);
+            var errorEnvelope = new ServiceRequestResponseEnvelope
+            {
+                InstanceId = instanceId ?? string.Empty,
+                ResponseState = "error",
+                StateVersion = 0,
+                CorrelationId = Guid.NewGuid().ToString(),
+                ServerTimeUtc = DateTimeOffset.UtcNow,
+                Problems = [new ServiceRequestProblem
+                {
+                    FieldKey = string.Empty,
+                    Message = "Sorry, there is a problem with this service. Try again later.",
+                    Code = "UNHANDLED_EXCEPTION",
+                }],
+            };
+            return new ServiceRequestStageRenderResult(
+                errorEnvelope, blueprintKey, Nonce: "", problems ?? [], formValues ?? new Dictionary<string, string>());
+        }
+    }
+
+    private async Task<ServiceRequestStageRenderResult> RenderCurrentCoreAsync(
+        HttpContext ctx,
+        string blueprintKey,
+        string? instanceId,
+        string? action,
+        IReadOnlyList<ServiceRequestProblem>? problems,
+        IReadOnlyDictionary<string, string>? formValues)
     {
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
@@ -80,11 +135,21 @@ public class ServiceRequestStageService(
         // correct and no more expensive for the pure case.
         var nonceFields = envelope.Render?.Components.SelectMany(c => c.Fields).ToList() ?? [];
 
-        var nonce = await nonceService.CreateAsync(nonceFields);
+        var nonce = await nonceService.CreateAsync(envelope.InstanceId, userId, nonceFields);
 
         return new ServiceRequestStageRenderResult(envelope, blueprintKey, nonce, problems ?? [], formValues ?? new Dictionary<string, string>());
     }
 
+    /// <summary>
+    /// Handles a stage's whole-page form POST — validates the presented nonce against the caller's
+    /// instance/user (see <see cref="IStageNonceService"/>), resolves any async-uploaded files by
+    /// their token, submits the merged field values to the engine, and always returns a
+    /// PRG-pattern redirect back to <see cref="ServiceRequestStageAdvanceResult.ReturnUrl"/> —
+    /// validation problems and resubmitted values ride in <c>TempData</c> for the next GET to pick
+    /// back up, rather than rendering the result of a POST directly.
+    /// </summary>
+    /// <param name="ctx">The current request, used to resolve identity.</param>
+    /// <param name="form">The submitted form — <c>ReturnUrl</c>/<c>InstanceId</c>/<c>Nonce</c> plus every <c>field:{fieldKey}</c> value.</param>
     public async Task<ServiceRequestStageAdvanceResult> AdvanceAsync(HttpContext ctx, IFormCollection form)
     {
         var options = optionsAccessor.Value;
@@ -102,12 +167,17 @@ public class ServiceRequestStageService(
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
         }
 
-        var authoritativeFields = await nonceService.ResolveAsync(nonce);
+        var authoritativeFields = await nonceService.ResolveAsync(nonce, instanceId, userId);
         if (authoritativeFields == null)
         {
-            logger.LogWarning("Stage advance: nonce expired or invalid — redirecting to GET");
+            logger.LogWarning("Stage advance: nonce expired, invalid, or bound to a different instance/user — redirecting to GET");
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
         }
+
+        // Consumed the moment a whole-page submission actually uses it — bounds replay of this
+        // exact submission to "before this point", rather than "until the nonce's own TTL
+        // expires" (an async file-upload's own resolve never reaches here, so it's unaffected).
+        await nonceService.InvalidateAsync(nonce);
 
         // Fields post under GovUk.FieldName's "field:{fieldKey}" convention (Wayfinder.Rendering.GovUk's own rendering contract).
         var submittedFields = form.Keys

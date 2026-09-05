@@ -31,41 +31,57 @@ public class StageNonceService : IStageNonceService
         _options = options.Value;
     }
 
+    private sealed record NoncePayload(string InstanceId, string UserId, IReadOnlyList<FieldRenderPayload> Fields);
+
     /// <summary>
-    /// Creates a nonce, caches the step's field definitions under it, and returns the nonce string.
+    /// Creates a nonce bound to <paramref name="instanceId"/>/<paramref name="userId"/>, caches
+    /// the step's field definitions under it, and returns the nonce string.
     /// </summary>
-    public async Task<string> CreateAsync(IReadOnlyList<FieldRenderPayload> fields, CancellationToken ct = default)
+    public async Task<string> CreateAsync(
+        string instanceId, string userId, IReadOnlyList<FieldRenderPayload> fields, CancellationToken ct = default)
     {
         var nonce = Guid.NewGuid().ToString("N");
-        var cacheKey = $"wayfinder:workflow:nonce:{nonce}";
 
-        var json = JsonSerializer.SerializeToUtf8Bytes(fields, JsonOptions);
+        var json = JsonSerializer.SerializeToUtf8Bytes(new NoncePayload(instanceId, userId, fields), JsonOptions);
 
         var cacheOptions = new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = _options.NonceExpiry
         };
 
-        await _cache.SetAsync(cacheKey, json, cacheOptions, ct);
+        await _cache.SetAsync(CacheKey(nonce), json, cacheOptions, ct);
 
         return nonce;
     }
 
     /// <summary>
-    /// Resolves a nonce back to its field definitions. Returns null if the nonce has
-    /// expired or never existed — the caller should redirect to GET in this case.
+    /// Resolves a nonce back to its field definitions — only when it was created for this exact
+    /// <paramref name="instanceId"/>/<paramref name="userId"/>. Returns null for an
+    /// expired/unknown nonce or a mismatched instance/user — deliberately indistinguishable from
+    /// each other. See <see cref="InvalidateAsync"/> for eviction.
     /// </summary>
-    public async Task<IReadOnlyList<FieldRenderPayload>?> ResolveAsync(string nonce, CancellationToken ct = default)
+    public async Task<IReadOnlyList<FieldRenderPayload>?> ResolveAsync(
+        string nonce, string instanceId, string userId, CancellationToken ct = default)
     {
-        var cacheKey = $"wayfinder:workflow:nonce:{nonce}";
-
-        var json = await _cache.GetAsync(cacheKey, ct);
+        var json = await _cache.GetAsync(CacheKey(nonce), ct);
 
         if (json == null)
             return null;
 
-        var fields = JsonSerializer.Deserialize<List<FieldRenderPayload>>(json, JsonOptions);
+        var payload = JsonSerializer.Deserialize<NoncePayload>(json, JsonOptions);
+        if (payload is null
+            || !string.Equals(payload.InstanceId, instanceId, StringComparison.Ordinal)
+            || !string.Equals(payload.UserId, userId, StringComparison.Ordinal))
+        {
+            return null;
+        }
 
-        return fields;
+        return payload.Fields;
     }
+
+    /// <inheritdoc/>
+    public Task InvalidateAsync(string nonce, CancellationToken ct = default) =>
+        _cache.RemoveAsync(CacheKey(nonce), ct);
+
+    private static string CacheKey(string nonce) => $"wayfinder:workflow:nonce:{nonce}";
 }
