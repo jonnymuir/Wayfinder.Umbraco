@@ -35,6 +35,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
     public Task<IReadOnlyList<ServiceBlueprintSourceSummary>> ListAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         using var db = databaseFactory.CreateDatabase();
         var rows = db.Fetch<ServiceBlueprintSchema>(
             "SELECT DefinitionKey, DisplayName FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
@@ -48,6 +49,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
     public Task<ServiceBlueprint?> LoadAsync(string definitionKey, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         using var db = databaseFactory.CreateDatabase();
         var row = db.FirstOrDefault<ServiceBlueprintSchema>(
             "SELECT * FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
@@ -64,6 +66,7 @@ public sealed class UmbracoServiceBlueprintStore(
     public Task<ServiceBlueprintSaveResult> SaveAsync(
         ServiceBlueprint blueprint, int expectedVersion, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         using var db = databaseFactory.CreateDatabase();
 
         var existing = db.FirstOrDefault<ServiceBlueprintSchema>(
@@ -76,6 +79,7 @@ public sealed class UmbracoServiceBlueprintStore(
                 return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: 0, Location: "wayfinderServiceBlueprint"));
             }
 
+            ct.ThrowIfCancellationRequested();
             var newRow = new ServiceBlueprintSchema
             {
                 DefinitionKey = blueprint.DefinitionKey,
@@ -95,6 +99,7 @@ public sealed class UmbracoServiceBlueprintStore(
             return Task.FromResult(new ServiceBlueprintSaveResult(Saved: false, CurrentVersion: existing.Version, Location: "wayfinderServiceBlueprint"));
         }
 
+        ct.ThrowIfCancellationRequested();
         var newVersion = expectedVersion + 1;
         var toSave = blueprint with { Version = newVersion };
 
@@ -123,6 +128,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
     public Task<bool> DeleteAsync(string definitionKey, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         using var db = databaseFactory.CreateDatabase();
         var rowsAffected = db.Execute(
             "DELETE FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
