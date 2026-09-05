@@ -29,10 +29,11 @@ public class ServiceRequestWorklistService(
         int pageSize = 20)
     {
         var options = optionsAccessor.Value;
+        var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
         var accessProfile = options.ResolveAccessProfile!(ctx);
 
-        return processManager.GetQueueWorkItems(userId, accessProfile, statuses, sort, searchText, pageIndex, pageSize);
+        return processManager.GetQueueWorkItems(tenantId, userId, accessProfile, statuses, sort, searchText, pageIndex, pageSize);
     }
 
     public ServiceRequestResponseEnvelope Pickup(HttpContext ctx, string instanceId, string cursorId)
