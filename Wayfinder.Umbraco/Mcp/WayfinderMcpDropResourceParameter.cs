@@ -25,6 +25,13 @@ namespace Wayfinder.Umbraco.Mcp;
 /// endpoint as a real OpenIddict scope/resource and validating audience end to end is the
 /// hardening path, deferred: it needs the host's public base URL known at startup and matching
 /// <c>AddAudiences(...)</c> on the validation side.
+///
+/// Security impact of the deferral, stated plainly: without audience binding, any access token a
+/// <c>BlueprintsAdmin</c>-scoped backoffice user holds for another purpose is also valid at the
+/// MCP endpoint, and vice versa — a token isn't confined to the audience it was actually issued
+/// for. Acceptable today only because both surfaces already require the same
+/// <c>BlueprintsAdmin</c> policy membership; revisit before adding any MCP-only tool or scope that
+/// backoffice access shouldn't imply.
 /// </remarks>
 public sealed class WayfinderMcpDropResourceParameter(IOptions<WayfinderMcpOptions> options)
     : IOpenIddictServerHandler<ExtractAuthorizationRequestContext>,

@@ -7,6 +7,12 @@ namespace Wayfinder.Umbraco.Models;
 /// </summary>
 public static class ServiceRequestRenderShellResolver
 {
+    /// <summary>
+    /// Picks which partial (<c>question</c>/<c>check-answers</c>/<c>confirmation</c>/<c>status-timeline</c>/
+    /// <c>task-list</c>/<c>waiting</c>) <c>_WayfinderStageRender.cshtml</c> should render a stage
+    /// with, inferring from the actual component tree rather than trusting a possibly-stale
+    /// <paramref name="legacyStepType"/> alone.
+    /// </summary>
     public static string ResolveShell(
         IReadOnlyList<ComponentRenderPayload>? components,
         string? legacyStepType,

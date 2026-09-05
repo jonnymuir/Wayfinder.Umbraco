@@ -58,10 +58,12 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
         return Ok(queues);
     }
 
+    /// <summary>Every saved blueprint's key/display name — the backoffice list view's own data source.</summary>
     [HttpGet("service-blueprints")]
     public async Task<IActionResult> ListServiceBlueprints(CancellationToken ct) =>
         Ok(await authoringService.ListAsync(ct));
 
+    /// <summary>The full definition for one blueprint, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
     [HttpGet("service-blueprints/{definitionKey}")]
     public async Task<IActionResult> ReadServiceBlueprint(string definitionKey, CancellationToken ct)
     {
@@ -69,6 +71,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
         return blueprint is null ? NotFound() : Ok(blueprint);
     }
 
+    /// <summary>Just the current version number — the editor's cheap "has this changed under me?" poll, without re-fetching the whole definition.</summary>
     [HttpGet("service-blueprints/{definitionKey}/version")]
     public async Task<IActionResult> GetServiceBlueprintVersion(string definitionKey, CancellationToken ct)
     {
@@ -76,6 +79,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
         return blueprint is null ? NotFound() : Ok(new { version = blueprint.Version });
     }
 
+    /// <summary>Runs <see cref="ServiceBlueprintAuthoringService.Validate"/> against a blueprint that hasn't been saved yet — the editor's live-validation-as-you-type call.</summary>
     [HttpPost("service-blueprints/validate")]
     public IActionResult ValidateServiceBlueprint([FromBody] ServiceBlueprint blueprint) =>
         Ok(authoringService.Validate(blueprint));
@@ -120,10 +124,12 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
         };
     }
 
+    /// <summary>Dry-runs a scripted sequence of steps against a blueprint without persisting any instance — the editor's "try it" panel.</summary>
     [HttpPost("service-blueprints/simulate")]
     public IActionResult SimulateServiceBlueprint([FromBody] ServiceBlueprintSimulationRequest request) =>
         Ok(authoringService.Simulate(request.Blueprint, request.Steps));
 
+    /// <summary>Permanently removes a blueprint, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
     [HttpDelete("service-blueprints/{definitionKey}")]
     public async Task<IActionResult> DeleteServiceBlueprint(string definitionKey, CancellationToken ct)
     {

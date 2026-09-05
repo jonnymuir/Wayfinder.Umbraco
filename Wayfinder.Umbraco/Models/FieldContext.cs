@@ -114,6 +114,12 @@ public record FieldContext
         return displayValue;
     }
 
+    /// <summary>
+    /// Builds the render-time context a field partial (built-in or a host's own override) needs:
+    /// the resolved display value (submitted value takes precedence over the field's own,
+    /// prefix-stripped), generated ids for label/hint/error ARIA wiring, and the
+    /// instance/nonce/blueprint context a <c>file-upload</c> field's upload/download URLs need.
+    /// </summary>
     public static FieldContext Build(
         FieldRenderPayload field,
         string? fieldError,
