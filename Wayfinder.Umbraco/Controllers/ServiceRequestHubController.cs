@@ -92,6 +92,6 @@ public class ServiceRequestHubController(
     private string BuildLoginRedirectUrl()
     {
         var returnUrl = $"{Request.PathBase}{Request.Path}{Request.QueryString}";
-        return $"/auth/login?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
+        return $"{optionsAccessor.Value.LoginPath}?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 }
