@@ -206,10 +206,12 @@ public class ComponentTagHelper : TagHelper
     private string RenderFileUpload(FieldContext ctx)
     {
         var field = ctx.Field;
-        var acceptAttr = field.AcceptedFileTypes is { Count: > 0 }
-            ? $" accept=\"{string.Join(",", field.AcceptedFileTypes)}\""
-            : string.Empty;
         var acceptList = field.AcceptedFileTypes is { Count: > 0 } ? string.Join(",", field.AcceptedFileTypes) : string.Empty;
+        var acceptListEncoded = GovUk.Esc(acceptList);
+        var acceptAttr = acceptList.Length > 0 ? $" accept=\"{acceptListEncoded}\"" : string.Empty;
+        var labelEncoded = GovUk.Esc(field.Label);
+        var hintEncoded = GovUk.Esc(field.Hint);
+        var fieldErrorEncoded = GovUk.Esc(ctx.FieldError);
         var maxSizeBytes = field.MaxSizeBytes ?? DefaultMaxFileSizeBytes;
         var alreadyUploaded = !string.IsNullOrEmpty(ctx.DisplayValue);
         var downloadUrl = alreadyUploaded && !string.IsNullOrEmpty(ctx.InstanceId)
@@ -236,16 +238,16 @@ public class ComponentTagHelper : TagHelper
                  data-wayfinder-nonce="{ctx.Nonce}"
                  data-wayfinder-field-key="{field.FieldKey}"
                  data-wayfinder-max-size="{maxSizeBytes}"
-                 data-wayfinder-accept="{acceptList}"
-                 data-wayfinder-label="{field.Label}">
-              <label class="govuk-label" for="{field.FieldKey}">{field.Label}{(field.Required ? """<span class="govuk-visually-hidden"> (required)</span>""" : "")}</label>
-              {(ctx.HasHint ? $"""<div class="govuk-hint" id="{ctx.HintId}">{field.Hint}</div>""" : "")}
-              {(ctx.HasFieldError ? $"""<p class="govuk-error-message" id="{ctx.ErrorId}"><span class="govuk-visually-hidden">Error:</span> {ctx.FieldError}</p>""" : "")}
+                 data-wayfinder-accept="{acceptListEncoded}"
+                 data-wayfinder-label="{labelEncoded}">
+              <label class="govuk-label" for="{field.FieldKey}">{labelEncoded}{(field.Required ? """<span class="govuk-visually-hidden"> (required)</span>""" : "")}</label>
+              {(ctx.HasHint ? $"""<div class="govuk-hint" id="{ctx.HintId}">{hintEncoded}</div>""" : "")}
+              {(ctx.HasFieldError ? $"""<p class="govuk-error-message" id="{ctx.ErrorId}"><span class="govuk-visually-hidden">Error:</span> {fieldErrorEncoded}</p>""" : "")}
               {uploadedBlock}
               <div class="wayfinder-file-upload-progress" data-wayfinder-file-upload-progress hidden>
-                <p class="govuk-body" data-wayfinder-file-upload-progress-label>Uploading {field.Label}…</p>
+                <p class="govuk-body" data-wayfinder-file-upload-progress-label>Uploading {labelEncoded}…</p>
                 <div class="wayfinder-file-upload-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-                     aria-label="Upload progress for {field.Label}" data-wayfinder-file-upload-progress-bar>
+                     aria-label="Upload progress for {labelEncoded}" data-wayfinder-file-upload-progress-bar>
                   <div class="wayfinder-file-upload-progress-fill" data-wayfinder-file-upload-progress-fill></div>
                 </div>
                 <span class="govuk-visually-hidden" aria-live="polite" data-wayfinder-file-upload-progress-announce></span>
@@ -253,7 +255,7 @@ public class ComponentTagHelper : TagHelper
               <p class="govuk-error-message" data-wayfinder-file-upload-error hidden></p>
               <input class="govuk-file-upload{(ctx.HasFieldError ? " govuk-file-upload--error" : "")}"
                      type="file" id="{field.FieldKey}" name="{GovUk.FieldName(field.FieldKey)}"
-                     data-wayfinder-file-upload-input data-label="{field.Label}"{acceptAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
+                     data-wayfinder-file-upload-input data-label="{labelEncoded}"{acceptAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
                      {(alreadyUploaded ? "hidden disabled" : "")} />
               <input type="hidden" name="{GovUk.FieldName(field.FieldKey)}" data-wayfinder-file-upload-token disabled value="" />
             </div>
