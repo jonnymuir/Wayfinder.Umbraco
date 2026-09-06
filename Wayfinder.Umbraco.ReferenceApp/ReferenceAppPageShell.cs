@@ -203,7 +203,7 @@ public static class ReferenceAppPageShell
                       <div class="govuk-footer__meta-item govuk-footer__meta-item--grow">
                         <h2 class="govuk-visually-hidden">Support links</h2>
                         <div class="govuk-footer__meta-custom">
-                          A transient Wayfinder.Umbraco reference host — <a class="govuk-footer__link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">github.com/jonnymuir/Wayfinder.Umbraco</a>, MIT licensed.
+                          A Wayfinder.Umbraco reference host — <a class="govuk-footer__link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">github.com/jonnymuir/Wayfinder.Umbraco</a>, MIT licensed.
                         </div>
                       </div>
                     </div>

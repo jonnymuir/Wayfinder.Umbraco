@@ -11,6 +11,7 @@
 @{
     var pageUrl = Context.Request.PathBase + Context.Request.Path;
     var instanceId = Context.Request.Query["instanceId"].ToString();
+    var noLongerInQueue = false;
 
     if (!string.IsNullOrEmpty(instanceId))
     {
@@ -24,10 +25,26 @@
         var blueprintKey = Context.Request.Query["blueprintKey"].ToString();
         var itemUrl = $"{pageUrl}{Context.Request.QueryString}";
         var result = await StageService.RenderCurrentAsync(Context, blueprintKey, instanceId, action: null);
-        var vm = ServiceRequestPageViewModel.FromRenderResult(result, itemUrl);
-        <p><a href="@pageUrl">&larr; Back to worklist</a></p>
-        @await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)
-        return;
+
+        // The one PRG outcome that isn't a "wait, resume here" case: a *final* Advance (approve/
+        // reject, or anything else that moves the item out of every queue this actor can act on)
+        // leaves ReturnUrl pointing at an instance this actor can no longer access at all — every
+        // ACCESS_DENIED the engine raises here means exactly that for a link the worklist itself
+        // generated (see ProcessManagerEngine's own ACCESS_DENIED call sites: this actor never had
+        // an unrelated reason to be shown someone else's instanceId). Falling through to the
+        // listing below, with a banner explaining why, beats a dead-end "There is a problem" box
+        // for what is actually a normal, expected outcome of finishing the item. Found live: Casey
+        // approving a request in the reference app landed on exactly this dead end.
+        noLongerInQueue = result.Envelope.ResponseState == "error"
+            && result.Envelope.Problems.Any(p => p.Code == "ACCESS_DENIED");
+
+        if (!noLongerInQueue)
+        {
+            var vm = ServiceRequestPageViewModel.FromRenderResult(result, itemUrl);
+            <p><a href="@pageUrl">&larr; Back to worklist</a></p>
+            @await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)
+            return;
+        }
     }
 
     var pageSizeText = Model.Content.Value<string>(PublishedValueFallback, "pageSize");
@@ -46,6 +63,17 @@
 
     string ReviewUrl(QueueWorkItem item) =>
         $"{pageUrl}?instanceId={Uri.EscapeDataString(item.InstanceId)}&blueprintKey={Uri.EscapeDataString(item.BlueprintKey)}";
+}
+@if (noLongerInQueue)
+{
+    <div class="govuk-notification-banner" role="region" aria-labelledby="wayfinder-worklist-notification-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="wayfinder-worklist-notification-title">Important</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">That item is no longer in your queue — it's likely already been actioned, or picked up by someone else.</p>
+        </div>
+    </div>
 }
 <table class="wayfinder-worklist">
     <thead>

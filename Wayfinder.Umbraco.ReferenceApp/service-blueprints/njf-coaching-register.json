@@ -45,11 +45,11 @@
           "type": "summary-list",
           "title": "Application details",
           "children": [
-            { "type": "text", "fieldKey": "applicantName", "label": "Full name", "changeStateKey": "apply" },
-            { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "changeStateKey": "apply" },
-            { "type": "number", "fieldKey": "yearsCoaching", "label": "Years of coaching experience", "changeStateKey": "apply" },
-            { "type": "text", "fieldKey": "disclosureReference", "label": "Safeguarding disclosure reference", "changeStateKey": "apply" },
-            { "type": "date", "fieldKey": "firstAidExpiry", "label": "First-aid certificate expiry date", "changeStateKey": "apply" }
+            { "type": "text", "fieldKey": "applicantName", "label": "Full name" },
+            { "type": "email", "fieldKey": "applicantEmail", "label": "Email address" },
+            { "type": "number", "fieldKey": "yearsCoaching", "label": "Years of coaching experience" },
+            { "type": "text", "fieldKey": "disclosureReference", "label": "Safeguarding disclosure reference" },
+            { "type": "date", "fieldKey": "firstAidExpiry", "label": "First-aid certificate expiry date" }
           ]
         }
       ],
