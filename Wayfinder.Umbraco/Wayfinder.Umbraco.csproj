@@ -55,12 +55,9 @@
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="uSync.BackOffice" Version="17.3.5" />
-    <!-- Match whatever Umbraco.Cms.Api.Management ($(UmbracoVersion)) itself references — a
-         higher version here wins the assembly-conflict resolution at build time but isn't
-         actually present at runtime in a host app, since Umbraco's own dependency is what's
-         really on disk (confirmed live: 2.7.5 here throws FileNotFoundException at startup
-         against a real Umbraco 17.5.3 host, which ships 2.4.1). -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.4.1" PrivateAssets="all" />
+    <!-- See $(MicrosoftOpenApiVersion) in the repo's Directory.Build.props for why this can't
+         just be the latest version. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="$(MicrosoftOpenApiVersion)" PrivateAssets="all" />
     <!-- Compiled against for the MCP OAuth client registration + dev transport-security relaxation
          (Wayfinder.Umbraco.Mcp). Both are already on disk in any Umbraco 17 host transitively via
          Umbraco.Cms.Api.Management ($(UmbracoVersion) → OpenIddict 7.4.0) — pinned here only to

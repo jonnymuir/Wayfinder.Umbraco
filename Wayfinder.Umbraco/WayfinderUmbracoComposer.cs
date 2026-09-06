@@ -39,6 +39,17 @@ public class WayfinderUmbracoComposer : IComposer
     {
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, WayfinderMigrationHandler>();
 
+        // Every IWayfinderCatalogExtension in the host's own assemblies, found the same way
+        // Umbraco discovers its own composers/handlers — no manual registration call needed (see
+        // that interface's own remarks). Each gets its own DI registration so IEnumerable<...>
+        // resolves them all; WayfinderCatalogExtensionHandler drains the collection at startup.
+        foreach (var extensionType in builder.TypeLoader.GetTypes<Extensions.IWayfinderCatalogExtension>())
+        {
+            builder.Services.AddSingleton(typeof(Extensions.IWayfinderCatalogExtension), extensionType);
+        }
+
+        builder.AddNotificationHandler<UmbracoApplicationStartedNotification, WayfinderCatalogExtensionHandler>();
+
         builder.Services.AddWayfinderUmbraco(_ => { });
         builder.Services.ConfigureOptions<WayfinderManagementApiConfiguration>();
 
@@ -60,6 +71,22 @@ public class WayfinderUmbracoComposer : IComposer
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new WayfinderAdminRequirement());
             });
+        });
+
+        // A default ServiceRequestPolling policy — RequireAuthenticatedUser(), exactly the body
+        // both reference hosts (Wayfinder.Umbraco.ReferenceApp, UmbracoPrism.TestSite) already
+        // wire up by hand — so a bare package reference's polling endpoint returns 401 instead of
+        // an unhandled 500 (ASP.NET Core's AuthorizationMiddleware throws InvalidOperationException
+        // for an unregistered policy name). Only takes effect if no host has already registered
+        // this exact policy name — a host wanting different behaviour (e.g. a specific scheme)
+        // still calls AddPolicy with the same name and simply wins, whichever composer order runs.
+        builder.Services.Configure<AuthorizationOptions>(options =>
+        {
+            if (options.GetPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling) is null)
+            {
+                options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling,
+                    policy => policy.RequireAuthenticatedUser());
+            }
         });
     }
 }

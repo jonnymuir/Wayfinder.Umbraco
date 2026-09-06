@@ -11,13 +11,31 @@ namespace Wayfinder.Umbraco.Services;
 public interface IStageNonceService
 {
     /// <summary>
-    /// Creates a nonce, caches the step's field definitions under it, and returns the nonce string.
+    /// Creates a nonce bound to <paramref name="instanceId"/>/<paramref name="userId"/>, caches
+    /// the step's field definitions under it, and returns the nonce string.
     /// </summary>
-    Task<string> CreateAsync(IReadOnlyList<FieldRenderPayload> fields, CancellationToken ct = default);
+    Task<string> CreateAsync(
+        string instanceId, string userId, IReadOnlyList<FieldRenderPayload> fields, CancellationToken ct = default);
 
     /// <summary>
-    /// Resolves a nonce back to its field definitions. Returns null if the nonce has
-    /// expired or never existed — the caller should redirect to GET in this case.
+    /// Resolves a nonce back to its field definitions — but only when
+    /// <paramref name="instanceId"/>/<paramref name="userId"/> match what it was created with
+    /// (see <see cref="CreateAsync"/>). Does not evict the entry: a single render's nonce is
+    /// legitimately resolved multiple times before the eventual whole-page submission (once per
+    /// async <c>file-upload</c> field a visitor fills in ahead of it) — see
+    /// <see cref="InvalidateAsync"/> for the caller that actually consumes a submission. Returns
+    /// null for an expired/unknown nonce or one presented with a mismatched instance/user —
+    /// deliberately indistinguishable from each other.
     /// </summary>
-    Task<IReadOnlyList<FieldRenderPayload>?> ResolveAsync(string nonce, CancellationToken ct = default);
+    Task<IReadOnlyList<FieldRenderPayload>?> ResolveAsync(
+        string nonce, string instanceId, string userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Evicts a nonce so it can't be resolved again — called once a whole-page submission has
+    /// actually used it (<see cref="Controllers.WayfinderStageSurfaceController.Advance"/>), to
+    /// bound replay of the same submission to "before the first successful advance" rather than
+    /// "until the nonce's own TTL expires". Never called for an async <c>file-upload</c>'s own
+    /// resolve — that nonce still has a whole-page submission ahead of it to serve.
+    /// </summary>
+    Task InvalidateAsync(string nonce, CancellationToken ct = default);
 }

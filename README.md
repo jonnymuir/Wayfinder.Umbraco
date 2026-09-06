@@ -96,9 +96,9 @@ Install the package and call `AddWayfinderUmbraco()`:
   persistence run where Umbraco runs. There is no remote service to proxy to.
 - **Multi-queue support.** A blueprint declares as many queues as it needs; each block renders only
   what the signed-in actor's `ActorProfile` can see.
-- **A GOV.UK component and field catalog** (`Views/Partials/_WayfinderComponents` /
-  `_WayfinderFields`), overridable one type at a time by placing a same-named partial in your own
-  app.
+- **A GOV.UK component and field catalog**, overridable one type at a time by placing
+  `~/Views/Partials/Components/_Component-{Type}.cshtml` (or `Fields/` for an input field) in your
+  own app — e.g. `_Component-SummaryList.cshtml` overrides the `summary-list` component.
 - **The supporting infrastructure**: nonce handling, file upload, field validation, and live
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
@@ -107,16 +107,79 @@ Install the package and call `AddWayfinderUmbraco()`:
 
 ![The worklist block with a submitted request waiting to be picked up](assets/screenshots/caseworker-worklist.png)
 
+## Quickstart
+
+```bash
+dotnet add package Wayfinder.Umbraco
+```
+
+That's it for the Blueprints authoring UI — boot the site and go to **Settings → Advanced →
+Blueprints**. To make a real citizen/caseworker journey work (rather than the safe
+no-real-access defaults below), wire up your own identity model too:
+
+```csharp
+// YourSiteComposer.cs
+public class YourSiteComposer : IComposer
+{
+    public void Compose(IUmbracoBuilder builder)
+    {
+        builder.Services.AddWayfinderUmbraco(options =>
+        {
+            options.ResolveTenantId      = _   => "default";               // single-tenant
+            options.ResolveUserId        = ctx => ctx.User.Identity!.Name!;
+            options.ResolveAccessProfile = _   => YourQueues.AccessProfile;
+        });
+
+        builder.Services.Configure<AuthorizationOptions>(o =>
+            o.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling,
+                p => p.RequireAuthenticatedUser()));
+    }
+}
+```
+
+Then drop the `wayfinderServiceRequestStage` block onto any Block Grid page and set its
+`blueprintKey`.
+
 ## What a host still owns
 
 Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wires:
 
 - **Identity and tenancy**, via `WayfinderServiceDesignOptions.ResolveTenantId` / `ResolveUserId` /
-  `ResolveAccessProfile` (all required).
+  `ResolveAccessProfile`. All three default to safe, no-real-access values (a fixed `"default"`
+  tenant, and an `ActorProfile` that can view/start/act on no real queue) so a bare package
+  reference boots — override them for citizen/caseworker journeys to actually work.
 - **The polling policy.** The live-update endpoint (`ServiceRequestPollController`) sits behind the
-  `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` named policy; register it against
-  the authentication scheme your host uses. Without it, waiting screens fall back to a manual
-  refresh. `Wayfinder.Umbraco.ReferenceApp/ReferenceAppComposer.cs` is a minimal working example.
+  `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` named policy; the package registers
+  a default (`RequireAuthenticatedUser()`) if a host doesn't register its own against a specific
+  authentication scheme. `Wayfinder.Umbraco.ReferenceApp/ReferenceAppComposer.cs` is a minimal
+  working example.
+
+## Security responsibilities
+
+The package enforces two named authorization policies:
+
+| Policy | Guards | Registered by |
+|---|---|---|
+| `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin` | The backoffice authoring API (`ServiceBlueprintAuthoringController`) | This package, automatically — checked against `WayfinderServiceDesignOptions.AdminGroupAliases` |
+| `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` | The live-update poll endpoint (`ServiceRequestPollController`) | This package, with a `RequireAuthenticatedUser()` default a host can override |
+
+Everything else the package renders — `wayfinderServiceRequestStage`'s file upload/download links,
+in particular — resolves through `WayfinderServiceDesignOptions.FileEndpointBasePath`, and **the
+package does not serve those routes itself**. A host mounts its own upload/download controllers at
+that base path, and each one must verify the caller actually owns the instance it's serving,
+exactly like `UmbracoPrism.TestSite`'s reference controllers do:
+
+```csharp
+if (!engine.IsOwnedInstance(instanceId, tenantId, userId, accessProfile))
+{
+    return NotFound();
+}
+```
+
+Skipping this check is an IDOR: anyone who knows (or guesses) an `instanceId` could read or
+download another citizen's uploaded file. See `PublicServiceRequestFileUploadController`/
+`PublicServiceRequestFileDownloadController` in `UmbracoPrism.TestSite` for the full pattern,
+including nonce validation.
 
 ## Reference app
 
@@ -126,6 +189,12 @@ worklist, pickup and putback, access control, and the MCP authoring surface. Bac
 logins are documented there.
 
 ## How it fits together
+
+```mermaid
+graph LR
+  WF["Wayfinder<br/>core engine<br/>(framework-agnostic)"] --> WFU["Wayfinder.Umbraco<br/>CMS binding<br/>(this package)"]
+  WFU --> PRISM["Umbraco Prism<br/>multi-tenant host<br/>(OIDC, branding)"]
+```
 
 - **[`Wayfinder`](https://github.com/jonnymuir/Wayfinder)** is the framework-agnostic core: the
   domain model, the calculation engine, and the state-machine engine. No Umbraco, no hosting

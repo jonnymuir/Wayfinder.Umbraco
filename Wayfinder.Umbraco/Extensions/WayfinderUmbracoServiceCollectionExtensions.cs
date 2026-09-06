@@ -25,10 +25,22 @@ namespace Wayfinder.Umbraco.Extensions;
 /// </remarks>
 public static class WayfinderUmbracoServiceCollectionExtensions
 {
+    /// <summary>
+    /// Zero-config overload — a bare <c>services.AddWayfinderUmbraco();</c> gives a working
+    /// "Blueprints" authoring UI with the safe, no-real-access defaults documented on
+    /// <see cref="WayfinderServiceDesignOptions.ResolveTenantId"/>/<c>ResolveAccessProfile</c>.
+    /// Call the other overload once a host is ready to wire up real identity/tenancy for
+    /// citizen/caseworker journeys to actually work.
+    /// </summary>
+    public static IServiceCollection AddWayfinderUmbraco(this IServiceCollection services) =>
+        services.AddWayfinderUmbraco(_ => { });
+
     /// <param name="configure">
-    /// Required — must set <see cref="WayfinderServiceDesignOptions.ResolveTenantId"/> and
-    /// <see cref="WayfinderServiceDesignOptions.ResolveAccessProfile"/> at minimum (validated at
-    /// startup). The engine is authoritative and in-process
+    /// Sets <see cref="WayfinderServiceDesignOptions.ResolveTenantId"/> and
+    /// <see cref="WayfinderServiceDesignOptions.ResolveAccessProfile"/> for a host with real
+    /// identity/tenancy — both default to safe "no real access" values otherwise (see their own
+    /// remarks), so this is optional for the authoring experience but required for any journey a
+    /// citizen/caseworker actually needs to use. The engine is authoritative and in-process
     /// (<see cref="Services.UmbracoProcessManagerEngine"/>) — a host resolves identity for it the
     /// same way <c>Wayfinder.Engine.Worklist</c>/<c>Wayfinder.Engine.Journey</c> already ask a
     /// host to, rather than this package assuming a remote "Business App" derives it from a
@@ -70,10 +82,7 @@ public static class WayfinderUmbracoServiceCollectionExtensions
 
         services.AddOptions<WayfinderServiceDesignOptions>()
             .BindConfiguration("Wayfinder")
-            .Configure(configure)
-            .Validate(o => o.ResolveTenantId is not null, $"{nameof(WayfinderServiceDesignOptions.ResolveTenantId)} must be set.")
-            .Validate(o => o.ResolveAccessProfile is not null, $"{nameof(WayfinderServiceDesignOptions.ResolveAccessProfile)} must be set.")
-            .ValidateOnStart();
+            .Configure(configure);
 
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
 

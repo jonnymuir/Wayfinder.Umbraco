@@ -20,6 +20,12 @@ public class ServiceRequestWorklistService(
     IProcessManager processManager,
     IOptions<WayfinderServiceDesignOptions> optionsAccessor)
 {
+    /// <summary>
+    /// Lists the work items the calling caseworker's <c>ActorProfile</c> can see across whatever
+    /// queues it has visibility into — the caseworker worklist's own paged/filtered/sorted query,
+    /// resolving identity via <see cref="WayfinderServiceDesignOptions"/> the same way every other
+    /// method on this class does.
+    /// </summary>
     public QueueWorkListEnvelope GetWorklist(
         HttpContext ctx,
         IReadOnlyCollection<QueueWorkItemStatus>? statuses = null,
@@ -36,6 +42,7 @@ public class ServiceRequestWorklistService(
         return processManager.GetQueueWorkItems(tenantId, userId, accessProfile, statuses, sort, searchText, pageIndex, pageSize);
     }
 
+    /// <summary>Claims a shared queue's work item cursor for the calling caseworker, so nobody else can act on it until they put it back.</summary>
     public ServiceRequestResponseEnvelope Pickup(HttpContext ctx, string instanceId, string cursorId)
     {
         var options = optionsAccessor.Value;
@@ -46,6 +53,7 @@ public class ServiceRequestWorklistService(
         return processManager.PickupWorkItem(instanceId, cursorId, tenantId, userId, accessProfile);
     }
 
+    /// <summary>Releases a work item cursor the calling caseworker previously picked up, returning it to the shared queue for anyone eligible to claim.</summary>
     public ServiceRequestResponseEnvelope Putback(HttpContext ctx, string instanceId, string cursorId)
     {
         var options = optionsAccessor.Value;

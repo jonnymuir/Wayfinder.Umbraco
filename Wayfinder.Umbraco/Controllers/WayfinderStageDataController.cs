@@ -18,11 +18,19 @@ namespace Wayfinder.Umbraco.Controllers;
 /// <c>WorklistExtensions</c>'s own file/bulk-dataset routes, but resolving identity the same way
 /// <see cref="Services.ServiceRequestStageService"/> does — via
 /// <see cref="WayfinderServiceDesignOptions"/>, not <c>WorklistOptions</c> — since this is the
-/// citizen/single-instance stage surface, not the caseworker worklist. <see cref="IProcessManager"/>
-/// is still the only real access check: <c>GetCurrent</c> already enforces whatever queue
-/// visibility the caller's <c>ActorProfile</c> allows, and <see cref="IBulkDatasetStore"/>
-/// independently verifies <c>instanceId</c> owns <c>datasetId</c> regardless (defence in depth) —
-/// no extra <c>[Authorize]</c> here would add anything the engine doesn't already check.
+/// citizen/single-instance stage surface, not the caseworker worklist. Same
+/// identity-resolved-and-ownership-checked model as
+/// <see cref="ServiceBlueprintAuthoringController"/>'s sibling public file endpoints
+/// (<c>PublicServiceRequestFileUploadController</c> in a host): every action here resolves the
+/// caller's tenant/user/<c>ActorProfile</c> from <see cref="WayfinderServiceDesignOptions"/> and
+/// calls <see cref="Services.UmbracoProcessManagerEngine.IsOwnedInstance"/> before touching
+/// <see cref="IBulkDatasetStore"/> or <see cref="IServiceRequestFileStorage"/> — deliberately no
+/// <c>[Authorize]</c>, since a host may resolve identity for an anonymous citizen journey that
+/// never authenticates with ASP.NET Core Identity at all; the engine's own ownership check is the
+/// package's one real access boundary here, exactly as it is for
+/// <see cref="Services.ServiceRequestStageService"/>. <see cref="IBulkDatasetStore"/>'s own
+/// <c>instanceId</c>-owns-<c>datasetId</c> check is a separate, narrower guarantee (the dataset
+/// belongs to that instance) and is not a substitute for verifying the *caller* owns the instance.
 ///
 /// Before this existed, <see cref="Services.ServiceRequestStageService.RenderCurrentAsync"/> never
 /// called <c>WithFileDownloadUrls</c>/<c>WithBulkDatasetApiUrls</c> at all — a "bulk-data-review"
@@ -35,13 +43,28 @@ namespace Wayfinder.Umbraco.Controllers;
 /// </summary>
 [Route(RoutePrefix)]
 public class WayfinderStageDataController(
-    IProcessManager processManager,
+    Services.UmbracoProcessManagerEngine processManager,
     IOptions<WayfinderServiceDesignOptions> optionsAccessor,
     IServiceRequestFileStorage fileStorage,
     IBulkDatasetStore bulkDatasetStore)
     : Microsoft.AspNetCore.Mvc.Controller
 {
     public const string RoutePrefix = "/umbraco/wayfinder-stage/{blueprintKey}/{instanceId}";
+
+    /// <summary>
+    /// The one real access check for every bulk-dataset action below: does the caller resolved
+    /// from this request own <paramref name="instanceId"/>? Mirrors
+    /// <c>PublicServiceRequestFileUploadController.Upload</c>'s own check in a host.
+    /// </summary>
+    private bool CallerOwnsInstance(string instanceId)
+    {
+        var options = optionsAccessor.Value;
+        return processManager.IsOwnedInstance(
+            instanceId,
+            options.ResolveTenantId!(HttpContext),
+            options.ResolveUserId(HttpContext),
+            options.ResolveAccessProfile!(HttpContext));
+    }
 
     /// <summary>Builds the same URL prefixes <see cref="Services.ServiceRequestStageService"/>
     /// hands to <c>WithFileDownloadUrls</c>/<c>WithBulkDatasetApiUrls</c> — kept here, next to the
@@ -80,6 +103,11 @@ public class WayfinderStageDataController(
     [HttpGet("bulk-datasets/{datasetId}/summary")]
     public async Task<IActionResult> GetSummary(string instanceId, string datasetId)
     {
+        if (!CallerOwnsInstance(instanceId))
+        {
+            return NotFound();
+        }
+
         try
         {
             var summary = await bulkDatasetStore.GetSummaryAsync(instanceId, datasetId);
@@ -100,6 +128,11 @@ public class WayfinderStageDataController(
         var pageIndex = Math.Max(page ?? 0, 0);
         var size = Math.Clamp(pageSize ?? 20, 1, 100);
 
+        if (!CallerOwnsInstance(instanceId))
+        {
+            return NotFound();
+        }
+
         try
         {
             var result = await bulkDatasetStore.GetRowsAsync(instanceId, datasetId, parsedFilter, pageIndex, size);
@@ -116,6 +149,11 @@ public class WayfinderStageDataController(
         string instanceId, string datasetId, string rowKey,
         [FromBody] Dictionary<string, string?> correctedValues)
     {
+        if (!CallerOwnsInstance(instanceId))
+        {
+            return NotFound();
+        }
+
         var options = optionsAccessor.Value;
         try
         {
@@ -140,6 +178,11 @@ public class WayfinderStageDataController(
     [HttpPost("bulk-datasets/{datasetId}/revert")]
     public async Task<IActionResult> RevertCorrections(string instanceId, string datasetId)
     {
+        if (!CallerOwnsInstance(instanceId))
+        {
+            return NotFound();
+        }
+
         var options = optionsAccessor.Value;
         try
         {
@@ -159,6 +202,11 @@ public class WayfinderStageDataController(
     [HttpGet("bulk-datasets/{datasetId}/download")]
     public async Task<IActionResult> DownloadDataset(string instanceId, string datasetId)
     {
+        if (!CallerOwnsInstance(instanceId))
+        {
+            return NotFound();
+        }
+
         ServiceRequestFileReference materialized;
         try
         {

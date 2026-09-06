@@ -27,6 +27,7 @@ public class ServiceBlueprintHandler : SyncHandlerRoot<ServiceBlueprintSchema, S
 {
     private readonly IUmbracoDatabaseFactory _databaseFactory;
 
+    /// <summary>Groups this handler under uSync's "Settings" tab — matches where Blueprints itself lives in the backoffice.</summary>
     public override string Group => BackOfficeConsts.Groups.Settings;
 
     public ServiceBlueprintHandler(
