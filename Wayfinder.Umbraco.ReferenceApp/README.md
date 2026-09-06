@@ -6,7 +6,9 @@ backoffice and a real content pipeline, not a mock. It sits next to the package 
 solution and never ships in the NuGet package itself; it's the host for future end-to-end tests
 and demo/documentation footage.
 
-Not for production deployment, it's a transient, unattended-install dev host.
+Not for production deployment, it's an unattended-install dev host — its SQLite database
+(`Umbraco.sqlite.db`) persists across restarts like any other Umbraco site's; delete it yourself
+if you want a clean slate.
 
 ## Running it
 
