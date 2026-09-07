@@ -20,8 +20,9 @@ here as NuGet packages (`Wayfinder`, `Wayfinder.Engine`, `Wayfinder.Rendering.Go
 `Wayfinder.Editor`, plus `Wayfinder.Engine.Mcp` in the reference app). nuget.org is the only
 restore/publish target. There is no GitHub Packages feed.
 
-Solo developer project. Work directly on `main` for trivial fixes; feature branches + PRs for
-substantive changes.
+Solo developer project, but every change reaches `main` through a pull request. `main` is
+protected — required status checks, no admin bypass — and stays green at all times. No direct
+pushes.
 
 ## Projects
 
@@ -127,8 +128,10 @@ as the behavioural-testing rules above.
 
 ### Branch policy
 
-Feature branches + PRs for substantive changes: `{type}/{kebab-slug}`. Direct commits to `main`
-for trivial fixes only.
+Every change goes through a feature branch + PR: `{type}/{kebab-slug}`. `main` is protected
+(required checks, branch must be current before merge, no admin bypass) — there are no direct
+commits to `main`, however trivial. An emergency merge means deliberately, and visibly,
+disabling protection.
 
 ### Commit conventions
 
