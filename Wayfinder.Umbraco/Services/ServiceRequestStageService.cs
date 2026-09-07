@@ -110,6 +110,12 @@ public class ServiceRequestStageService(
             return new ServiceRequestStageRenderResult(envelope, blueprintKey, Nonce: "", problems ?? [], formValues ?? new Dictionary<string, string>());
         }
 
+        // Whether this render carries a bulk-data-review component with a real dataset — the only
+        // thing that needs an antiforgery token (its /correct + /revert fetch calls). Checked here,
+        // off the engine's own envelope, before any WithXxx transform rebuilds the component list.
+        var hasBulkReview = envelope.Render?.Components
+            .Any(c => c.Type == "bulk-data-review" && !string.IsNullOrEmpty(c.DatasetId)) == true;
+
         // A caseworker/citizen viewing an uploaded file, or a bulk-data-review component's own
         // row cards, needs real REST URLs to fetch against — see WayfinderStageDataController,
         // the routes these prefixes resolve to. Without this, WithBulkDatasetApiUrls never fires
@@ -120,11 +126,12 @@ public class ServiceRequestStageService(
         // but no row cards to act on.
         var (filesPrefix, bulkDatasetsPrefix) = Controllers.WayfinderStageDataController.BuildUrlPrefixes(blueprintKey, envelope.InstanceId);
         envelope = envelope.WithFileDownloadUrls(filesPrefix);
-        // WayfinderStageDataController's /correct and /revert POSTs are [ValidateAntiForgeryToken];
-        // hand the request token to the bulk-data-review component so its client can send it back
-        // as the RequestVerificationToken header. GetAndStoreTokens also drops the antiforgery
-        // cookie on this render response, which the later fetch() carries automatically.
-        var requestToken = antiforgery.GetAndStoreTokens(ctx).RequestToken;
+
+        // Mint the token — and write its cookie onto this response — only when it's actually
+        // needed (guard above). GetAndStoreTokens has a Set-Cookie side effect, so it must not
+        // run on every stage render (a plain question page, a "waiting" page): confirmed live
+        // that doing so broke the waiting page's own poll request.
+        var requestToken = hasBulkReview ? antiforgery.GetAndStoreTokens(ctx).RequestToken : null;
         envelope = envelope.WithBulkDatasetApiUrls(bulkDatasetsPrefix, requestToken);
 
         // Always the real rendered fields, regardless of StepType. A prior version special-cased
