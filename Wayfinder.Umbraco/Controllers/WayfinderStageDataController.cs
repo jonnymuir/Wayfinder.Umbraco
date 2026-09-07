@@ -144,7 +144,13 @@ public class WayfinderStageDataController(
         }
     }
 
+    // The bulk-data-review client sends the antiforgery request token as the
+    // RequestVerificationToken header (ServiceRequestStageService renders it into the
+    // component markup via WithBulkDatasetApiUrls). Both mutating endpoints validate it —
+    // the row-correct body is JSON-only already, but /revert takes no body and would
+    // otherwise be forgeable by a cross-site form (CodeQL cs/web/missing-token-validation).
     [HttpPost("bulk-datasets/{datasetId}/rows/{rowKey}/correct")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CorrectRow(
         string instanceId, string datasetId, string rowKey,
         [FromBody] Dictionary<string, string?> correctedValues)
@@ -176,6 +182,7 @@ public class WayfinderStageDataController(
     }
 
     [HttpPost("bulk-datasets/{datasetId}/revert")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RevertCorrections(string instanceId, string datasetId)
     {
         if (!CallerOwnsInstance(instanceId))
