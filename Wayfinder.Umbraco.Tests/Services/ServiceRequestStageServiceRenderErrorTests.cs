@@ -28,6 +28,7 @@ public sealed class ServiceRequestStageServiceRenderErrorTests
         Mock.Of<IStageNonceService>(),
         Mock.Of<Wayfinder.Umbraco.Services.IServiceRequestFileStorage>(),
         Mock.Of<IUploadTokenService>(),
+        Mock.Of<Microsoft.AspNetCore.Antiforgery.IAntiforgery>(),
         NullLogger<ServiceRequestStageService>.Instance);
 
     [Fact]

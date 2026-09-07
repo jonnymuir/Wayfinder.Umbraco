@@ -7,22 +7,25 @@ using Wayfinder.Umbraco.Controllers;
 namespace Wayfinder.Umbraco.Tests.Controllers;
 
 /// <summary>
-/// SECURITY REGRESSION: the two browser-form SurfaceControllers change server state from a
-/// cookie-authenticated POST, so every non-GET action on them must validate the antiforgery
-/// token — otherwise a cross-site page could forge a pickup / putback / stage-advance as a
-/// signed-in caseworker. This test goes red if a <c>[ValidateAntiForgeryToken]</c> is dropped
-/// or a new unprotected POST/PUT/DELETE action is added.
+/// SECURITY REGRESSION: these controllers change server state from a cookie-authenticated
+/// request, so every non-GET action must validate the antiforgery token — otherwise a
+/// cross-site page could forge a pickup / putback / stage-advance, or a bulk-dataset
+/// correct / revert, as a signed-in user. The two SurfaceControllers are browser forms; the
+/// StageData controller is a JSON fetch API whose client sends the token as the
+/// RequestVerificationToken header. This test goes red if a <c>[ValidateAntiForgeryToken]</c>
+/// is dropped or a new unprotected POST/PUT/DELETE action is added.
 /// </summary>
 public class SurfaceControllerAntiforgeryContractTests
 {
-    public static TheoryData<Type> BrowserFormControllers() =>
+    public static TheoryData<Type> StateChangingControllers() =>
     [
         typeof(WayfinderStageSurfaceController),
         typeof(WayfinderWorklistSurfaceController),
+        typeof(WayfinderStageDataController),
     ];
 
     [Theory]
-    [MemberData(nameof(BrowserFormControllers))]
+    [MemberData(nameof(StateChangingControllers))]
     public void EveryStateChangingAction_ValidatesTheAntiforgeryToken(Type controller)
     {
         var stateChanging = controller
