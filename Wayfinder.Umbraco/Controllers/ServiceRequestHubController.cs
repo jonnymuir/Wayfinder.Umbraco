@@ -32,7 +32,7 @@ public class ServiceRequestHubController(
     {
         if (User.Identity?.IsAuthenticated != true)
         {
-            return Redirect(BuildLoginRedirectUrl());
+            return RedirectToLogin();
         }
 
         return IndexInternal();
@@ -89,9 +89,23 @@ public class ServiceRequestHubController(
         return CurrentPage?.Url() ?? "/";
     }
 
-    private string BuildLoginRedirectUrl()
+    /// <summary>
+    /// Redirect an unauthenticated visitor to the configured login page, carrying the current
+    /// request as <c>?ReturnUrl=</c>. Both the destination and the return URL are constrained to
+    /// local URLs: <see cref="ControllerBase.LocalRedirect"/> rejects an off-site
+    /// <c>LoginPath</c>, and the return URL is only appended when it passes
+    /// <see cref="IUrlHelper.IsLocalUrl"/> — so neither operator misconfiguration nor a crafted
+    /// request path can turn this into an open redirect (CodeQL cs/web/unvalidated-url-redirection).
+    /// </summary>
+    private IActionResult RedirectToLogin()
     {
+        var loginPath = optionsAccessor.Value.LoginPath;
         var returnUrl = $"{Request.PathBase}{Request.Path}{Request.QueryString}";
-        return $"{optionsAccessor.Value.LoginPath}?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        var target = Url.IsLocalUrl(returnUrl)
+            ? $"{loginPath}?ReturnUrl={Uri.EscapeDataString(returnUrl)}"
+            : loginPath;
+
+        return LocalRedirect(target);
     }
 }
