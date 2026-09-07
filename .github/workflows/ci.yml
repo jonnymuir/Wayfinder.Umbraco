@@ -66,3 +66,21 @@ jobs:
 
       - name: Verify MARKETPLACE.md is current
         run: npm run check:marketplace
+
+  # Single aggregate check so branch protection only needs to name one CI status check
+  # ("all") instead of every job individually — same pattern as the Wayfinder and
+  # Umbraco.Prism repos. Add new jobs above to the `needs` list to keep them gating merges.
+  all:
+    runs-on: ubuntu-latest
+    needs: [build-and-pack, marketplace-description]
+    if: always()
+    steps:
+      - name: Decide whether checks have passed
+        run: |
+          if [[ "${{ needs.build-and-pack.result }}" == "success" && "${{ needs.marketplace-description.result }}" == "success" ]]; then
+            echo "All checks passed"
+            exit 0
+          else
+            echo "Some checks failed"
+            exit 1
+          fi
