@@ -1,7 +1,5 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Logging;
 using Umbraco.Cms.Core.Routing;
@@ -28,8 +26,6 @@ public class WayfinderStageSurfaceController(
     AppCaches appCaches,
     IProfilingLogger profilingLogger,
     IPublishedUrlProvider publishedUrlProvider,
-    ILogger<WayfinderStageSurfaceController> logger,
-    IAntiforgery antiforgery,
     ServiceRequestStageService stageService)
     : SurfaceController(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
 {
@@ -42,20 +38,14 @@ public class WayfinderStageSurfaceController(
     /// </summary>
     public const string RoutePath = "/umbraco/wayfinder-stage/advance";
 
+    // wayfinder-stage-form (StageFormTagHelper) emits __RequestVerificationToken, so
+    // [ValidateAntiForgeryToken] validates the same token this action used to check by hand —
+    // now in a form CodeQL recognises (cs/web/missing-token-validation).
     [HttpPost]
+    [ValidateAntiForgeryToken]
     [Route(RoutePath)]
     public async Task<IActionResult> Advance()
     {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(HttpContext);
-        }
-        catch (AntiforgeryValidationException)
-        {
-            logger.LogWarning("Stage advance POST: antiforgery validation failed");
-            return BadRequest("Invalid form submission.");
-        }
-
         var result = await stageService.AdvanceAsync(HttpContext, Request.Form);
 
         // PRG: problems/resubmitted values ride in TempData for the block's own GET-side
