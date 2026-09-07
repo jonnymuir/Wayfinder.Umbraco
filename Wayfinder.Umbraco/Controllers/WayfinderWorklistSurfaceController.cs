@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Logging;
 using Umbraco.Cms.Core.Routing;
@@ -26,51 +24,31 @@ public class WayfinderWorklistSurfaceController(
     AppCaches appCaches,
     IProfilingLogger profilingLogger,
     IPublishedUrlProvider publishedUrlProvider,
-    ILogger<WayfinderWorklistSurfaceController> logger,
-    IAntiforgery antiforgery,
     ServiceRequestWorklistService worklistService)
     : SurfaceController(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
 {
     public const string PickupRoutePath = "/umbraco/wayfinder-worklist/pickup";
     public const string PutbackRoutePath = "/umbraco/wayfinder-worklist/putback";
 
+    // Both forms emit @Html.AntiForgeryToken() (wayfinderServiceRequestWorklist.cshtml), so the
+    // framework's [ValidateAntiForgeryToken] validates the same __RequestVerificationToken this
+    // controller used to check by hand — now in a form the analyzer recognises (CodeQL
+    // cs/web/missing-token-validation).
     [HttpPost]
+    [ValidateAntiForgeryToken]
     [Route(PickupRoutePath)]
-    public async Task<IActionResult> Pickup(string instanceId, string cursorId, string returnUrl)
+    public IActionResult Pickup(string instanceId, string cursorId, string returnUrl)
     {
-        if (!await ValidateAntiforgeryAsync())
-        {
-            return BadRequest("Invalid form submission.");
-        }
-
         worklistService.Pickup(HttpContext, instanceId, cursorId);
         return Redirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     [Route(PutbackRoutePath)]
-    public async Task<IActionResult> Putback(string instanceId, string cursorId, string returnUrl)
+    public IActionResult Putback(string instanceId, string cursorId, string returnUrl)
     {
-        if (!await ValidateAntiforgeryAsync())
-        {
-            return BadRequest("Invalid form submission.");
-        }
-
         worklistService.Putback(HttpContext, instanceId, cursorId);
         return Redirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
-    }
-
-    private async Task<bool> ValidateAntiforgeryAsync()
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(HttpContext);
-            return true;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            logger.LogWarning("Worklist pickup/putback POST: antiforgery validation failed");
-            return false;
-        }
     }
 }
