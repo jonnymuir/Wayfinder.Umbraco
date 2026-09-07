@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,6 +26,7 @@ public class ServiceRequestStageService(
     IStageNonceService nonceService,
     IServiceRequestFileStorage fileStorage,
     IUploadTokenService uploadTokenService,
+    IAntiforgery antiforgery,
     ILogger<ServiceRequestStageService> logger)
 {
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
@@ -118,7 +120,12 @@ public class ServiceRequestStageService(
         // but no row cards to act on.
         var (filesPrefix, bulkDatasetsPrefix) = Controllers.WayfinderStageDataController.BuildUrlPrefixes(blueprintKey, envelope.InstanceId);
         envelope = envelope.WithFileDownloadUrls(filesPrefix);
-        envelope = envelope.WithBulkDatasetApiUrls(bulkDatasetsPrefix);
+        // WayfinderStageDataController's /correct and /revert POSTs are [ValidateAntiForgeryToken];
+        // hand the request token to the bulk-data-review component so its client can send it back
+        // as the RequestVerificationToken header. GetAndStoreTokens also drops the antiforgery
+        // cookie on this render response, which the later fetch() carries automatically.
+        var requestToken = antiforgery.GetAndStoreTokens(ctx).RequestToken;
+        envelope = envelope.WithBulkDatasetApiUrls(bulkDatasetsPrefix, requestToken);
 
         // Always the real rendered fields, regardless of StepType. A prior version special-cased
         // "check-answers" to an empty list (the reasoning: a check-answers page is a read-only
