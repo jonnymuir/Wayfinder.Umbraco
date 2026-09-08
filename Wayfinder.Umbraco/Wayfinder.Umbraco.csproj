@@ -58,20 +58,16 @@
     <!-- Microsoft.OpenApi (used directly in WayfinderManagementApiConfiguration.cs) is left to
          flow transitively from Umbraco.Cms.Api.Management below — see Directory.Build.props for
          why it isn't pinned. -->
-    <!-- Compiled against for the MCP OAuth client registration + dev transport-security relaxation
-         (Wayfinder.Umbraco.Mcp). Both are already on disk in any Umbraco 17 host transitively via
-         Umbraco.Cms.Api.Management ($(UmbracoVersion) → OpenIddict 7.6.0 on Umbraco 17.6.x) —
-         pinned here only to compile against, PrivateAssets="all" so the host's own
-         Umbraco-resolved version wins at runtime.
-
-         MUST equal (never exceed) the OpenIddict version Umbraco itself resolves: PrivateAssets="all"
-         means these don't flow to a host, so the host restores OpenIddict.Server at *its* Umbraco's
-         version. If this pin is higher, Wayfinder.Umbraco.dll demands an OpenIddict.Server assembly
-         version the host doesn't have on disk → ReflectionTypeLoadException at Umbraco's type scan
-         (regressed once by a Dependabot bump to 7.6.1; see the dependabot.yml ignore). Bump only in
-         lockstep with $(UmbracoVersion). -->
-    <PackageReference Include="OpenIddict.Abstractions" Version="7.6.0" PrivateAssets="all" />
-    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="7.6.0" PrivateAssets="all" />
+    <!-- Wayfinder.Umbraco.Mcp plugs a custom IOpenIddictServerHandler into Umbraco's *own*
+         backoffice OpenIddict server (and registers the MCP OAuth client, relaxes dev transport
+         security). It must run against exactly the OpenIddict version Umbraco itself resolves —
+         PrivateAssets="all" keeps these off the package's dependency graph (the host gets
+         OpenIddict from its Umbraco), and the version is an EXACT pin "[$(OpenIddictVersion)]",
+         kept in lockstep with $(UmbracoVersion) in Directory.Build.props. Exact (not ">= ") so a
+         drift fails `dotnet restore` here (NU1107), not a host at boot — a ">= " pin above
+         Umbraco's version once shipped a ReflectionTypeLoadException to every 17.6.x host. -->
+    <PackageReference Include="OpenIddict.Abstractions" Version="[$(OpenIddictVersion)]" PrivateAssets="all" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="[$(OpenIddictVersion)]" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11" PrivateAssets="all" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="$(UmbracoPackageRange)" />
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoPackageRange)" />

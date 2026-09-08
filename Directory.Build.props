@@ -13,6 +13,15 @@
     <!-- uSync's major tracks Umbraco's, so it gets the same treatment. -->
     <USyncVersion>17.3.8</USyncVersion>
     <USyncPackageRange>[$(USyncVersion), $([MSBuild]::Add($(UmbracoMajor), 1)).0.0)</USyncPackageRange>
+    <!-- The exact OpenIddict version Umbraco $(UmbracoVersion) resolves transitively (via
+         Umbraco.Cms.Api.Management → OpenIddict.AspNetCore). Wayfinder.Umbraco.Mcp compiles
+         against OpenIddict.Server*/Abstractions to plug a custom IOpenIddictServerHandler into
+         Umbraco's *own* backoffice OpenIddict server, so it must run against exactly that
+         version — the refs use "[$(OpenIddictVersion)]" (exact), not ">= ", so a $(UmbracoVersion)
+         bump that moves OpenIddict without this pin moving in lockstep fails `dotnet restore`
+         here (NU1107) rather than crashing a host at boot (as a 7.6.0 -> 7.6.1 drift once did —
+         see dependabot.yml's OpenIddict* ignore). -->
+    <OpenIddictVersion>7.6.0</OpenIddictVersion>
     <!-- Microsoft.OpenApi is deliberately NOT pinned in this repo: it flows transitively from
          Umbraco.Cms.Api.Management ($(UmbracoVersion)) at the version Umbraco itself requires
          (17.6.x → 2.9.0+, which clears GHSA-v5pm-xwqc-g5wc, the OpenAPI-parsing resource-exhaustion
