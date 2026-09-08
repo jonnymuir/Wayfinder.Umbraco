@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Umbraco.Cms" Version="$(UmbracoVersion)" />
-    <PackageReference Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="$(UmbracoVersion)" />
+    <PackageReference Include="Umbraco.Cms" Version="$(UmbracoPackageRange)" />
+    <PackageReference Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="$(UmbracoPackageRange)" />
     <!-- Umbraco Automate (MIT) — the worked example of a configuration-only webhook support
          system. Version tracks the Umbraco major; 17.3.0 is the current 17.x line. Only in this
          reference app, never in the Wayfinder.Umbraco package itself. -->
