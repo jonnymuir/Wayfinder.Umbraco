@@ -62,9 +62,16 @@
          (Wayfinder.Umbraco.Mcp). Both are already on disk in any Umbraco 17 host transitively via
          Umbraco.Cms.Api.Management ($(UmbracoVersion) → OpenIddict 7.6.0 on Umbraco 17.6.x) —
          pinned here only to compile against, PrivateAssets="all" so the host's own
-         Umbraco-resolved version wins at runtime. -->
-    <PackageReference Include="OpenIddict.Abstractions" Version="7.6.1" PrivateAssets="all" />
-    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="7.6.1" PrivateAssets="all" />
+         Umbraco-resolved version wins at runtime.
+
+         MUST equal (never exceed) the OpenIddict version Umbraco itself resolves: PrivateAssets="all"
+         means these don't flow to a host, so the host restores OpenIddict.Server at *its* Umbraco's
+         version. If this pin is higher, Wayfinder.Umbraco.dll demands an OpenIddict.Server assembly
+         version the host doesn't have on disk → ReflectionTypeLoadException at Umbraco's type scan
+         (regressed once by a Dependabot bump to 7.6.1; see the dependabot.yml ignore). Bump only in
+         lockstep with $(UmbracoVersion). -->
+    <PackageReference Include="OpenIddict.Abstractions" Version="7.6.0" PrivateAssets="all" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="7.6.0" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11" PrivateAssets="all" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="$(UmbracoPackageRange)" />
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoPackageRange)" />
