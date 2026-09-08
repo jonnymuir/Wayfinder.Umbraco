@@ -33,6 +33,12 @@ updates:
       # pin must never exceed what Umbraco ships (a 7.6.0 -> 7.6.1 bump regressed the reference
       # app with a ReflectionTypeLoadException). It moves only in lockstep with Umbraco.
       - dependency-name: "OpenIddict*"
+      # AwesomeAssertions is intentionally held at 7.x — the community fork of FluentAssertions
+      # 7.2.0 that keeps the FluentAssertions namespace/assembly name, so it is a drop-in with
+      # zero test edits. 8.x / 9.x rename to the AwesomeAssertions namespace (touching every test
+      # file for no functional gain). Bump only as a deliberate namespace migration.
+      - dependency-name: "AwesomeAssertions"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"
