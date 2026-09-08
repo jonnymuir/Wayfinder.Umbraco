@@ -28,6 +28,11 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "uSync*"
         update-types: ["version-update:semver-major"]
+      # OpenIddict.* is pinned in Wayfinder.Umbraco.csproj PrivateAssets="all" purely to
+      # compile against — the host resolves it at *its* Umbraco's version at runtime, so this
+      # pin must never exceed what Umbraco ships (a 7.6.0 -> 7.6.1 bump regressed the reference
+      # app with a ReflectionTypeLoadException). It moves only in lockstep with Umbraco.
+      - dependency-name: "OpenIddict*"
 
   - package-ecosystem: github-actions
     directory: "/"
