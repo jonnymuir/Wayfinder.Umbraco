@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <UmbracoVersion>17.6.2</UmbracoVersion>
+    <UmbracoVersion>18.1.1</UmbracoVersion>
     <!-- Microsoft.OpenApi is deliberately NOT pinned in this repo: it flows transitively from
          Umbraco.Cms.Api.Management ($(UmbracoVersion)) at the version Umbraco itself requires
          (17.6.x → 2.9.0+, which clears GHSA-v5pm-xwqc-g5wc, the OpenAPI-parsing resource-exhaustion
