@@ -7,11 +7,62 @@
 #   url-regex — omit (empty 3rd column) to apply to every URL; otherwise a Python
 #               regex matched against the finding's URL
 #
-# Posture: ADVISORY for now (fail-action: false in dast.yml) — this file is the staging
-# ground. As each finding from the first report is judged, add an IGNORE line with a note,
-# or fix it. Once the report is clean of un-IGNOREd findings, add the pull_request trigger,
-# flip fail-action to true, and add the "DAST baseline" check-run to the branch ruleset.
+# Posture: ADVISORY for now (fail-action: false in dast.yml). Once this file covers the
+# report, add the pull_request trigger, flip fail-action to true, and add the "DAST
+# baseline" check-run to the branch ruleset — the same advisory -> blocking rollout the
+# Wayfinder repo's DAST followed.
 #
 # alert IDs: https://www.zaproxy.org/docs/alerts/
 #
-# (no rules yet — every finding is reported as WARN)
+# --- Triaged from the 2026-09-10 unauthenticated baseline of Wayfinder.Umbraco.ReferenceApp,
+#     after the security-headers middleware (#74). ---
+
+# Absence of Anti-CSRF Tokens — the demo login form only. A pre-auth login form has no
+# session to protect with a synchroniser token; the citizen/caseworker POST forms behind
+# auth carry __RequestVerificationToken. Phase 3c (authenticated scan) must retune.
+10202	IGNORE	.*/demo/login	unauthenticated demo login form
+
+# CSP style-src 'unsafe-inline' — required on the Wayfinder-rendered front end: the two
+# inline style="…" attributes on the signed-in nav in ReferenceAppPageShell.cs, plus
+# Umbraco's Block Grid layout partials which emit inline style="--umb-block-grid-…" custom
+# properties on every seeded page. script-src has NO 'unsafe-inline' and NO 'unsafe-eval'.
+10055	IGNORE		inline style attrs (nav + Umbraco Block Grid custom properties)
+
+# Cross-Origin-* headers (COEP / COOP / CORP all report under 90004):
+#   COEP — not adopted anywhere: it only matters for cross-origin isolation
+#          (SharedArrayBuffer / high-res timers), which this host does not use.
+#   COOP / CORP — present on the Wayfinder front end (set by the #74 middleware); absent
+#          only on /umbraco*, which the middleware deliberately excludes (see below).
+90004	IGNORE		COEP unused estate-wide; COOP/CORP set on the front end, /umbraco* excluded
+
+# ---- /umbraco* : the Umbraco backoffice owns its own header + CSP regime ----
+# The reference app's security-headers middleware is deliberately scoped to skip /umbraco*
+# (a Lit web-component SPA a strict CSP would break) — the same ExcludeBackoffice posture
+# Umbraco.Prism's PrismSecurityHeadersOptions ships. A real deployment fronts the backoffice
+# with its own policy (reverse proxy / WAF), and it is often not publicly reachable at all.
+# Each line is path-scoped so the identical header regressing on the *front end* still fails.
+10038	IGNORE	.*/umbraco(/|$)	CSP: backoffice, Umbraco-owned (a strict CSP would break the backoffice SPA)
+10020	IGNORE	.*/umbraco(/|$)	anti-clickjacking: backoffice, Umbraco-owned
+10021	IGNORE	.*/umbraco	X-Content-Type-Options: backoffice + its static assets, Umbraco-owned
+10063	IGNORE	.*/umbraco	Permissions-Policy: backoffice, Umbraco-owned
+
+# Timestamp Disclosure (Unix) in vendored GOV.UK Frontend CSS — "1904761905" is a numeric
+# literal in the minified stylesheet, not a timestamp. Third-party vendored asset.
+10096	IGNORE	.*/govuk-frontend/govuk-frontend\.min\.css	numeric literal in minified vendored CSS
+
+# Suspicious Comments — plain English words ("from", "where", "user", "script") inside
+# genuine prose comments in the vendored Wayfinder rendering JS and Umbraco's own backoffice
+# bundle. No secrets, no security-relevant TODO markers.
+10027	IGNORE	.*/(_content/Wayfinder\.Rendering\.GovUk/js|umbraco/backoffice)/.*	prose words in vendored JS comments
+
+# Modern Web Application — informational; ZAP noting the Umbraco backoffice is a SPA.
+10109	IGNORE	.*/umbraco	informational: the backoffice is a SPA
+
+# Session Management Response Identified — informational; ZAP spotting the ASP.NET
+# antiforgery / TempData cookies on the stage journey POSTs. Expected.
+10112	IGNORE		informational: ASP.NET antiforgery / TempData cookies
+
+# Storable and Cacheable Content — informational cache-control notes on immutable static
+# assets, robots.txt, sitemap.xml, and cacheable anonymous pages. Correct behaviour.
+# Revisit for sensitive authenticated responses under the Phase 3c scan.
+10049	IGNORE		informational cache-control notes on static + anonymous content
