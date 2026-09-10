@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Logging;
@@ -16,7 +17,15 @@ namespace Wayfinder.Umbraco.Controllers;
 /// item and its own advance posts are handled by <see cref="WayfinderStageSurfaceController"/>
 /// directly (the worklist block renders the same stage UI for a picked instance, via
 /// <see cref="ServiceRequestStageService"/>) — this controller only ever does pickup/putback.
+///
+/// Pickup/putback is a caseworker/backstage action with no legitimate anonymous or citizen use,
+/// so it carries a bare <see cref="AuthorizeAttribute"/> — the deny-by-default HTTP boundary
+/// (any authenticated member of the host's default scheme). <em>Which</em> queues a caseworker
+/// may act on is still the engine's call, enforced by <see cref="ServiceRequestWorklistService"/>
+/// passing the host-resolved <c>ActorProfile</c> to <c>PickupWorkItem</c>/<c>PutbackWorkItem</c>.
+/// A host that wants a tighter gate registers its own policy and applies it here.
 /// </summary>
+[Authorize]
 public class WayfinderWorklistSurfaceController(
     IUmbracoContextAccessor umbracoContextAccessor,
     IUmbracoDatabaseFactory databaseFactory,

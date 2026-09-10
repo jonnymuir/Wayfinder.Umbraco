@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Wayfinder.Engine.Abstractions;
@@ -41,6 +42,11 @@ namespace Wayfinder.Umbraco.Controllers;
 /// Playwright walkthrough spec that submitted a genuine file and got back a real
 /// summary (1 error/1 warning/3 accepted) but no row cards to act on.
 /// </summary>
+// [AllowAnonymous] is deliberate — see the class remarks above: this is the citizen stage
+// surface's data plane, which supports not-yet-signed-in applicants, and every action gates on
+// the engine's ownership check (CanAccessInstance) before touching any store. That check, plus
+// the host-resolved identity, is the package's real access boundary here.
+[AllowAnonymous]
 [Route(RoutePrefix)]
 public class WayfinderStageDataController(
     Services.UmbracoProcessManagerEngine processManager,
