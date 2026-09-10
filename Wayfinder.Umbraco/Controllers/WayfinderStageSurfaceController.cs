@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Logging;
@@ -41,7 +42,14 @@ public class WayfinderStageSurfaceController(
     // wayfinder-stage-form (StageFormTagHelper) emits __RequestVerificationToken, so
     // [ValidateAntiForgeryToken] validates the same token this action used to check by hand —
     // now in a form CodeQL recognises (cs/web/missing-token-validation).
+    // [AllowAnonymous] is deliberate: the citizen stage journey supports not-yet-signed-in
+    // applicants (GOV.UK anonymous-start pattern — see the reference app's ResolveAccessProfile,
+    // which resolves an anonymous caller to a citizen profile). Authorization is enforced
+    // downstream by the engine — AdvanceAsync is scoped by the host-resolved AccessProfile and
+    // the instanceId, and cross-citizen isolation is covered by the reference app's
+    // cross-citizen-isolation Playwright spec. [ValidateAntiForgeryToken] still applies.
     [HttpPost]
+    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     [Route(RoutePath)]
     public async Task<IActionResult> Advance()
