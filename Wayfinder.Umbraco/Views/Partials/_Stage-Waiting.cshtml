@@ -72,6 +72,14 @@
 
     var hasWaitingUi = waitingComponent is not null;
     var waitLabel = expectedWaitSeconds > 0 ? FormatWaitLabel(expectedWaitSeconds) : null;
+
+    // The shared wayfinder-poll.js (Wayfinder.Rendering.GovUk >= 0.4.2) polls this URL and
+    // reloads the page on a {"changed": true} response — see ServiceRequestPollController.
+    // Built here, not in the script, so the script stays route-agnostic. Razor HTML-encodes
+    // the "&" separators into the attribute; the browser decodes them back on read.
+    var pollUrl = $"/api/wayfinder/workflow/poll?blueprintKey={Uri.EscapeDataString(Model.BlueprintKey ?? string.Empty)}"
+        + $"&instanceId={Uri.EscapeDataString(Model.InstanceId ?? string.Empty)}"
+        + $"&knownStateVersion={Model.StateVersion}";
 }
 
 <div class="govuk-grid-row">
@@ -129,10 +137,9 @@
             <div role="status" aria-live="polite" aria-atomic="true" id="wayfinder-poll-status" class="govuk-visually-hidden"></div>
 
             <div id="wayfinder-waiting-data"
-                 data-blueprint-key="@Model.BlueprintKey"
-                 data-instance-id="@Model.InstanceId"
-                 data-state-version="@Model.StateVersion"
-                 data-poll-interval-ms="@pollIntervalMs"
+                 data-wayfinder-poll-url="@pollUrl"
+                 data-wayfinder-poll-interval-ms="@pollIntervalMs"
+                 data-wayfinder-poll-status-id="wayfinder-poll-status"
                  hidden>
             </div>
 
@@ -156,60 +163,5 @@
 
 @if (hasWaitingUi)
 {
-    <script>
-    (function() {
-        var el = document.getElementById('wayfinder-waiting-data');
-        if (!el) return;
-
-        var blueprintKey = el.dataset.blueprintKey;
-        var instanceId = el.dataset.instanceId;
-        var stateVersion = parseInt(el.dataset.stateVersion, 10);
-        var intervalMs = parseInt(el.dataset.pollIntervalMs, 10) || 5000;
-        var statusEl = document.getElementById('wayfinder-poll-status');
-        var retryCount = 0;
-        var maxRetries = 100;
-        var pollTimeout;
-
-        function updateStatus(msg) {
-            if (statusEl) statusEl.textContent = msg;
-        }
-
-        function poll() {
-            if (retryCount >= maxRetries) {
-                updateStatus('Please refresh the page to check for updates.');
-                return;
-            }
-            if (document.hidden) {
-                pollTimeout = setTimeout(poll, intervalMs);
-                return;
-            }
-            retryCount++;
-            var url = '/api/wayfinder/workflow/poll?blueprintKey=' + encodeURIComponent(blueprintKey)
-                + '&instanceId=' + encodeURIComponent(instanceId)
-                + '&knownStateVersion=' + stateVersion;
-
-            updateStatus('Checking for updates…');
-
-            fetch(url)
-                .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-                .then(function(data) {
-                    if (data.changed) {
-                        updateStatus('Update received — reloading page.');
-                        window.location.reload();
-                    } else {
-                        pollTimeout = setTimeout(poll, intervalMs);
-                    }
-                })
-                .catch(function() {
-                    pollTimeout = setTimeout(poll, intervalMs);
-                });
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', poll);
-        } else {
-            poll();
-        }
-    })();
-    </script>
+    <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-poll.js" defer></script>
 }
