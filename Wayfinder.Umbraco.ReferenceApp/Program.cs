@@ -90,19 +90,25 @@ var app = builder.Build();
 // with dynamic imports) with its own header and CSP regime that Umbraco owns; a strict CSP there
 // would break it. Umbraco already sets its own anti-clickjacking header on the backoffice.
 //
-// CSP is the same shape as the core repo's Wayfinder.ReferenceApp — the rendering stack
-// (Wayfinder.Rendering.GovUk) is identical:
+// CSP is close to the core repo's Wayfinder.ReferenceApp — the rendering stack
+// (Wayfinder.Rendering.GovUk) is shared:
 //   - script-src: 'self' for the vendored govuk-frontend / wayfinder JS under /_content/…, plus
-//     the sha256 of GOV.UK Frontend's inline "js-enabled" bootstrap in ReferenceAppPageShell.cs.
-//     No 'unsafe-inline', no 'unsafe-eval'.
+//     two sha256 hashes — no 'unsafe-inline', no 'unsafe-eval':
+//       * GUQ5ad8… — GOV.UK Frontend's inline "js-enabled" bootstrap in ReferenceAppPageShell.cs.
+//       * xsM6P7Kw… — the poll-loop bootstrap inlined by Wayfinder.Umbraco's own
+//         Views/Partials/_Stage-Waiting.cshtml on the citizen "waiting for a decision" page.
+//         A static block (per-request values arrive via #wayfinder-waiting-data data-* attrs),
+//         so the hash is stable; verify it against that partial if the package is bumped.
 //   - style-src: 'unsafe-inline' is required for the two inline style="…" attributes on the
-//     signed-in nav in ReferenceAppPageShell.cs.
+//     signed-in nav in ReferenceAppPageShell.cs, plus Umbraco's Block Grid layout partials which
+//     emit inline style="--umb-block-grid-…" custom properties on every seeded page.
 //   - img-src data:: govuk-frontend's inline SVG data URIs.
 // No HSTS: plain HTTP in Development (a TLS deployment adds app.UseHsts()). COEP omitted — it
 // only matters for cross-origin isolation, which this host does not use.
 const string contentSecurityPolicy =
     "default-src 'self'; " +
-    "script-src 'self' 'sha256-GUQ5ad8JK5KmEWmROf3LZd9ge94daqNvd8xy9YS1iDw='; " +
+    "script-src 'self' 'sha256-GUQ5ad8JK5KmEWmROf3LZd9ge94daqNvd8xy9YS1iDw=' " +
+        "'sha256-xsM6P7KwQHOxzxzMMvXZKP8k6odETdDILq+GrNsgtpc='; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data:; " +
     "font-src 'self'; " +
