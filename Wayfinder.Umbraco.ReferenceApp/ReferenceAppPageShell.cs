@@ -212,7 +212,6 @@ public static class ReferenceAppPageShell
               </footer>
 
               <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-govuk-frontend-init.js?v={AssetVersion}"></script>
-              <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-poll.js?v={AssetVersion}"></script>
               <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-slider.js?v={AssetVersion}"></script>
               <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js?v={AssetVersion}"></script>
             </body>
