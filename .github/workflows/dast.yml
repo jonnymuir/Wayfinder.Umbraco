@@ -1,0 +1,51 @@
+name: DAST
+
+# Dynamic scan — OWASP ZAP baseline (passive rules only, non-destructive) against a
+# running Wayfinder.Umbraco.ReferenceApp. Implementation lives in jonnymuir/ci-security
+# so the same scan runs identically across the estate (see the Wayfinder repo's dast.yml).
+# Catches runtime issues SAST can't: missing/mis-set security headers, cookie flags,
+# cache-control, info disclosure — here, over a real Umbraco backoffice + delivery host.
+#
+# Separate from security.yml because it boots an app (different execution model).
+#
+# Posture: ADVISORY — .zap/rules.tsv is the triage staging ground, `fail-action: false`.
+# When the first report's findings are triaged (accepted ones marked IGNORE), flip
+# `fail-action: true` here and add the `DAST baseline` check-run to the branch ruleset —
+# the same advisory -> blocking path SAST and the Wayfinder repo's DAST took.
+#
+# Phase 3b: unauthenticated scan of the Umbraco reference host in the Development
+# environment. Umbraco installs unattended into a fresh SQLite DB on first boot
+# (Umbraco:CMS:Unattended in its appsettings.json), so no database or wizard step.
+#
+# No pull_request trigger yet — this boots a full Umbraco host (~minutes), so while it's
+# only advisory it runs on schedule + push + dispatch. The PR trigger goes in alongside
+# the flip to fail-action: true, when it actually gates a merge (as the Wayfinder repo did).
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # nightly 04:00 UTC (SAST runs Mondays 03:00)
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  baseline:
+    # SHA-pinned (zizmor blanket policy); Dependabot's github-actions ecosystem keeps
+    # this current, so ci-security changes arrive as a reviewed bump.
+    uses: jonnymuir/ci-security/.github/workflows/dast-baseline.yml@a285cc9a48f51af8ea2bc79ca075865f64141a9b # v1
+    permissions:
+      contents: read
+    with:
+      boot-command: dotnet run --project Wayfinder.Umbraco.ReferenceApp --urls http://127.0.0.1:8080
+      target-url: http://127.0.0.1:8080
+      # /umbraco (the backoffice login shell) returns 200 once the host is up; the
+      # front-end "/" depends on published content and isn't a reliable readiness signal.
+      health-path: /umbraco
+      # First boot runs Umbraco's unattended install + package migrations (Umbraco.Automate
+      # has its own) against a cold SQLite DB — well beyond the 180s default.
+      boot-timeout-seconds: 420
+      # Wayfinder.Umbraco packs its backoffice bundles as static web assets the host serves
+      # — they must exist before the reference app boots. Same list as ci.yml / security.yml.
+      node-build: '["Wayfinder.Umbraco.Client"]'
+      # rules-file-path defaults to .zap/rules.tsv
+      # fail-action defaults to false (advisory) — flip once .zap/rules.tsv is tuned
