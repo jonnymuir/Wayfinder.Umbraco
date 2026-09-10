@@ -79,6 +79,60 @@ builder.Services.AddScoped<INotificationAsyncHandler<UmbracoApplicationStartedNo
 
 var app = builder.Build();
 
+// Security response headers for the Wayfinder-rendered GOV.UK front-end (home, /demo/login, the
+// service pages with the citizen/worklist blocks). First in the pipeline so it also covers the
+// _content/* static assets. A real host would centralise this (its own middleware, a CDN, a
+// gateway); this reference app carries it inline to show the minimum a Wayfinder.Umbraco host
+// should set, and so the estate's DAST baseline (.github/workflows/dast.yml) scans a
+// representative target.
+//
+// Scoped to skip /umbraco* — the backoffice is a separate app surface (a Lit web-component SPA
+// with dynamic imports) with its own header and CSP regime that Umbraco owns; a strict CSP there
+// would break it. Umbraco already sets its own anti-clickjacking header on the backoffice.
+//
+// CSP is the same shape as the core repo's Wayfinder.ReferenceApp — the rendering stack
+// (Wayfinder.Rendering.GovUk) is identical:
+//   - script-src: 'self' for the vendored govuk-frontend / wayfinder JS under /_content/…, plus
+//     the sha256 of GOV.UK Frontend's inline "js-enabled" bootstrap in ReferenceAppPageShell.cs.
+//     No 'unsafe-inline', no 'unsafe-eval'.
+//   - style-src: 'unsafe-inline' is required for the two inline style="…" attributes on the
+//     signed-in nav in ReferenceAppPageShell.cs.
+//   - img-src data:: govuk-frontend's inline SVG data URIs.
+// No HSTS: plain HTTP in Development (a TLS deployment adds app.UseHsts()). COEP omitted — it
+// only matters for cross-origin isolation, which this host does not use.
+const string contentSecurityPolicy =
+    "default-src 'self'; " +
+    "script-src 'self' 'sha256-GUQ5ad8JK5KmEWmROf3LZd9ge94daqNvd8xy9YS1iDw='; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "font-src 'self'; " +
+    "connect-src 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "object-src 'none'";
+
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/umbraco"))
+    {
+        var headers = context.Response.Headers;
+        headers["Content-Security-Policy"] = contentSecurityPolicy;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["Cross-Origin-Opener-Policy"] = "same-origin";
+        headers["Cross-Origin-Resource-Policy"] = "same-origin";
+        headers["Permissions-Policy"] =
+            "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), " +
+            "fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), " +
+            "midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), " +
+            "screen-wake-lock=(), sync-xhr=(), usb=(), xr-spatial-tracking=()";
+    }
+
+    await next();
+});
+
 // Outermost middleware, deliberately: it post-processes the finished 401 that the MCP endpoint's
 // own authorization produces (adding the RFC 9728 `resource_metadata` hint so an MCP client can
 // start the OAuth flow). WebApplication auto-inserts UseAuthentication/UseAuthorization near the
