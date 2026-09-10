@@ -216,3 +216,7 @@ app.MapWebhookSupportSystemCallbacks(
     .AllowAnonymous();
 
 await app.RunAsync();
+
+// Exposed so Wayfinder.Umbraco.Tests can boot this exact host with WebApplicationFactory<Program>
+// for the authorization-contract behavioural suite (auth-contract Layer 2).
+public partial class Program;

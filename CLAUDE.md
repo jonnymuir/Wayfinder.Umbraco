@@ -32,7 +32,8 @@ pushes.
 | `Wayfinder.Umbraco.ReferenceApp` | A real bootable Umbraco 17 site proving the package end to end (citizen block, caseworker worklist, pickup/putback, the MCP authoring surface). Never ships. |
 | `Wayfinder.Umbraco.Client` | The backoffice bundles (Blueprints tab + manifests), packed into the NuGet package via `wwwroot/dist`. |
 | `Wayfinder.Umbraco.AppHost` | .NET Aspire orchestrator for the reference app. |
-| `Wayfinder.Umbraco.Tests` | xUnit test suite. |
+| `Wayfinder.Umbraco.Tests` | xUnit unit/component suite — fast, no host boot. |
+| `Wayfinder.Umbraco.IntegrationTests` | Booted-host xUnit suite: `WebApplicationFactory<Program>` over `Wayfinder.Umbraco.ReferenceApp`. Its own test process (Wayfinder's static `SupportSystemRegistry` can't be re-registered once a unit test has read it) with one shared `[Collection]` boot. Put a test here only when the behaviour genuinely emerges from a booted host (authorization enforcement, routing, the real middleware order). |
 
 ## Build and test
 
