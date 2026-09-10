@@ -8,20 +8,20 @@ name: DAST
 #
 # Separate from security.yml because it boots an app (different execution model).
 #
-# Posture: ADVISORY — .zap/rules.tsv is the triage staging ground, `fail-action: false`.
-# When the first report's findings are triaged (accepted ones marked IGNORE), flip
-# `fail-action: true` here and add the `DAST baseline` check-run to the branch ruleset —
-# the same advisory -> blocking path SAST and the Wayfinder repo's DAST took.
+# Posture: BLOCKING — every finding from the first unauthenticated baseline is triaged in
+# .zap/rules.tsv (accepted ones marked IGNORE, #75), so `fail-action: true` and the `DAST
+# baseline` check-run is required in the branch ruleset. A new un-IGNOREd finding fails.
+# Re-triage .zap/rules.tsv when a later phase widens the scan (authenticated pages).
 #
 # Phase 3b: unauthenticated scan of the Umbraco reference host in the Development
 # environment. Umbraco installs unattended into a fresh SQLite DB on first boot
 # (Umbraco:CMS:Unattended in its appsettings.json), so no database or wizard step.
 #
-# No pull_request trigger yet — this boots a full Umbraco host (~minutes), so while it's
-# only advisory it runs on schedule + push + dispatch. The PR trigger goes in alongside
-# the flip to fail-action: true, when it actually gates a merge (as the Wayfinder repo did).
+# Runs on every pull_request (so the required check reports pre-merge, like CodeQL/zizmor),
+# on push to main, nightly, and on demand. It boots a full Umbraco host (~minutes).
 
 on:
+  pull_request:
   schedule:
     - cron: '0 4 * * *'   # nightly 04:00 UTC (SAST runs Mondays 03:00)
   push:
@@ -48,4 +48,4 @@ jobs:
       # — they must exist before the reference app boots. Same list as ci.yml / security.yml.
       node-build: '["Wayfinder.Umbraco.Client"]'
       # rules-file-path defaults to .zap/rules.tsv
-      # fail-action defaults to false (advisory) — flip once .zap/rules.tsv is tuned
+      fail-action: true
