@@ -8,11 +8,11 @@ name: DAST
 #
 # Separate from security.yml because it boots an app (different execution model).
 #
-# Posture: BLOCKING for `baseline` — every finding from its first scan is triaged in
-# .zap/rules.tsv (accepted ones marked IGNORE, #75), so `fail-action: true` and its
-# check-run are required in the branch ruleset. `authenticated-baseline` (Phase 3c) is
-# ADVISORY for now — flip it once its own first-run findings are triaged, same rollout.
-# Re-triage .zap/rules.tsv when a later phase widens either scan.
+# Posture: BLOCKING — both legs. Every finding from each one's first scan is triaged in
+# .zap/rules.tsv (accepted ones marked IGNORE, #75), so `fail-action: true` on both and both
+# check-runs (`baseline / DAST baseline`, `authenticated-baseline / DAST baseline`) are
+# required in the branch ruleset. A new un-IGNOREd finding fails. Re-triage .zap/rules.tsv
+# when a later phase widens either scan.
 #
 # Phase 3b: unauthenticated scan of the Umbraco reference host in the Development
 # environment. Umbraco installs unattended into a fresh SQLite DB on first boot
@@ -87,7 +87,5 @@ jobs:
         # before it reaches ZAP (see jonnymuir/Wayfinder's own dast.yml for where this was
         # first found and fixed).
         awk -F'\t' '/^#HttpOnly_/ { sub(/^#HttpOnly_/, ""); } !/^#/ && NF==7 { printf "%s=%s;", $6, $7 }' "$jar" | sed 's/;$//' > "$RUNNER_TEMP/zap-auth-cookie.txt"
-      # Advisory for its first run — flip once its own findings are triaged into
-      # .zap/rules.tsv, same rollout every other DAST leg in the estate has followed.
-      fail-action: false
+      fail-action: true
       artifact-name: zap-authenticated-baseline-report
