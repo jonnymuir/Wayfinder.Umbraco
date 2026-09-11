@@ -7,10 +7,8 @@
 #   url-regex — omit (empty 3rd column) to apply to every URL; otherwise a Python
 #               regex matched against the finding's URL
 #
-# Posture: ADVISORY for now (fail-action: false in dast.yml). Once this file covers the
-# report, add the pull_request trigger, flip fail-action to true, and add the "DAST
-# baseline" check-run to the branch ruleset — the same advisory -> blocking rollout the
-# Wayfinder repo's DAST followed.
+# Posture: BLOCKING — both legs (fail-action: true, both check-runs required in the
+# branch ruleset).
 #
 # alert IDs: https://www.zaproxy.org/docs/alerts/
 #
@@ -19,7 +17,9 @@
 
 # Absence of Anti-CSRF Tokens — the demo login form only. A pre-auth login form has no
 # session to protect with a synchroniser token; the citizen/caseworker POST forms behind
-# auth carry __RequestVerificationToken. Phase 3c (authenticated scan) must retune.
+# auth carry __RequestVerificationToken. Verified by the Phase 3c authenticated scan: this
+# finding did NOT reappear on any authenticated page — every caseworker POST genuinely
+# carries the token, not just untested until now.
 10202	IGNORE	.*/demo/login	unauthenticated demo login form
 
 # CSP style-src 'unsafe-inline' — required on the Wayfinder-rendered front end: the two
@@ -66,3 +66,14 @@
 # assets, robots.txt, sitemap.xml, and cacheable anonymous pages. Correct behaviour.
 # Revisit for sensitive authenticated responses under the Phase 3c scan.
 10049	IGNORE		informational cache-control notes on static + anonymous content
+
+# --- Triaged from the 2026-09-11 authenticated (Phase 3c) baseline, signed in as the demo
+#     caseworker — 42 URLs reached vs. the unauthenticated scan's much smaller surface. ---
+
+# User Controllable HTML Element Attribute (Potential XSS) — the worklist search box
+# reflects ?q= back into its <input value="…">. Same shared Wayfinder.Engine.Worklist
+# WorklistRenderer core's own Phase 3c pass already verified (see jonnymuir/Wayfinder's own
+# .zap/rules.tsv): rendered via esc(q ?? "") → GovUk.Esc → WebUtility.HtmlEncode. ZAP's
+# heuristic can't see server-side escaping, it just flags "user input landed in an
+# attribute". Genuinely escaped, not a vulnerability.
+10031	IGNORE	.*/(caseworker-queue|coaching-register-queue).*	q is HTML-encoded via GovUk.Esc (WebUtility.HtmlEncode) before landing in value="…"
