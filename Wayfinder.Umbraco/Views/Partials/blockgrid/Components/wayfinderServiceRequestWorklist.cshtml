@@ -41,7 +41,7 @@
         if (!noLongerInQueue)
         {
             var vm = ServiceRequestPageViewModel.FromRenderResult(result, itemUrl);
-            <p><a href="@pageUrl">&larr; Back to worklist</a></p>
+            <p class="govuk-body"><a href="@pageUrl" class="govuk-link">&larr; Back to worklist</a></p>
             @await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)
             return;
         }
@@ -130,13 +130,13 @@
     </tbody>
 </table>
 <nav>
-    <span>Page @(pageIndex + 1) &mdash; showing @envelope.Items.Count of @envelope.TotalMatchingCount</span>
+    <span class="govuk-body">Page @(pageIndex + 1) &mdash; showing @envelope.Items.Count of @envelope.TotalMatchingCount</span>
     @if (pageIndex > 0)
     {
-        <a href="@pageUrl?page=@(pageIndex - 1)">Previous</a>
+        <a href="@pageUrl?page=@(pageIndex - 1)" class="govuk-link">Previous</a>
     }
     @if ((pageIndex + 1) * pageSize < envelope.TotalMatchingCount)
     {
-        <a href="@pageUrl?page=@(pageIndex + 1)">Next</a>
+        <a href="@pageUrl?page=@(pageIndex + 1)" class="govuk-link">Next</a>
     }
 </nav>
