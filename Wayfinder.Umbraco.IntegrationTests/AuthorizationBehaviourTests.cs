@@ -36,19 +36,19 @@ public sealed class AuthorizationBehaviourTests(ReferenceAppFactory factory)
     private const string CaseworkerEmail = "casey@example.test";
 
     // ---- WayfinderWorklistSurfaceController: [Authorize] (the #78 fix) ----
+    // Route shape matches Wayfinder.Engine.Worklist's WorklistRenderer: {ItemUrlPrefix}/
+    // {blueprintKey}/{instanceId} (GET, the review redirect) and .../pickup or .../putback
+    // (POST, cursorId + a returnTo hidden field/query parameter).
 
     [Theory]
-    [InlineData("/umbraco/wayfinder-worklist/pickup")]
-    [InlineData("/umbraco/wayfinder-worklist/putback")]
+    [InlineData("/umbraco/wayfinder-worklist/test-blueprint/test-instance/pickup")]
+    [InlineData("/umbraco/wayfinder-worklist/test-blueprint/test-instance/putback")]
     public async Task Worklist_pickup_putback_challenge_an_anonymous_caller(string path)
     {
         using var client = Anonymous();
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["instanceId"] = "does-not-matter", ["cursorId"] = "x", ["returnUrl"] = "/",
-        });
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string> { ["returnTo"] = "/" });
 
-        var res = await client.PostAsync(path, form);
+        var res = await client.PostAsync($"{path}?cursorId=x", form);
 
         res.StatusCode.Should().Be(HttpStatusCode.Redirect,
             "{0} carries [Authorize] — an unauthenticated POST must be challenged before the action runs", path);
@@ -57,20 +57,42 @@ public sealed class AuthorizationBehaviourTests(ReferenceAppFactory factory)
     }
 
     [Fact]
+    public async Task Worklist_review_redirect_challenges_an_anonymous_caller()
+    {
+        using var client = Anonymous();
+
+        var res = await client.GetAsync("/umbraco/wayfinder-worklist/test-blueprint/test-instance?returnTo=/");
+
+        res.StatusCode.Should().Be(HttpStatusCode.Redirect,
+            "the review redirect carries [Authorize] too — worklist items are a caseworker/backstage concern");
+        res.Headers.Location!.ToString().Should().Contain("/demo/login");
+    }
+
+    [Fact]
     public async Task Worklist_pickup_lets_an_authenticated_caller_past_the_authorization_gate()
     {
         using var client = await SignedInAs(CaseworkerEmail);
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["instanceId"] = "no-such-instance", ["cursorId"] = "x", ["returnUrl"] = "/",
-        });
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string> { ["returnTo"] = "/" });
 
-        var res = await client.PostAsync("/umbraco/wayfinder-worklist/pickup", form);
+        var res = await client.PostAsync("/umbraco/wayfinder-worklist/test-blueprint/no-such-instance/pickup?cursorId=x", form);
 
         // No antiforgery token → the antiforgery filter rejects with 400. The point: an
         // authenticated caseworker is NOT bounced to /demo/login — [Authorize] passed and the
         // request reached the (antiforgery) filter, exactly as it should for a signed-in caller.
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Worklist_review_redirect_never_forwards_to_an_off_site_returnTo()
+    {
+        using var client = await SignedInAs(CaseworkerEmail);
+
+        var res = await client.GetAsync(
+            "/umbraco/wayfinder-worklist/test-blueprint/test-instance?returnTo=https://evil.example/steal");
+
+        res.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        res.Headers.Location!.IsAbsoluteUri.Should().BeFalse("Url.IsLocalUrl rejects an off-site returnTo, falling back to \"/\"");
+        res.Headers.Location!.OriginalString.Should().StartWith("/");
     }
 
     // ---- ServiceBlueprintAuthoringController: [Authorize(Policy = BlueprintsAdmin)] ----
