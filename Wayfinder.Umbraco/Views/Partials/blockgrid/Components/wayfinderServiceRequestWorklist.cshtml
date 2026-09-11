@@ -85,7 +85,8 @@
         q: string.IsNullOrEmpty(searchText) ? null : searchText,
         pageIndex: pageIndex,
         size: pageSize,
-        antiforgeryToken: antiforgeryToken);
+        antiforgeryToken: antiforgeryToken,
+        emptyStateMessage: "No service requests match the current filters");
 }
 @if (noLongerInQueue)
 {
