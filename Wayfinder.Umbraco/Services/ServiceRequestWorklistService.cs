@@ -12,9 +12,9 @@ namespace Wayfinder.Umbraco.Services;
 /// Calls <see cref="IProcessManager.GetQueueWorkItems"/>/<see cref="IProcessManager.PickupWorkItem"/>/
 /// <see cref="IProcessManager.PutbackWorkItem"/> directly (the engine is authoritative and
 /// in-process), resolving identity the same way <see cref="ServiceRequestStageService"/> does.
-/// Deliberately doesn't depend on the core repo's <c>Wayfinder.Engine.Worklist</c> package — that
-/// package's minimal-API + raw-HTML-string shape doesn't fit an Umbraco-hosted, Block
-/// Grid-composed page; only the underlying <see cref="IProcessManager"/> calls are shared.
+/// The Block Grid partial renders this data via <c>Wayfinder.Engine.Worklist</c>'s own
+/// <c>WorklistRenderer</c> — the GOV.UK markup is shared with every other worklist host; only
+/// query/pickup/putback wiring against a Block Grid page's own identity/routing lives here.
 /// </summary>
 public class ServiceRequestWorklistService(
     IProcessManager processManager,
