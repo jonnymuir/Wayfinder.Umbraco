@@ -76,8 +76,9 @@ public class ServiceRequestPageViewModel
     /// <summary>
     /// Live calculation model JSON for this step (nullable). Present when the workflow
     /// definition declares a calculations block: contains the calculation set, input
-    /// types/defaults and service-sourced values. Embedded on the page for the generic
-    /// prism-live-form runtime, which re-evaluates the definitions as inputs change.
+    /// types/defaults and service-sourced values. Embedded on the page for
+    /// Wayfinder.Rendering.GovUk's own wayfinder-live-form.js runtime, which re-evaluates the
+    /// definitions as inputs change.
     /// </summary>
     public string? LiveModelJson { get; set; }
 
@@ -106,8 +107,10 @@ public class ServiceRequestPageViewModel
 
     /// <summary>
     /// True when this step renders at least one <c>file-upload</c> field — gates whether the
-    /// view includes <c>prism-file-upload.js</c>, the same way <see cref="LiveModelJson"/>
-    /// already gates <c>prism-live-form.js</c>. Derived purely from <see cref="AllFields"/>
+    /// view includes <c>prism-file-upload.js</c> (a host-supplied extension point; unlike the
+    /// live-form runtime, this package ships no equivalent of its own), the same way
+    /// <see cref="LiveModelJson"/> already gates <c>wayfinder-live-form.js</c>. Derived purely
+    /// from <see cref="AllFields"/>
     /// (already on this model), unlike <see cref="LiveModelJson"/>, which needs the controller's
     /// own involvement because it comes from a separate render-data key.
     /// </summary>
