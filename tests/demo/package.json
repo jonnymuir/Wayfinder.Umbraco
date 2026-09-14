@@ -7,7 +7,7 @@
     "demo:screenshots": "playwright test -c playwright.screenshots.config.ts --reporter=line"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.0",
     "typescript": "~7.0.2",
     "wayfinder-demo-recording-kit": "github:jonnymuir/wayfinder-demo-recording-kit#v1.0.0"
