@@ -22,7 +22,17 @@
 
     @if (!string.IsNullOrEmpty(Model.LiveModelJson))
     {
-        <script type="module" src="/App_Plugins/UmbracoPrism/dist/prism-live-form.js"></script>
+        @* This package carries no dependency on any specific host — Wayfinder.Rendering.GovUk
+           already ships the exact runtime this needs (wayfinder-live-form.js), and every host
+           gets it for free via this package's own transitive static web assets, no host-side
+           wiring required. This used to hardcode Umbraco.Prism's own compiled bundle path
+           instead (/App_Plugins/UmbracoPrism/dist/prism-live-form.js) — a real violation of this
+           repo's own "no duplication of anything Wayfinder ships" rule, and a silent trap for
+           any other host: nothing here would work at all unless that host happened to also be
+           Prism, serving a script at that exact Prism-namespaced URL. Found live, via
+           Umbraco.Prism's Money Modeller demo needing a bugfix that only ever got applied to
+           Prism's own duplicate. *@
+        <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js"></script>
         <script type="application/json" data-wayfinder-live-model>@Html.Raw(Model.LiveModelJson!.Replace("</", "<\\/"))</script>
     }
 
