@@ -16,11 +16,9 @@ import {
   markWaitStart,
   markWaitEnd,
   showFastForwardChip,
-  hideFastForwardChip
-} from './support/narration';
-import { humanClick, humanType } from './support/human-interactions';
-import { compressDeadTime } from './support/compress-dead-time';
-import {
+  hideFastForwardChip,
+  humanClick,
+  humanType,
   startDemoTerminalSession,
   sendTerminalText,
   sendTerminalKey,
@@ -31,7 +29,8 @@ import {
   waitForPromptText,
   waitForPromptTextGone,
   captureTerminal
-} from './support/tmux-terminal';
+} from 'wayfinder-demo-recording-kit';
+import { compressDeadTime } from 'wayfinder-demo-recording-kit/compress-dead-time';
 
 // One continuous take across every act, sharing a single Page created in beforeAll — Playwright
 // records one video per Page, so as long as nothing ever opens a second page, "Act 5" is just a
