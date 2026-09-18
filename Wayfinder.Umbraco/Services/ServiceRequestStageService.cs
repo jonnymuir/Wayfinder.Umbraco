@@ -281,15 +281,18 @@ public class ServiceRequestStageService(
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
         }
 
-        var fieldValues = submittedFields.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
-
-        // An untouched file-upload field still posts as a regular, empty form field — strip it
-        // back out so the engine sees a genuinely omitted key instead of an explicit "" (which
-        // it would read as "cleared").
-        foreach (var fieldKey in validationOverrides.Keys)
-        {
-            fieldValues.Remove(fieldKey);
-        }
+        // Generic field coercion (booleans, numbers/decimals, GDS date sub-inputs, plain text) is
+        // Wayfinder.Rendering.GovUk's own concern — GovUkStageJourney.CoerceFieldValues is this
+        // package's *only* implementation of it, so this package layers just its own concern
+        // (async file-upload resolution) on top rather than re-deriving any part of it. A
+        // previous hand-rolled second implementation here silently transposed a posted date
+        // field's day and month (see ServiceRequestStageServiceDateFieldTests). Read-only fields
+        // (summary-list rows, most notably) must never be coerced as though they'd been posted —
+        // see CoerceFieldValues' own remarks on why that mattered.
+        var fieldsByKey = authoritativeFields
+            .Where(field => !field.ReadOnly)
+            .ToDictionary(field => field.FieldKey, field => field.FieldType, StringComparer.Ordinal);
+        var fieldValues = GovUkStageJourney.CoerceFieldValues(form, fieldsByKey);
 
         foreach (var (field, file) in postedFiles)
         {
@@ -299,20 +302,6 @@ public class ServiceRequestStageService(
         foreach (var (field, binding) in tokenUploads)
         {
             fieldValues[field.FieldKey] = binding.Reference;
-        }
-
-        // Combine GDS date sub-input parts (-day/-month/-year) into a display value.
-        foreach (var field in authoritativeFields.Where(f => f.FieldType.Equals("date", StringComparison.OrdinalIgnoreCase)))
-        {
-            if (fieldValues.TryGetValue($"{field.FieldKey}-day", out var day) &&
-                fieldValues.TryGetValue($"{field.FieldKey}-month", out var month) &&
-                fieldValues.TryGetValue($"{field.FieldKey}-year", out var year) &&
-                !string.IsNullOrWhiteSpace(day?.ToString()) &&
-                !string.IsNullOrWhiteSpace(month?.ToString()) &&
-                !string.IsNullOrWhiteSpace(year?.ToString()))
-            {
-                fieldValues[field.FieldKey] = $"{day}/{month}/{year}";
-            }
         }
 
         var envelope = processManager.Advance(instanceId, tenantId, userId, accessProfile, action, stateVersion, fieldValues);
