@@ -54,7 +54,16 @@ public class ServiceRequestAdminController(
     /// Soft-terminates a stuck instance. The acting admin's own backoffice user id is resolved
     /// server-side for the audit trail, never trusted from the request body.
     /// </summary>
+    /// <remarks>
+    /// <see cref="IgnoreAntiforgeryTokenAttribute"/>: this is a Management API endpoint,
+    /// authenticated by a Bearer token this package's own <c>serviceRequestAdminFetch</c> attaches
+    /// explicitly (see <see cref="ServiceBlueprintAuthoringController"/>'s own mutating endpoints
+    /// for the same, already-established pattern) — never an ambient cookie a cross-site request
+    /// could ride along on, so the anti-forgery token CSRF protection exists for is not the
+    /// applicable threat model here.
+    /// </remarks>
     [HttpPost("service-requests/{instanceId}/abort")]
+    [IgnoreAntiforgeryToken]
     public IActionResult AbortServiceRequest(string instanceId, [FromBody] AbortServiceRequestRequest request)
     {
         var abortedByUserId = backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Username ?? "unknown";
