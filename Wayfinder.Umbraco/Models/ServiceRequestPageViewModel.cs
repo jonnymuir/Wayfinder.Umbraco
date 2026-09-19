@@ -63,6 +63,15 @@ public class ServiceRequestPageViewModel
     /// <summary>True when the workflow engine returned a fatal error (definition not found, etc.).</summary>
     public bool HasError { get; set; }
 
+    /// <summary>
+    /// Mirrors <see cref="ServiceRequestResponseEnvelope.AllowManualRestart"/> — whether the
+    /// <c>_Stage-Completion.cshtml</c> partial may render its "Start again" link. A blueprint that
+    /// hasn't opted in must never show a link that, if clicked, would either do nothing (its
+    /// server-side handling is gated too) or worse invite confusion — so the link itself is gated
+    /// here rather than just its handling.
+    /// </summary>
+    public bool AllowManualRestart { get; set; }
+
     /// <summary>Human-readable error message when <see cref="HasError"/> is true (e.g., "Workflow definition 'pension-application' not found").</summary>
     public string? ErrorMessage { get; set; }
 
@@ -153,7 +162,8 @@ public class ServiceRequestPageViewModel
             FormValues = result.FormValues,
             Nonce = result.Nonce,
             PollAfterMs = envelope.PollAfterMs,
-            LiveModelJson = envelope.Render?.Data?["live"]?.ToJsonString()
+            LiveModelJson = envelope.Render?.Data?["live"]?.ToJsonString(),
+            AllowManualRestart = envelope.AllowManualRestart
         };
 
         if (envelope.ResponseState == "instance_picker")

@@ -100,10 +100,17 @@ public class ServiceRequestStageService(
         var userId = options.ResolveUserId(ctx);
         var accessProfile = options.ResolveAccessProfile!(ctx);
 
-        var envelope = processManager.GetCurrent(
-            blueprintKey, tenantId, userId, accessProfile,
-            string.IsNullOrEmpty(instanceId) ? null : instanceId,
-            string.IsNullOrEmpty(action) ? null : action);
+        // action=start-new is untrusted query-string input from a citizen-facing surface (the
+        // "Start again" link) — never forwarded to GetCurrent's own raw, unconditional handling of
+        // that literal (that's a trusted-caller primitive, see ServiceBlueprintSimulationRunner).
+        // GetCurrentOrManualRestart is the gated entry point: it checks the blueprint's own
+        // AllowManualRestart before honouring it at all.
+        var envelope = string.Equals(action, "start-new", StringComparison.OrdinalIgnoreCase)
+            ? processManager.GetCurrentOrManualRestart(blueprintKey, tenantId, userId, accessProfile)
+            : processManager.GetCurrent(
+                blueprintKey, tenantId, userId, accessProfile,
+                string.IsNullOrEmpty(instanceId) ? null : instanceId,
+                string.IsNullOrEmpty(action) ? null : action);
 
         if (envelope.ResponseState is "error" or "instance_picker")
         {
