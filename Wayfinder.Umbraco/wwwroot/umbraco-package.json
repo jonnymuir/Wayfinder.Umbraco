@@ -7,6 +7,12 @@
       "alias": "Wayfinder.ServiceBlueprint.Bundle",
       "name": "Wayfinder Service Blueprint Management Bundle",
       "js": "/App_Plugins/Wayfinder/dist/wayfinder-service-blueprint-manifests.js"
+    },
+    {
+      "type": "bundle",
+      "alias": "Wayfinder.ServiceRequestAdmin.Bundle",
+      "name": "Wayfinder Service Request Admin Bundle",
+      "js": "/App_Plugins/Wayfinder/dist/wayfinder-service-request-admin-manifests.js"
     }
   ]
 }
