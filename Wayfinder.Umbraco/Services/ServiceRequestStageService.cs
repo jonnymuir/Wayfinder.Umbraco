@@ -98,7 +98,7 @@ public class ServiceRequestStageService(
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx);
+        var accessProfile = options.ResolveAccessProfile!(ctx, blueprintKey);
 
         // action=start-new is untrusted query-string input from a citizen-facing surface (the
         // "Start again" link) — never forwarded to GetCurrent's own raw, unconditional handling of
@@ -173,10 +173,14 @@ public class ServiceRequestStageService(
     /// <param name="form">The submitted form — <c>ReturnUrl</c>/<c>InstanceId</c>/<c>Nonce</c> plus every <c>field:{fieldKey}</c> value.</param>
     public async Task<ServiceRequestStageAdvanceResult> AdvanceAsync(HttpContext ctx, IFormCollection form)
     {
+        // Read up front (form is already buffered, so this is free) — ResolveAccessProfile below
+        // needs it, ahead of where this value was previously first read further down.
+        var blueprintKey = form["BlueprintKey"].ToString();
+
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx);
+        var accessProfile = options.ResolveAccessProfile!(ctx, blueprintKey);
 
         var returnUrl = form["ReturnUrl"].ToString();
         var instanceId = form["InstanceId"].ToString();
@@ -278,7 +282,6 @@ public class ServiceRequestStageService(
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl, problems, submittedFields);
         }
 
-        var blueprintKey = form["BlueprintKey"].ToString();
         var action = form["Action"].ToString();
         var stateVersion = int.TryParse(form["StateVersion"], out var sv) ? sv : 0;
 
