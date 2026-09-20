@@ -45,7 +45,7 @@ public static class ReferenceAppAuth
 
     private static readonly DemoUser[] AllUsers = [Citizen, Caseworker, SecondCaseworker];
 
-    public static ActorProfile ResolveAccessProfile(HttpContext ctx)
+    public static ActorProfile ResolveAccessProfile(HttpContext ctx, string? blueprintKey)
     {
         var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
         var store = ctx.RequestServices.GetRequiredService<IServiceBlueprintSourceStore>();
@@ -98,8 +98,8 @@ public static class ReferenceAppAuth
     /// caching) rather than assuming a fixed name, since only the blueprint author actually knows
     /// what a given queue is called. GetAwaiter().GetResult() rather than making this async:
     /// WayfinderServiceDesignOptions.ResolveAccessProfile is a synchronous
-    /// Func&lt;HttpContext, ActorProfile&gt; (Wayfinder.Umbraco's own delegate shape, not this
-    /// app's to change) — acceptable here since IServiceBlueprintSourceStore's real implementation
+    /// Func&lt;HttpContext, string?, ActorProfile&gt; (Wayfinder.Umbraco's own delegate shape, not
+    /// this app's to change) — acceptable here since IServiceBlueprintSourceStore's real implementation
     /// in this app is in-memory/DB-local, not a genuinely slow remote call.
     /// </summary>
     private static IReadOnlyList<string> QueueKeysForActor(IServiceBlueprintSourceStore store, string actor)

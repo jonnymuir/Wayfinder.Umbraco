@@ -37,7 +37,9 @@ public class ServiceRequestWorklistService(
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx);
+        // Genuinely no single blueprint in scope here — a caseworker's worklist spans whatever
+        // queues their ActorProfile can see, across every blueprint using them, not one.
+        var accessProfile = options.ResolveAccessProfile!(ctx, null);
 
         return processManager.GetQueueWorkItems(tenantId, userId, accessProfile, statuses, sort, searchText, pageIndex, pageSize);
     }
@@ -48,7 +50,9 @@ public class ServiceRequestWorklistService(
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx);
+        // Pickup/putback are queue-membership actions, not blueprint-specific ones — same
+        // reasoning as GetWorklist above.
+        var accessProfile = options.ResolveAccessProfile!(ctx, null);
 
         return processManager.PickupWorkItem(instanceId, cursorId, tenantId, userId, accessProfile);
     }
@@ -59,7 +63,7 @@ public class ServiceRequestWorklistService(
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx);
+        var accessProfile = options.ResolveAccessProfile!(ctx, null);
 
         return processManager.PutbackWorkItem(instanceId, cursorId, tenantId, userId, accessProfile);
     }

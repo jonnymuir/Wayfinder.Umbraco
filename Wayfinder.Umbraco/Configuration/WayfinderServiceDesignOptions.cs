@@ -29,14 +29,28 @@ public class WayfinderServiceDesignOptions
 
     /// <summary>
     /// How this host resolves the accessing actor's <see cref="ActorProfile"/> for the current
-    /// request — see <see cref="ResolveTenantId"/>'s own remarks. Defaults to
-    /// <see cref="NoQueueAccessProfile"/>, a profile that can start/view/act on no real queue at
-    /// all: a stage block renders "access denied" for every journey rather than a host getting an
-    /// <c>OptionsValidationException</c> at startup for the entire package. A host wanting
-    /// citizen/caseworker journeys to actually work overrides this with its own real
+    /// request — see <see cref="ResolveTenantId"/>'s own remarks. The second parameter is the
+    /// blueprint the current call is scoped to, when there is one — every call site that has one
+    /// on hand (rendering/advancing a stage, polling for updates, a stage's own file/bulk-dataset
+    /// actions) passes it through, so a host with per-blueprint access rules can key off it
+    /// directly instead of reverse-engineering "which blueprint is this" from the request's own
+    /// path/form/query shape. <see langword="null"/> for a call with no single blueprint in scope
+    /// (a caseworker's worklist spans whatever queues they can see, across blueprints).
+    /// <para/>
+    /// Found live: a host resolver that instead sniffed <c>HttpContext.Request.Path</c>/
+    /// <c>Form</c> to infer the blueprint recognised the page GET and the stage-advance POST's own
+    /// shape, but not <see cref="Controllers.ServiceRequestPollController"/>'s poll GET — a
+    /// signed-in applicant's own wait-screen poll silently resolved the wrong access profile and
+    /// 404'd on every attempt. Passing the already-resolved key removes the entire bug class: a
+    /// host never has to know or keep up with this package's own internal route shapes.
+    /// <para/>
+    /// Defaults to <see cref="NoQueueAccessProfile"/>, a profile that can start/view/act on no
+    /// real queue at all: a stage block renders "access denied" for every journey rather than a
+    /// host getting an <c>OptionsValidationException</c> at startup for the entire package. A host
+    /// wanting citizen/caseworker journeys to actually work overrides this with its own real
     /// identity-derived profile.
     /// </summary>
-    public Func<HttpContext, ActorProfile>? ResolveAccessProfile { get; set; } = static _ => NoQueueAccessProfile;
+    public Func<HttpContext, string?, ActorProfile>? ResolveAccessProfile { get; set; } = static (_, _) => NoQueueAccessProfile;
 
     /// <summary>
     /// A profile restricted to a queue key no real blueprint will ever declare — <see cref="ActorProfile.CanViewQueue"/>/

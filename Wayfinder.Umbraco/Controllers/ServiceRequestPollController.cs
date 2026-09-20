@@ -38,7 +38,7 @@ public class ServiceRequestPollController(IProcessManager processManager, IOptio
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(HttpContext);
         var userId = options.ResolveUserId(HttpContext);
-        var accessProfile = options.ResolveAccessProfile!(HttpContext);
+        var accessProfile = options.ResolveAccessProfile!(HttpContext, blueprintKey);
 
         var envelope = processManager.GetCurrent(blueprintKey, tenantId, userId, accessProfile, instanceId);
 

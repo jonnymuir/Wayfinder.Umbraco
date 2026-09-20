@@ -73,7 +73,7 @@ public sealed class WayfinderStageDataControllerTests
         var options = new WayfinderServiceDesignOptions
         {
             ResolveTenantId = _ => TenantId,
-            ResolveAccessProfile = _ => new ActorProfile(),
+            ResolveAccessProfile = (_, _) => new ActorProfile(),
             ResolveUserId = ctx => (string)ctx.Items["UserId"]!,
         };
 
@@ -128,7 +128,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OtherUserId) };
 
-        var result = await controller.GetSummary(instanceId, datasetId);
+        var result = await controller.GetSummary(DefinitionKey, instanceId, datasetId);
 
         result.Should().BeOfType<NotFoundResult>(
             "a caller who does not own this instance must never see another citizen's bulk-dataset summary");
@@ -141,7 +141,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OwnerUserId) };
 
-        var result = await controller.GetSummary(instanceId, datasetId);
+        var result = await controller.GetSummary(DefinitionKey, instanceId, datasetId);
 
         result.Should().BeOfType<OkObjectResult>("the ownership check must not block the instance's own owner");
     }
@@ -153,7 +153,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OtherUserId) };
 
-        var result = await controller.GetRows(instanceId, datasetId, filter: null, page: null, pageSize: null);
+        var result = await controller.GetRows(DefinitionKey, instanceId, datasetId, filter: null, page: null, pageSize: null);
 
         result.Should().BeOfType<NotFoundResult>(
             "a caller who does not own this instance must never page through another citizen's rows");
@@ -166,7 +166,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OtherUserId) };
 
-        var result = await controller.CorrectRow(instanceId, datasetId, "M-1", new Dictionary<string, string?> { ["memberName"] = "Mallory" });
+        var result = await controller.CorrectRow(DefinitionKey, instanceId, datasetId, "M-1", new Dictionary<string, string?> { ["memberName"] = "Mallory" });
 
         result.Should().BeOfType<NotFoundResult>(
             "a caller who does not own this instance must never rewrite another citizen's row values");
@@ -183,7 +183,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OtherUserId) };
 
-        var result = await controller.RevertCorrections(instanceId, datasetId);
+        var result = await controller.RevertCorrections(DefinitionKey, instanceId, datasetId);
 
         result.Should().BeOfType<NotFoundResult>(
             "a caller who does not own this instance must never revert another citizen's corrections");
@@ -196,7 +196,7 @@ public sealed class WayfinderStageDataControllerTests
         var controller = BuildController(engine, bulkDatasetStore, fileStorage);
         controller.ControllerContext = new ControllerContext { HttpContext = HttpContextFor(OtherUserId) };
 
-        var result = await controller.DownloadDataset(instanceId, datasetId);
+        var result = await controller.DownloadDataset(DefinitionKey, instanceId, datasetId);
 
         result.Should().BeOfType<NotFoundResult>(
             "a caller who does not own this instance must never download another citizen's dataset as CSV");

@@ -62,14 +62,14 @@ public class WayfinderStageDataController(
     /// from this request own <paramref name="instanceId"/>? Mirrors
     /// <c>PublicServiceRequestFileUploadController.Upload</c>'s own check in a host.
     /// </summary>
-    private bool CallerOwnsInstance(string instanceId)
+    private bool CallerOwnsInstance(string blueprintKey, string instanceId)
     {
         var options = optionsAccessor.Value;
         return processManager.IsOwnedInstance(
             instanceId,
             options.ResolveTenantId!(HttpContext),
             options.ResolveUserId(HttpContext),
-            options.ResolveAccessProfile!(HttpContext));
+            options.ResolveAccessProfile!(HttpContext, blueprintKey));
     }
 
     /// <summary>Builds the same URL prefixes <see cref="Services.ServiceRequestStageService"/>
@@ -85,7 +85,7 @@ public class WayfinderStageDataController(
         var options = optionsAccessor.Value;
         var envelope = processManager.GetCurrent(
             blueprintKey, options.ResolveTenantId!(HttpContext), options.ResolveUserId(HttpContext),
-            options.ResolveAccessProfile!(HttpContext), instanceId);
+            options.ResolveAccessProfile!(HttpContext, blueprintKey), instanceId);
 
         var value = envelope.Render?.Components
             .SelectMany(c => c.Fields)
@@ -107,9 +107,9 @@ public class WayfinderStageDataController(
     }
 
     [HttpGet("bulk-datasets/{datasetId}/summary")]
-    public async Task<IActionResult> GetSummary(string instanceId, string datasetId)
+    public async Task<IActionResult> GetSummary(string blueprintKey, string instanceId, string datasetId)
     {
-        if (!CallerOwnsInstance(instanceId))
+        if (!CallerOwnsInstance(blueprintKey, instanceId))
         {
             return NotFound();
         }
@@ -126,7 +126,7 @@ public class WayfinderStageDataController(
     }
 
     [HttpGet("bulk-datasets/{datasetId}/rows")]
-    public async Task<IActionResult> GetRows(string instanceId, string datasetId, string? filter, int? page, int? pageSize)
+    public async Task<IActionResult> GetRows(string blueprintKey, string instanceId, string datasetId, string? filter, int? page, int? pageSize)
     {
         var parsedFilter = Enum.TryParse<BulkDatasetRowFilter>(filter, ignoreCase: true, out var f)
             ? f
@@ -134,7 +134,7 @@ public class WayfinderStageDataController(
         var pageIndex = Math.Max(page ?? 0, 0);
         var size = Math.Clamp(pageSize ?? 20, 1, 100);
 
-        if (!CallerOwnsInstance(instanceId))
+        if (!CallerOwnsInstance(blueprintKey, instanceId))
         {
             return NotFound();
         }
@@ -158,10 +158,10 @@ public class WayfinderStageDataController(
     [HttpPost("bulk-datasets/{datasetId}/rows/{rowKey}/correct")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CorrectRow(
-        string instanceId, string datasetId, string rowKey,
+        string blueprintKey, string instanceId, string datasetId, string rowKey,
         [FromBody] Dictionary<string, string?> correctedValues)
     {
-        if (!CallerOwnsInstance(instanceId))
+        if (!CallerOwnsInstance(blueprintKey, instanceId))
         {
             return NotFound();
         }
@@ -171,7 +171,7 @@ public class WayfinderStageDataController(
         {
             await bulkDatasetStore.ApplyCorrectionAsync(
                 instanceId, datasetId, rowKey, correctedValues, options.ResolveUserId(HttpContext));
-            return Content(RenderSyncedActionBar(instanceId, datasetId, options), "text/html");
+            return Content(RenderSyncedActionBar(blueprintKey, instanceId, datasetId, options), "text/html");
         }
         catch (UnauthorizedAccessException)
         {
@@ -189,9 +189,9 @@ public class WayfinderStageDataController(
 
     [HttpPost("bulk-datasets/{datasetId}/revert")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RevertCorrections(string instanceId, string datasetId)
+    public async Task<IActionResult> RevertCorrections(string blueprintKey, string instanceId, string datasetId)
     {
-        if (!CallerOwnsInstance(instanceId))
+        if (!CallerOwnsInstance(blueprintKey, instanceId))
         {
             return NotFound();
         }
@@ -200,7 +200,7 @@ public class WayfinderStageDataController(
         try
         {
             await bulkDatasetStore.RevertCorrectionsAsync(instanceId, datasetId, options.ResolveUserId(HttpContext));
-            return Content(RenderSyncedActionBar(instanceId, datasetId, options), "text/html");
+            return Content(RenderSyncedActionBar(blueprintKey, instanceId, datasetId, options), "text/html");
         }
         catch (UnauthorizedAccessException)
         {
@@ -213,9 +213,9 @@ public class WayfinderStageDataController(
     }
 
     [HttpGet("bulk-datasets/{datasetId}/download")]
-    public async Task<IActionResult> DownloadDataset(string instanceId, string datasetId)
+    public async Task<IActionResult> DownloadDataset(string blueprintKey, string instanceId, string datasetId)
     {
-        if (!CallerOwnsInstance(instanceId))
+        if (!CallerOwnsInstance(blueprintKey, instanceId))
         {
             return NotFound();
         }
@@ -243,11 +243,11 @@ public class WayfinderStageDataController(
         return stream is null ? NotFound() : File(stream, "text/csv", materialized.OriginalFileName);
     }
 
-    private string RenderSyncedActionBar(string instanceId, string datasetId, WayfinderServiceDesignOptions options)
+    private string RenderSyncedActionBar(string blueprintKey, string instanceId, string datasetId, WayfinderServiceDesignOptions options)
     {
         var envelope = processManager.SyncBulkDatasetSyncState(
             instanceId, options.ResolveTenantId!(HttpContext), options.ResolveUserId(HttpContext),
-            options.ResolveAccessProfile!(HttpContext), datasetId);
+            options.ResolveAccessProfile!(HttpContext, blueprintKey), datasetId);
         return envelope.Render is { } render
             ? GovUkComponentRenderer.RenderActionButtons(render.AvailableActions, envelope.StateVersion)
             : GovUkComponentRenderer.RenderActionButtons([], envelope.StateVersion);

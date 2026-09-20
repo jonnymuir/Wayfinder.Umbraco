@@ -51,7 +51,7 @@ public sealed class WayfinderUmbracoServiceCollectionExtensionsTests
     {
         var options = ResolveOptions(services => services.AddWayfinderUmbraco());
 
-        var profile = options.Value.ResolveAccessProfile!(new DefaultHttpContext());
+        var profile = options.Value.ResolveAccessProfile!(new DefaultHttpContext(), null);
 
         profile.CanViewQueue("citizen").Should().BeFalse(
             "the zero-config default must deny access to every real queue, not silently allow everything");
