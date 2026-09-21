@@ -68,7 +68,7 @@
          Umbraco's version once shipped a ReflectionTypeLoadException to every 17.6.x host. -->
     <PackageReference Include="OpenIddict.Abstractions" Version="[$(OpenIddictVersion)]" PrivateAssets="all" />
     <PackageReference Include="OpenIddict.Server.AspNetCore" Version="[$(OpenIddictVersion)]" PrivateAssets="all" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11" PrivateAssets="all" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.12" PrivateAssets="all" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="$(UmbracoPackageRange)" />
     <PackageReference Include="Umbraco.Cms.Core" Version="$(UmbracoPackageRange)" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="$(UmbracoPackageRange)" />
