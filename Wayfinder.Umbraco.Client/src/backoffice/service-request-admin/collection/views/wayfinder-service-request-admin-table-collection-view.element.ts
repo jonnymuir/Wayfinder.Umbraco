@@ -3,7 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_COLLECTION_CONTEXT, type UmbDefaultCollectionContext } from '@umbraco-cms/backoffice/collection';
 import type { ServiceRequestAdminEntityModel } from '../../entity.js';
-import type { ServiceRequestAdminCollectionFilterModel } from '../../repository/service-request-admin-collection.repository.js';
+import type { ServiceRequestAdminCollectionFilterModel, ServiceRequestAdminSort } from '../../repository/service-request-admin-collection.repository.js';
 
 interface TableColumn {
   name: string;
@@ -18,6 +18,33 @@ interface TableItem {
 }
 
 type CollectionContextType = UmbDefaultCollectionContext<ServiceRequestAdminEntityModel, ServiceRequestAdminCollectionFilterModel>;
+
+const SORT_STORAGE_KEY = 'Wayfinder.ServiceRequestAdmin.sort';
+const DEFAULT_SORT: ServiceRequestAdminSort = 'UpdatedAtOldestFirst';
+const SORT_OPTIONS: ReadonlyArray<{ name: string; value: ServiceRequestAdminSort }> = [
+  { name: 'Oldest updated first (default — surfaces likely-stuck instances)', value: 'UpdatedAtOldestFirst' },
+  { name: 'Newest updated first', value: 'UpdatedAtNewestFirst' },
+  { name: 'Oldest created first', value: 'CreatedAtOldestFirst' },
+  { name: 'Newest created first', value: 'CreatedAtNewestFirst' },
+];
+
+/** localStorage, not a cookie — this is a per-browser display preference the server never needs to see. */
+function readStoredSort(): ServiceRequestAdminSort {
+  try {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY);
+    return SORT_OPTIONS.some((option) => option.value === stored) ? (stored as ServiceRequestAdminSort) : DEFAULT_SORT;
+  } catch {
+    return DEFAULT_SORT;
+  }
+}
+
+function storeSort(sort: ServiceRequestAdminSort) {
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, sort);
+  } catch {
+    // Private browsing / blocked storage — sorting still works, it just won't be remembered next visit.
+  }
+}
 
 /**
  * Deliberately no generic Umbraco search-toolbar action here — the "include aborted" toggle is
@@ -40,7 +67,7 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
   @state() private _tableItems: TableItem[] = [];
   @state() private _searchText = '';
   @state() private _includeAborted = false;
-  @state() private _sort: ServiceRequestAdminCollectionFilterModel['sort'] = 'UpdatedAtOldestFirst';
+  @state() private _sort: ServiceRequestAdminSort = readStoredSort();
 
   #collectionContext?: CollectionContextType;
   #searchDebounce?: ReturnType<typeof setTimeout>;
@@ -50,6 +77,10 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
     this.consumeContext(UMB_COLLECTION_CONTEXT, (context) => {
       this.#collectionContext = context as CollectionContextType;
       this.observe(context?.items, (items) => this.#createTableItems((items ?? []) as ServiceRequestAdminEntityModel[]), 'wayfinderServiceRequestAdminCollectionItems');
+      // The collection context's own initial fetch only knows the generic UmbCollectionFilterModel
+      // shape, so it never carries our custom `sort` param — push the persisted (or default) sort
+      // explicitly once, so the very first request honours it too, not just the dropdown's display.
+      this.#collectionContext.setFilter({ sort: this._sort });
     });
   }
 
@@ -109,7 +140,8 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
   }
 
   #onSortChange(event: Event) {
-    this._sort = (event.target as HTMLSelectElement).value as ServiceRequestAdminCollectionFilterModel['sort'];
+    this._sort = (event.target as HTMLSelectElement).value as ServiceRequestAdminSort;
+    storeSort(this._sort);
     this.#collectionContext?.setFilter({ filter: this._searchText, includeAborted: this._includeAborted, sort: this._sort });
   }
 
@@ -124,13 +156,7 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
         <uui-checkbox label="Include aborted" @change=${this.#onIncludeAbortedChange}></uui-checkbox>
         <uui-select
           label="Sort by"
-          .value=${this._sort}
-          .options=${[
-            { name: 'Oldest updated first (default — surfaces likely-stuck instances)', value: 'UpdatedAtOldestFirst' },
-            { name: 'Newest updated first', value: 'UpdatedAtNewestFirst' },
-            { name: 'Oldest created first', value: 'CreatedAtOldestFirst' },
-            { name: 'Newest created first', value: 'CreatedAtNewestFirst' },
-          ]}
+          .options=${SORT_OPTIONS.map((option) => ({ ...option, selected: option.value === this._sort }))}
           @change=${this.#onSortChange}
         ></uui-select>
       </div>
