@@ -40,6 +40,7 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
   @state() private _tableItems: TableItem[] = [];
   @state() private _searchText = '';
   @state() private _includeAborted = false;
+  @state() private _sort: ServiceRequestAdminCollectionFilterModel['sort'] = 'UpdatedAtOldestFirst';
 
   #collectionContext?: CollectionContextType;
   #searchDebounce?: ReturnType<typeof setTimeout>;
@@ -98,13 +99,18 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
     clearTimeout(this.#searchDebounce);
     this.#searchDebounce = setTimeout(() => {
       this._searchText = value;
-      this.#collectionContext?.setFilter({ filter: value, includeAborted: this._includeAborted });
+      this.#collectionContext?.setFilter({ filter: value, includeAborted: this._includeAborted, sort: this._sort });
     }, 300);
   }
 
   #onIncludeAbortedChange(event: Event) {
     this._includeAborted = (event.target as HTMLInputElement).checked;
-    this.#collectionContext?.setFilter({ filter: this._searchText, includeAborted: this._includeAborted });
+    this.#collectionContext?.setFilter({ filter: this._searchText, includeAborted: this._includeAborted, sort: this._sort });
+  }
+
+  #onSortChange(event: Event) {
+    this._sort = (event.target as HTMLSelectElement).value as ServiceRequestAdminCollectionFilterModel['sort'];
+    this.#collectionContext?.setFilter({ filter: this._searchText, includeAborted: this._includeAborted, sort: this._sort });
   }
 
   render() {
@@ -116,9 +122,19 @@ export class WayfinderServiceRequestAdminTableCollectionViewElement extends UmbL
           @input=${this.#onSearchInput}
         ></uui-input>
         <uui-checkbox label="Include aborted" @change=${this.#onIncludeAbortedChange}></uui-checkbox>
+        <uui-select
+          label="Sort by"
+          .value=${this._sort}
+          .options=${[
+            { name: 'Oldest updated first (default — surfaces likely-stuck instances)', value: 'UpdatedAtOldestFirst' },
+            { name: 'Newest updated first', value: 'UpdatedAtNewestFirst' },
+            { name: 'Oldest created first', value: 'CreatedAtOldestFirst' },
+            { name: 'Newest created first', value: 'CreatedAtNewestFirst' },
+          ]}
+          @change=${this.#onSortChange}
+        ></uui-select>
       </div>
       <umb-table .columns=${this._tableColumns} .items=${this._tableItems}></umb-table>
-      <umb-collection-pagination></umb-collection-pagination>
     `;
   }
 
