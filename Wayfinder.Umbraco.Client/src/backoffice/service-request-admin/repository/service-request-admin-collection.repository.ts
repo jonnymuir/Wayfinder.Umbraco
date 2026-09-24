@@ -4,9 +4,17 @@ import type { UmbCollectionFilterModel } from '@umbraco-cms/backoffice/collectio
 import { serviceRequestAdminFetch } from '../service-request-admin-http.js';
 import { UMB_SERVICE_REQUEST_ADMIN_ENTITY_TYPE, type ServiceRequestAdminEntityModel } from '../entity.js';
 
-/** Extends the standard collection filter with the one admin-specific toggle this screen needs. */
+/** Matches the server's ServiceRequestAdminSort enum (Wayfinder/Models/ServiceDesign/ServiceRequestAdminListEnvelope.cs). */
+export type ServiceRequestAdminSort =
+  | 'UpdatedAtOldestFirst'
+  | 'UpdatedAtNewestFirst'
+  | 'CreatedAtOldestFirst'
+  | 'CreatedAtNewestFirst';
+
+/** Extends the standard collection filter with the admin-specific controls this screen needs. */
 export interface ServiceRequestAdminCollectionFilterModel extends UmbCollectionFilterModel {
   includeAborted?: boolean;
+  sort?: ServiceRequestAdminSort;
 }
 
 interface ServerSummary {
@@ -46,6 +54,9 @@ export class UmbServiceRequestAdminCollectionRepository extends UmbRepositoryBas
     }
     if (filter.includeAborted) {
       params.set('includeAborted', 'true');
+    }
+    if (filter.sort) {
+      params.set('sort', filter.sort);
     }
     if (filter.skip !== undefined && filter.take) {
       params.set('pageIndex', String(Math.floor(filter.skip / filter.take)));
