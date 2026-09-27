@@ -10,6 +10,14 @@ in CI.
   visual editor (Act 4), and run it as an applicant and a caseworker (Act 5). Mirrors
   [`../../docs/mcp-authoring-walkthrough.md`](../../docs/mcp-authoring-walkthrough.md) act for act.
 
+- **`coaching-register-automate-demo.spec.ts`** (`npm run demo:record:automate`), a UI-only
+  narrated take with no AI agent involved: a coach applies to join the NJF coaching register, a
+  registrar reviews it and runs the coaching-standards check, that check is a real Umbraco Automate
+  automation (branch, email, human approval), and the decision resolves back to the applicant.
+  Mirrors [`../automate-support-system-walkthrough.md`](../automate-support-system-walkthrough.md)'s
+  "Run the journey" section. Needs the full Aspire stack (Mailpit, not just the bare reference
+  app), see its own setup note below.
+
 - **`screenshots.spec.ts`** (`npm run demo:screenshots`), the stills the repo README and docs
   embed. It seeds the "transfer a juggling licence" blueprint directly via the REST authoring API
   (no agent, ~30s), then captures the blueprints list, the visual editor graph, a decision point,
@@ -56,6 +64,27 @@ as the only valid "the agent is done" signal).
    Output lands in `demo-footage/` (gitignored): `wayfinder-umbraco-mcp-authoring-demo.webm`
    (`.mp4` too, if `ffmpeg` is on your PATH) and `narration-timeline.json` (the line-by-line
    script with real video-relative timestamps, for a later voiced-narration pass).
+
+## Setup: coaching-register-automate-demo (Automate)
+
+This one needs Mailpit, which only the Aspire-orchestrated boot provides. A bare `dotnet run
+--project ../../Wayfinder.Umbraco.ReferenceApp` isn't enough:
+
+```
+rm -rf ../../Wayfinder.Umbraco.ReferenceApp/umbraco/Data/*
+dotnet run --project ../../Wayfinder.Umbraco.AppHost
+```
+
+Wait for the Aspire dashboard to report both `referenceapp` and `mailpit` running, then:
+
+```
+npm run demo:record:automate
+```
+
+No AI agent involved, so no long unattended wait. Headed Chromium is used anyway for consistency
+with the rest of this recording toolkit. Output lands in `demo-footage/`:
+`coaching-register-automate-demo.webm`/`.mp4` and
+`coaching-register-automate-narration-timeline.json`.
 
 ## Screenshots for the README
 
