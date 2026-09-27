@@ -433,27 +433,34 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
     sendTerminalKey('Enter');
 
     // Two distinct one-time consent gates can appear here, in order, on a genuinely fresh
-    // scratch-directory launch — confirmed live, both showed up and neither is the other:
-    // (1) the workspace-trust gate ("Is this a project you created or trust? ... 1. Yes, I trust
-    // this folder  2. No, exit"), which fired first and was NOT caught by only checking for the
-    // second gate's own text — the brief's own text then got typed straight into that still-open
-    // menu and corrupted the underlying shell. (2) the BypassPermissions gate ("1. No, exit
-    // 2. Yes, I accept"). Neither appears on every Claude Code version, and neither should be
-    // answered blindly.
+    // scratch-directory launch, confirmed live, both showed up and neither is the other:
+    // (1) the workspace-trust gate ("Is this a project you created or trust?"), which fired first
+    // and was NOT caught by only checking for the second gate's own text, the brief's own text
+    // then got typed straight into that still-open menu and corrupted the underlying shell.
+    // (2) the BypassPermissions gate ("Yes, I accept"). Neither appears on every Claude Code
+    // version, and neither should be answered blindly.
     //
-    // Checking the LIVE pane (waitForPromptText, below) rather than a rolling session-log tail —
+    // Checking the LIVE pane (waitForPromptText, below) rather than a rolling session-log tail,
     // confirmed live this matters, not just tidier: a rolling buffer can still contain a gate's
     // own option text well after that gate was actually dismissed. Both gates' option text
     // includes "No, exit", so a log-tail match on that phrase couldn't distinguish "gate 1 still
-    // showing" from "gate 1 already handled, and now just stale scrollback" — which once caused a
+    // showing" from "gate 1 already handled, and now just stale scrollback", which once caused a
     // stray "2" to get sent straight into the live, ready prompt after both gates were long past.
-    // Matching on "Yes, I accept" specifically (unique to gate 2 — gate 1's own affirmative option
+    // Matching on "Yes, I accept" specifically (unique to gate 2, gate 1's own affirmative option
     // reads "Yes, I trust this folder") removes the ambiguity entirely rather than working around
     // it, and waiting for each gate's text to actually disappear after answering confirms it was
     // really dismissed rather than just sent-and-hoped.
+    //
+    // Gate 1 is a plain arrow-selectable list on this Claude Code version (2.1.283), not a
+    // numbered menu, "No, exit" highlighted first, "Yes, I trust this folder" second, confirmed
+    // live: sending the digit "1" is not a valid input for it and does nothing, which silently
+    // corrupted a take that assumed a numbered "1. Yes / 2. No" menu (an older CLI behaviour).
+    // Down then Enter is what actually moves the selection and confirms it. Gate 2 (a separate,
+    // simpler confirmation) still responds to a plain digit.
     if (await waitForPromptText(/trust this folder/i, 8_000)) {
       await waitForPaneStable();
-      await sendTerminalText('1');
+      sendTerminalKey('Down');
+      await page.waitForTimeout(300);
       sendTerminalKey('Enter');
       await waitForPromptTextGone(/trust this folder/i, 5_000);
     }
@@ -633,6 +640,77 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
       return body.access_token ?? null;
     }
 
+    // Confirmed live (a separate, smaller recording in this same toolkit turned this up): claude
+    // mcp login (Act 1) authenticates the CLI's own meta-commands (mcp add/list), but a freshly
+    // launched interactive agent session still hits its own, separate "1 MCP server needs
+    // authentication" gate on its first real tool call, printing a fresh authorize URL into the
+    // conversation and waiting for a human to drive it. Nothing here handled that until now, which
+    // risked silently burning this whole act's poll budget on a conversation parked at an
+    // unanswered prompt. The URL must come from the session log's own OSC 8 hyperlink target, not
+    // the visually wrapped text the TUI renders: this URL is long enough to hard-wrap as real line
+    // breaks at 150 columns, truncating a plain \S+ match at the first wrap, while the OSC 8 URI
+    // parameter carries the whole thing with no wrapping. Also confirmed live this can happen more
+    // than once: an authorization code can expire before the agent finishes processing it, and the
+    // agent then asks for a fresh URL itself rather than getting stuck, so this re-triggers on any
+    // new, different authorize URL rather than only ever handling the first one it sees.
+    const midConversationAuthorizeUrlPattern =
+      /\x1b\]8;[^;]*;(https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?[^\x07\x1b]+)/g;
+    let lastHandledAuthUrl = '';
+    async function driveAgentAuthorizationIfWaiting(): Promise<void> {
+      const logText = existsSync(claudeSessionLogPath) ? readFileSync(claudeSessionLogPath, 'utf8') : '';
+      const matches = [...logText.matchAll(midConversationAuthorizeUrlPattern)].map(m => m[1]);
+      if (!matches.length) return;
+      const authUrl = matches[matches.length - 1];
+      if (authUrl === lastHandledAuthUrl) return;
+      lastHandledAuthUrl = authUrl;
+
+      const callbackRequest = page
+        .waitForRequest(r => r.url().startsWith('http://localhost:33418/callback'), { timeout: 30_000 })
+        .catch(() => null);
+      await page.goto(authUrl, { waitUntil: 'commit' }).catch(() => {});
+      const raced = await Promise.race([
+        callbackRequest.then(r => ({ pending: false as const, req: r })),
+        page.waitForTimeout(2_000).then(() => ({ pending: true as const, req: null }))
+      ]);
+      let callbackReq = raced.req;
+      if (raced.pending) {
+        if (await page.locator('#username-input').isVisible({ timeout: 4_000 }).catch(() => false)) {
+          await humanType(page, page.locator('#username-input'), adminCredentials.email);
+          await humanType(page, page.locator('#password-input'), adminCredentials.password);
+          await humanClick(page, page.getByRole('button', { name: /login/i }).first());
+        }
+        const consent = page
+          .getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i })
+          .first();
+        if (await consent.isVisible({ timeout: 6_000 }).catch(() => false)) {
+          await humanClick(page, consent);
+        }
+        callbackReq = await callbackRequest;
+      }
+      const redirectUrl = callbackReq?.url() ?? '';
+      // The OAuth redirect chain (login -> consent -> loopback callback) can still be settling
+      // its own navigation right here, confirmed live: showTerminalMirror's own page.evaluate
+      // raced an in-flight navigation and threw "Execution context was destroyed". A settle wait
+      // plus one retry covers it without guessing a fixed delay.
+      await page.waitForLoadState('load', { timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      try {
+        await showTerminalMirror(page);
+      } catch {
+        await page.waitForTimeout(1_000);
+        await showTerminalMirror(page);
+      }
+      await page.waitForTimeout(500);
+      if (redirectUrl) {
+        await waitForPaneStable();
+        await sendTerminalText(redirectUrl);
+        sendTerminalKey('Enter');
+        await page.waitForTimeout(1_500);
+      } else {
+        console.log('Mid-conversation authorization: no loopback callback captured from the authorize redirect.');
+      }
+    }
+
     // A proactive token-refresh + /mcp-Reconnect-and-nudge mechanism used to live here, on the
     // theory that refreshing well inside the token's ~30-minute lifetime meant the agent would
     // ideally never need to stop and ask. Removed entirely — confirmed live it was net-harmful,
@@ -767,6 +845,7 @@ test.describe.serial('Wayfinder.Umbraco MCP authoring demo', () => {
         // recording at full length.
         if (!openWaitLabel) await enterWait('act2-design', DESIGN_CHIP).catch(() => {});
         try {
+          await driveAgentAuthorizationIfWaiting();
           const outcome = await respondToLiveQuestionIfWaiting();
           console.log(`[keepalive #${keepaliveTick}] ${outcome}`);
         } catch (err) {
