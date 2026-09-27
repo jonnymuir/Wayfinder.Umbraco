@@ -1,6 +1,6 @@
 # Demo recording and README screenshots
 
-Two tools live here, both driven against a running `Wayfinder.Umbraco.ReferenceApp`. Neither runs
+Several tools live here, all driven against a running `Wayfinder.Umbraco.ReferenceApp`. None run
 in CI.
 
 - **`mcp-authoring-demo.spec.ts`** (`npm run demo:record`), the narrated walkthrough video, as
@@ -17,6 +17,15 @@ in CI.
   Mirrors [`../automate-support-system-walkthrough.md`](../automate-support-system-walkthrough.md)'s
   "Run the journey" section. Needs the full Aspire stack (Mailpit, not just the bare reference
   app), see its own setup note below.
+
+- **`coaching-register-add-stage-demo.spec.ts`** (`npm run demo:record:add-stage`), a small
+  conversational-edit take: connect the same way as `mcp-authoring-demo.spec.ts` (Act 1), then ask
+  the agent to add one new stage to the already-live `njf-coaching-register` definition rather
+  than build a whole service from scratch (Act 2), and see it in the visual editor (Act 3). Mirrors
+  Demo 3 of
+  [`../../docs/demos/service-design-meetup-talk.md`](https://github.com/jonnymuir/Umbraco.Prism/blob/main/docs/demos/service-design-meetup-talk.md)
+  (Umbraco.Prism). Much shorter than the full authoring demo, no multi-turn Q&A expected since the
+  brief is self-contained.
 
 - **`screenshots.spec.ts`** (`npm run demo:screenshots`), the stills the repo README and docs
   embed. It seeds the "transfer a juggling licence" blueprint directly via the REST authoring API
