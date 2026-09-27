@@ -129,10 +129,6 @@ public class YourSiteComposer : IComposer
             options.ResolveUserId        = ctx => ctx.User.Identity!.Name!;
             options.ResolveAccessProfile = _   => YourQueues.AccessProfile;
         });
-
-        builder.Services.Configure<AuthorizationOptions>(o =>
-            o.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling,
-                p => p.RequireAuthenticatedUser()));
     }
 }
 ```
@@ -148,11 +144,12 @@ Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wi
   `ResolveAccessProfile`. All three default to safe, no-real-access values (a fixed `"default"`
   tenant, and an `ActorProfile` that can view/start/act on no real queue) so a bare package
   reference boots — override them for citizen/caseworker journeys to actually work.
-- **The polling policy.** The live-update endpoint (`ServiceRequestPollController`) sits behind the
+- **The polling policy, only if the default doesn't fit.** The live-update endpoint
+  (`ServiceRequestPollController`) sits behind the
   `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` named policy; the package registers
-  a default (`RequireAuthenticatedUser()`) if a host doesn't register its own against a specific
-  authentication scheme. `Wayfinder.Umbraco.ReferenceApp/ReferenceAppComposer.cs` is a minimal
-  working example.
+  a default (`RequireAuthenticatedUser()`) so a bare package reference works out of the box. A
+  host only needs its own `Configure<AuthorizationOptions>` call (in its own composer) to require a
+  specific authentication scheme instead.
 
 ## Security responsibilities
 

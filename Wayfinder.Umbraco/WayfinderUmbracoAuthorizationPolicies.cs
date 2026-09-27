@@ -10,9 +10,11 @@ public static class WayfinderUmbracoAuthorizationPolicies
 {
     /// <summary>
     /// Required to call <see cref="Controllers.ServiceRequestPollController"/>'s polling
-    /// endpoint. A host must register this policy (e.g. requiring its own member cookie
-    /// scheme) — see the host's own composition for how Prism's "PrismMemberCookie" scheme
-    /// is wired to it.
+    /// endpoint. <see cref="WayfinderUmbracoComposer"/> registers a
+    /// <c>RequireAuthenticatedUser()</c> default so a bare package reference works out of the
+    /// box; a host only needs to register its own policy of this name (e.g. requiring its own
+    /// member cookie scheme, the way Prism wires "PrismMemberCookie" to it) to override that
+    /// default.
     /// </summary>
     public const string ServiceRequestPolling = "Wayfinder:ServiceRequestPolling";
 
