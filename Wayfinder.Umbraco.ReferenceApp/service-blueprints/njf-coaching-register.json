@@ -5,6 +5,7 @@
   "description": "A juggling coach applies to join the National Juggling Federation (NJF) coaching register. An NJF registrar reviews the application, then runs a coaching-standards check against an external standards body. That check is a configuration-only webhook support system (docs/guides/support-systems.md), driven here by an Umbraco Automate automation that does some logic, emails the standards officer, waits for a human decision, and calls back with accredited / provisional / referred.",
   "initialStage": "apply",
   "requestPolicy": "single",
+  "allowManualRestart": true,
   "queues": [
     { "key": "applicant", "displayName": "Coach", "actor": "citizen" },
     {
