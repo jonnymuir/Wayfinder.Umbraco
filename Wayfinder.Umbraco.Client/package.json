@@ -9,12 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@umbraco-cms/backoffice": "^17.6.2",
+    "@umbraco-cms/backoffice": "^17.7.0",
     "lit": "^3.3.1"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.3.0"
   },
   "overrides": {
     "js-yaml": "^4.3.2",
