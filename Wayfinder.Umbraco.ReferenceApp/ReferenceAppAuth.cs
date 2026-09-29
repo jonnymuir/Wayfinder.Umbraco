@@ -156,6 +156,7 @@ public static class ReferenceAppAuth
             {
                 new(ClaimTypes.NameIdentifier, demoUser.Email),
                 new(ClaimTypes.Name, demoUser.DisplayName),
+                new(ClaimTypes.Email, demoUser.Email),
                 new(ClaimTypes.Role, demoUser.Role)
             };
             var identity = new ClaimsIdentity(claims, SchemeName);
