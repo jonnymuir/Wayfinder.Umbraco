@@ -11,8 +11,9 @@ namespace Wayfinder.Umbraco.Services;
 /// <summary>
 /// This package's own in-Umbraco, in-process <see cref="IProcessManager"/> — the sole,
 /// authoritative engine for every Wayfinder.Umbraco-hosted service request; a distinctly named
-/// singleton so it's discoverable in DI registration/debugging. No override logic lives here:
-/// <c>serviceInputsResolver</c> (the toolkit's existing extension point for
+/// singleton so it's discoverable in DI registration/debugging. Beyond identity and the
+/// built-in <c>user</c> service value (<see cref="CurrentUserServiceValue"/>) no override logic
+/// lives here: <c>serviceInputsResolver</c> (the toolkit's existing extension point for
 /// <c>source: "service"</c> calculation fields — see <see cref="ProcessManagerEngine.ResolveServiceInputs"/>)
 /// is supplied as a plain delegate at registration time, so a demo host (e.g. TestSite's
 /// juggling-society membership lookup) needs no subclass of its own. Likewise
@@ -41,6 +42,33 @@ public sealed class UmbracoProcessManagerEngine(
     /// </summary>
     protected override bool ResolveIsAuthenticated(string tenantId, string userId) =>
         httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+    /// <summary>
+    /// Adds the built-in <see cref="CurrentUserServiceValue"/> when the blueprint declares a
+    /// <c>source: "service"</c> field named <c>user</c>, so a blueprint can default inputs from
+    /// the signed-in user declaratively. A host's own <c>serviceInputsResolver</c> that supplies
+    /// <c>user</c> itself takes precedence.
+    /// </summary>
+    protected override IReadOnlyDictionary<string, object?>? ResolveServiceInputs(
+        ServiceRequest instance,
+        ServiceBlueprint definition,
+        StageDefinition stage)
+    {
+        var inputs = base.ResolveServiceInputs(instance, definition, stage);
+
+        var declaresUser = definition.Calculations?.Fields.TryGetValue(CurrentUserServiceValue.FieldName, out var field) == true
+            && string.Equals(field.Source, "service", StringComparison.OrdinalIgnoreCase);
+        if (!declaresUser || inputs?.ContainsKey(CurrentUserServiceValue.FieldName) == true)
+        {
+            return inputs;
+        }
+
+        var merged = inputs is null
+            ? new Dictionary<string, object?>(StringComparer.Ordinal)
+            : new Dictionary<string, object?>(inputs, StringComparer.Ordinal);
+        merged[CurrentUserServiceValue.FieldName] = CurrentUserServiceValue.Build(httpContextAccessor.HttpContext?.User);
+        return merged;
+    }
 
     /// <summary>
     /// Resolves a <c>file-upload</c> field's stored reference for a download endpoint — reuses

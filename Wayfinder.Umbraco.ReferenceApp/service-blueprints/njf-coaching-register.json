@@ -6,6 +6,17 @@
   "initialStage": "apply",
   "requestPolicy": "single",
   "allowManualRestart": true,
+  "calculations": {
+    "fields": {
+      "user": {
+        "source": "service",
+        "shape": {
+          "name": { "valueKind": "string" },
+          "email": { "valueKind": "string" }
+        }
+      }
+    }
+  },
   "queues": [
     { "key": "applicant", "displayName": "Coach", "actor": "citizen" },
     {
@@ -25,8 +36,8 @@
       "components": [
         { "type": "panel", "heading": "Apply to join the NJF coaching register" },
         { "type": "body", "content": "Tell us about your coaching experience and your safeguarding checks. An NJF registrar will review your application." },
-        { "type": "text", "fieldKey": "applicantName", "label": "Full name", "required": true },
-        { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "required": true },
+        { "type": "text", "fieldKey": "applicantName", "label": "Full name", "required": true, "defaultFrom": "user.name" },
+        { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "required": true, "defaultFrom": "user.email" },
         { "type": "number", "fieldKey": "yearsCoaching", "label": "Years of coaching experience", "required": true },
         { "type": "text", "fieldKey": "disclosureReference", "label": "Safeguarding disclosure reference", "hint": "The reference number from your background disclosure certificate.", "required": true },
         { "type": "date", "fieldKey": "firstAidExpiry", "label": "First-aid certificate expiry date", "required": true }

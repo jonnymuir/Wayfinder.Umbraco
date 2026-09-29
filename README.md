@@ -99,6 +99,21 @@ Install the package and call `AddWayfinderUmbraco()`:
 - **A GOV.UK component and field catalog**, overridable one type at a time by placing
   `~/Views/Partials/Components/_Component-{Type}.cshtml` (or `Fields/` for an input field) in your
   own app — e.g. `_Component-SummaryList.cshtml` overrides the `summary-list` component.
+- **The signed-in user, as a blueprint value.** Declare a `source: "service"` calculation field
+  named `user` and any input can pre-fill from the signed-in user with `defaultFrom`, with no host
+  code. `user.name` comes from the `name` claim and `user.email` from the `email` claim, and both
+  are empty for an anonymous visitor. A saved answer always wins over the default:
+
+  ```json
+  "calculations": { "fields": { "user": { "source": "service", "shape": {
+      "name": { "valueKind": "string" }, "email": { "valueKind": "string" } } } } },
+  "components": [
+    { "type": "text",  "fieldKey": "applicantName",  "label": "Full name",     "defaultFrom": "user.name" },
+    { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "defaultFrom": "user.email" }
+  ]
+  ```
+
+  A `serviceInputsResolver` that supplies its own `user` value takes precedence.
 - **The supporting infrastructure**: nonce handling, file upload, field validation, and live
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
