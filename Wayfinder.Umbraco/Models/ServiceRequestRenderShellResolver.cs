@@ -31,11 +31,6 @@ public static class ServiceRequestRenderShellResolver
             return "task-list";
         }
 
-        if (AllDataCarryingComponentsAreSummaryLists(items))
-        {
-            return "check-answers";
-        }
-
         var hasInteractiveInputs = items.Any(ComponentHasInteractiveInputs);
 
         // A panel signals a genuinely terminal/confirmation screen only when there's nothing
@@ -47,9 +42,18 @@ public static class ServiceRequestRenderShellResolver
         // was flattening any such stage to _Stage-Completion's inert <a href="/"> links instead
         // of real submit buttons. Found live: a bulk-data-review stage's own "Resubmit corrected
         // file" route rendered as a dead link once AvailableActions was actually populated.
+        //
+        // This runs before the summary-list check below: a terminal stage that pairs its panel
+        // with a summary-list (an outcome screen) is still a confirmation. Treated as
+        // check-answers it rendered a form with no buttons, so it had no "Start again" link.
         if (HasComponentType(items, "panel") && !hasInteractiveInputs && !hasAvailableActions)
         {
             return "confirmation";
+        }
+
+        if (AllDataCarryingComponentsAreSummaryLists(items))
+        {
+            return "check-answers";
         }
 
         if (items.Count > 0 && !hasInteractiveInputs && !hasAvailableActions)
@@ -86,6 +90,12 @@ public static class ServiceRequestRenderShellResolver
 
     private static bool ComponentHasInteractiveInputs(ComponentRenderPayload component)
     {
+        // A summary-list's rows carry field types like "text" but are read-only.
+        if (string.Equals(NormalizeType(component.Type), "summary-list", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         if (component.Fields.Any(field => !IsContentOnlyFieldType(field.FieldType)))
         {
             return true;
