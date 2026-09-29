@@ -18,6 +18,7 @@ import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { loadWayfinderElements } from '../wayfinder-elements-bundle.js';
 import { UmbracoWayfinderServiceBlueprintSource } from '../service-blueprint-source.js';
 import { UmbracoWayfinderComponentCatalog } from '../component-catalog-source.js';
+import { UmbracoWayfinderSupportSystemCatalog } from '../support-system-catalog-source.js';
 import type { UmbServiceBlueprintWorkspaceContext } from './service-blueprint-workspace.context.js';
 import { UMB_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/workspace';
 
@@ -33,6 +34,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
 
   private _source?: UmbracoWayfinderServiceBlueprintSource;
   private _componentCatalog?: UmbracoWayfinderComponentCatalog;
+  private _supportSystemCatalog?: UmbracoWayfinderSupportSystemCatalog;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -46,6 +48,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
 
       this._source = new UmbracoWayfinderServiceBlueprintSource(() => authContext.getLatestToken());
       this._componentCatalog = new UmbracoWayfinderComponentCatalog(() => authContext.getLatestToken());
+      this._supportSystemCatalog = new UmbracoWayfinderSupportSystemCatalog(() => authContext.getLatestToken());
       this.requestUpdate();
       void this._loadQueues(authContext);
     });
@@ -88,6 +91,7 @@ export class WayfinderServiceBlueprintWorkspaceEditorElement extends UmbElementM
         blueprint-key=${this._definitionKey}
         .serviceBlueprintSource=${this._source}
         .componentCatalog=${this._componentCatalog}
+        .supportSystemCatalog=${this._supportSystemCatalog}
         .availableQueues=${this._availableQueues}
       ></wayfinder-service-blueprint-editor>
     `;
