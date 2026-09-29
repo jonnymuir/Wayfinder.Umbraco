@@ -6,6 +6,7 @@ using Umbraco.Cms.Api.Management.Routing;
 using Wayfinder.Engine.Services;
 using Wayfinder.Models.ServiceDesign;
 using Wayfinder.Models.ServiceDesign.Components;
+using Wayfinder.Models.ServiceDesign.SupportSystems;
 using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.Controllers;
@@ -95,6 +96,16 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     /// </summary>
     [HttpGet("service-blueprints/component-types")]
     public IActionResult GetComponentTypes() => Ok(ComponentTypeRegistry.All);
+
+    /// <summary>
+    /// Every registered support system and its capabilities, driving the stage-action editor's
+    /// support-system/capability pickers. Same reasoning as <see cref="GetComponentTypes"/>: the
+    /// backoffice mounts the editor with an explicit <c>supportSystemCatalog</c> pointing here,
+    /// because the editor's HTTP fallback probes a route this host doesn't expose and the pickers
+    /// would report "No support systems are registered on this host" even when some are.
+    /// </summary>
+    [HttpGet("service-blueprints/support-systems")]
+    public IActionResult GetSupportSystems() => Ok(SupportSystemRegistry.All);
 
     /// <summary>
     /// The body's own <c>version</c> (already round-tripped by any client that loaded the
