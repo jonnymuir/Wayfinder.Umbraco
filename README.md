@@ -78,6 +78,89 @@ it as an applicant and a caseworker.
 
 ![Settings, Blueprints: an authored service alongside the seeded example](assets/screenshots/blueprints-list.png)
 
+## Connect other systems with Umbraco Automate
+
+A service rarely finishes inside one system. In the service blueprint model, the systems a stage
+calls out to and waits on are the **support processes** lane: a standards body, an insurer, a
+payments provider. Wayfinder models each one as a **support system**, and
+[Umbraco Automate](https://docs.umbraco.com/umbraco-automate) is the integration engine behind it.
+
+You register the support system in `appsettings.json` and build the integration as an Automate
+automation on the same site. There is no support-system C# to write.
+
+```mermaid
+flowchart LR
+  subgraph Site["One Umbraco site"]
+    BP["Service blueprint<br/>support-system-call action"] --> ENG["Wayfinder engine"]
+    CFG["appsettings.json<br/>Wayfinder:SupportSystems<br/>url, auth, inputs, outcomes"] --> ENG
+    ENG -- "signed webhook POST" --> AUT["Umbraco Automate<br/>automation"]
+    AUT -- "resolve outcome" --> ENG
+    AUT --> BO["Backoffice Automate section<br/>run history and approvals"]
+  end
+  AUT -. "email, HTTP requests" .-> EXT["External systems<br/>and people"]
+```
+
+- **Wayfinder calls out.** A stage carries a `support-system-call` action. When the stage opens,
+  Wayfinder POSTs a signed invocation to the automation's webhook trigger and parks the request on
+  a wait screen. The POST carries the mapped field values and an `invocationId`, and no callback
+  URL.
+- **Automate does the integration work.** The automation is an ordinary Automate workflow: branch
+  on the applicant's data, send an email, call other systems over HTTP, ask a person to approve.
+  Its runs and pending approvals are visible in the backoffice Automate section, next to the
+  content the service runs on.
+- **The outcome comes back.** The automation finishes with one of the outcomes the capability
+  declares. The wait screen releases and the matching route fires. Validation rejects a route whose
+  trigger is not a declared outcome.
+
+Why this pairing works:
+
+- **One small contract.** A URL, an auth scheme, the inputs and the outcomes, all in configuration.
+  Anything that can receive a signed POST satisfies it, so Zapier, Make, n8n or your own service
+  work the same way. Automate is the one that needs no extra infrastructure.
+- **A human in the loop, out of the box.** A Request Approval step turns "the standards officer
+  decides" into a pending approval in the backoffice, and the citizen's journey holds until it is
+  answered.
+- **Same site, same database, same sign-in.** Automate shares the CMS database, so there is
+  nothing else to host, secure or monitor.
+- **Signed in both directions.** The outbound request carries an HMAC-SHA256 signature, and an
+  outcome can only be delivered against an unguessable `invocationId`.
+
+The reference app's coaching register shows the whole path. Two or more years of experience and a
+disclosure reference auto-accredit the applicant. Anything else emails the standards officer and
+waits for an approval, where approve means `provisional` and reject means `referred`:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Registrar as Registrar (caseworker)
+  participant WF as Wayfinder engine
+  participant AU as Automate automation
+  actor Officer as Standards officer
+
+  Registrar->>WF: Run coaching-standards check
+  WF->>AU: Signed webhook POST with invocationId and inputs
+  WF-->>Registrar: Wait screen while the check runs
+  alt Two or more years and a disclosure reference
+    AU->>WF: Resolve outcome accredited
+  else Needs a human decision
+    AU->>Officer: Send email
+    Officer->>AU: Approve or reject in the Automate section
+    AU->>WF: Resolve outcome provisional or referred
+  end
+  WF-->>Registrar: Wait screen releases and the matching route fires
+```
+
+An automation on the same site delivers the outcome in process, through a small custom Automate
+action (`ResolveSupportSystemOutcomeAction` in the reference app, ready to copy), because
+Automate's built-in HTTP Request step blocks loopback addresses. An automation on another host
+delivers it to Wayfinder's HTTP callback route instead.
+
+- **Walkthrough:** [`docs/automate-support-system-walkthrough.md`](docs/automate-support-system-walkthrough.md)
+  runs it step by step against the reference app.
+- **Reference:** the [support systems guide](https://github.com/jonnymuir/Wayfinder/blob/main/docs/guides/support-systems.md)
+  covers the configuration, including where the endpoint URL comes from, and writing a custom
+  client for systems that need file uploads or polling.
+
 ## What you get
 
 Install the package and call `AddWayfinderUmbraco()`:
@@ -99,6 +182,9 @@ Install the package and call `AddWayfinderUmbraco()`:
 - **A GOV.UK component and field catalog**, overridable one type at a time by placing
   `~/Views/Partials/Components/_Component-{Type}.cshtml` (or `Fields/` for an input field) in your
   own app — e.g. `_Component-SummaryList.cshtml` overrides the `summary-list` component.
+- **Support systems, integrated through Umbraco Automate.** Register an external system in
+  `appsettings.json`, build the integration as an automation on the same site, and a stage can call
+  it and wait for its outcome. See [Connect other systems with Umbraco Automate](#connect-other-systems-with-umbraco-automate).
 - **The signed-in user, as a blueprint value.** Declare a `source: "service"` calculation field
   named `user` and any input can pre-fill from the signed-in user with `defaultFrom`, with no host
   code. `user.name` comes from the `name` claim and `user.email` from the `email` claim, and both
