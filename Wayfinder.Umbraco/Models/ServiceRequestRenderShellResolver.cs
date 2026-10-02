@@ -3,7 +3,7 @@ using Wayfinder.Models.ServiceDesign;
 namespace Wayfinder.Umbraco.Models;
 
 /// <summary>
-/// Resolves the workflow render shell from the component tree, with legacy <c>stepType</c> fallback.
+/// Resolves the render shell from the component tree, falling back to the engine's inferred step type.
 /// </summary>
 public static class ServiceRequestRenderShellResolver
 {
@@ -11,11 +11,11 @@ public static class ServiceRequestRenderShellResolver
     /// Picks which partial (<c>question</c>/<c>check-answers</c>/<c>confirmation</c>/<c>status-timeline</c>/
     /// <c>task-list</c>/<c>waiting</c>) <c>_WayfinderStageRender.cshtml</c> should render a stage
     /// with, inferring from the actual component tree rather than trusting a possibly-stale
-    /// <paramref name="legacyStepType"/> alone.
+    /// <paramref name="engineStepType"/> alone.
     /// </summary>
     public static string ResolveShell(
         IReadOnlyList<ComponentRenderPayload>? components,
-        string? legacyStepType,
+        string? engineStepType,
         bool hasWaitingConfig,
         bool hasAvailableActions)
     {
@@ -61,7 +61,7 @@ public static class ServiceRequestRenderShellResolver
             return "status-timeline";
         }
 
-        var normalized = NormalizeShell(legacyStepType);
+        var normalized = NormalizeShell(engineStepType);
         if (normalized == "confirmation" && hasAvailableActions)
         {
             // The engine's own component-shape inference (ComponentExtensions.InferStepType,
