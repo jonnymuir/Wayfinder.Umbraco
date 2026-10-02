@@ -17,7 +17,7 @@ public class ServiceRequestRenderShellResolverTests
     {
         var shell = ServiceRequestRenderShellResolver.ResolveShell(
             new ComponentRenderPayload[] { new() { Type = "panel", Heading = "Your application is complete" }, SummaryList() },
-            legacyStepType: "Confirmation",
+            engineStepType: "Confirmation",
             hasWaitingConfig: false,
             hasAvailableActions: false);
 
@@ -29,7 +29,7 @@ public class ServiceRequestRenderShellResolverTests
     {
         var shell = ServiceRequestRenderShellResolver.ResolveShell(
             new ComponentRenderPayload[] { new() { Type = "panel", Heading = "Check your answers" }, SummaryList() },
-            legacyStepType: string.Empty,
+            engineStepType: string.Empty,
             hasWaitingConfig: false,
             hasAvailableActions: true);
 
