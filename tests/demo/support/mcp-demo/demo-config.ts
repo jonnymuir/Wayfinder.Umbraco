@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,6 @@ export const mcpAgentClientId = 'wayfinder-demo-agent';
 export const mcpAgentClientSecret = 'DemoAgentLocal!12345';
 export const seededDefinitionKey = 'reference-demo';
 export const mcpUrl = 'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp';
-export const claudeSessionLogPath = '/tmp/wayfinder-umbraco-demo-claude-session.log';
 
 /**
  * What Act 2 discovers and Acts 3 and 4 read. Deliberately NOT hardcoded — the brief (see Act 2)
@@ -38,8 +37,10 @@ export const demoRun = { newDefinitionKey: '', newDisplayName: '' };
 // no filesystem access to the codebase, only the MCP tools it was just given (--tools below
 // enforces that regardless of cwd, but a scratch directory with no repo in reach keeps the
 // framing honest, same convention as Umbraco.Prism's own tests/demo/README.md Act 4 setup).
-export const scratchDir = path.join(tmpdir(), 'wayfinder-umbraco-demo-scratch');
-mkdirSync(scratchDir, { recursive: true });
+// mkdtemp, not a fixed name under the shared temp directory: it creates a fresh directory only
+// this user can read, so nothing else on the machine can pre-create or symlink the paths below.
+export const scratchDir = mkdtempSync(path.join(tmpdir(), 'wayfinder-umbraco-demo-scratch-'));
+export const claudeSessionLogPath = path.join(scratchDir, 'claude-session.log');
 
 // Minimal but genuinely valid one-page PDFs — small enough to inline as literals, real enough
 // that a browser file-upload input and a server-side content-type check both accept them as real
