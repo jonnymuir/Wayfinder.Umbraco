@@ -138,7 +138,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     /// <summary>Dry-runs a scripted sequence of steps against a blueprint without persisting any instance — the editor's "try it" panel.</summary>
     [HttpPost("service-blueprints/simulate")]
     public IActionResult SimulateServiceBlueprint([FromBody] ServiceBlueprintSimulationRequest request) =>
-        Ok(authoringService.Simulate(request.Blueprint, request.Steps));
+        Ok(ServiceBlueprintSimulationRunner.Run(request.Blueprint, request.Steps));
 
     /// <summary>Permanently removes a blueprint, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
     [HttpDelete("service-blueprints/{definitionKey}")]
