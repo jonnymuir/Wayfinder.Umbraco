@@ -108,4 +108,31 @@ public sealed class ComponentTagHelperFileUploadTests
         html.Should().NotContain("<script>alert(1)</script>",
             "a blueprint-authored accepted-file-types entry must never inject a live script tag");
     }
+
+    [Fact]
+    public async Task FileUpload_InCameraMode_OpensTheRearCameraDirectly()
+    {
+        var html = await RenderFileUploadFieldAsync(CaptureField("camera"));
+
+        html.Should().Contain("capture=\"environment\"");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("choose")]
+    public async Task FileUpload_WithoutCameraMode_LeavesThePhoneToOfferTheCameraAndExistingFiles(string? mode)
+    {
+        var html = await RenderFileUploadFieldAsync(CaptureField(mode));
+
+        html.Should().NotContain("capture=");
+    }
+
+    private static FieldRenderPayload CaptureField(string? captureMode) => new()
+    {
+        FieldKey = "photo",
+        Label = "Photo",
+        FieldType = "file-upload",
+        Required = false,
+        CaptureMode = captureMode,
+    };
 }

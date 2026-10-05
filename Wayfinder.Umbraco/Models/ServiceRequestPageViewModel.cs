@@ -127,6 +127,14 @@ public class ServiceRequestPageViewModel
         AllFields.Any(f => f.FieldType.Equals("file-upload", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// True when this step renders at least one <c>location-picker</c> field — gates whether the
+    /// view loads Wayfinder.Rendering.GovUk's own <c>wayfinder-location-picker.js</c>, which ships
+    /// as a static web asset of that package and so needs no host-side wiring.
+    /// </summary>
+    public bool HasLocationPickerField =>
+        AllFields.Any(f => f.FieldType.Equals("location-picker", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Builds the render-ready view model from a <see cref="ServiceRequestStageRenderResult"/> —
     /// the one place both <c>wayfinderServiceRequestStage.cshtml</c> and the worklist block's own
     /// "review this item" mode construct it, so <c>_WayfinderStageRender.cshtml</c> always sees
