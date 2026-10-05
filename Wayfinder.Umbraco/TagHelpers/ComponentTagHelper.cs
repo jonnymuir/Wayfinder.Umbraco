@@ -209,6 +209,7 @@ public class ComponentTagHelper : TagHelper
         var acceptList = field.AcceptedFileTypes is { Count: > 0 } ? string.Join(",", field.AcceptedFileTypes) : string.Empty;
         var acceptListEncoded = GovUk.Esc(acceptList);
         var acceptAttr = acceptList.Length > 0 ? $" accept=\"{acceptListEncoded}\"" : string.Empty;
+        var captureAttr = GovUkFileUploadField.CaptureAttribute(field.CaptureMode);
         var labelEncoded = GovUk.Esc(field.Label);
         var hintEncoded = GovUk.Esc(field.Hint);
         var fieldErrorEncoded = GovUk.Esc(ctx.FieldError);
@@ -255,7 +256,7 @@ public class ComponentTagHelper : TagHelper
               <p class="govuk-error-message" data-wayfinder-file-upload-error hidden></p>
               <input class="govuk-file-upload{(ctx.HasFieldError ? " govuk-file-upload--error" : "")}"
                      type="file" id="{field.FieldKey}" name="{GovUk.FieldName(field.FieldKey)}"
-                     data-wayfinder-file-upload-input data-label="{labelEncoded}"{acceptAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
+                     data-wayfinder-file-upload-input data-label="{labelEncoded}"{acceptAttr}{captureAttr}{ctx.DescribedBy}{ctx.AriaRequired}{ctx.AriaInvalid}
                      {(alreadyUploaded ? "hidden disabled" : "")} />
               <input type="hidden" name="{GovUk.FieldName(field.FieldKey)}" data-wayfinder-file-upload-token disabled value="" />
             </div>
