@@ -72,7 +72,7 @@ public sealed class UmbracoProcessManagerEngine(
 
     /// <summary>
     /// Resolves a <c>file-upload</c> field's stored reference for a download endpoint — reuses
-    /// the exact same ownership check (<see cref="ProcessManagerEngine.CanAccessInstance"/>)
+    /// the exact same ownership check (<see cref="ProcessManagerEngine.TryGetAccessibleInstance"/>)
     /// every other instance access goes through, rather than a separate re-derivation. Returns
     /// <see langword="null"/> for an unknown instance, a requester who doesn't own it, or a
     /// field with no uploaded file — callers should treat all three identically (404), not
@@ -85,12 +85,8 @@ public sealed class UmbracoProcessManagerEngine(
         ActorProfile accessProfile,
         string fieldKey)
     {
-        if (!TryGetInstance(instanceId, out var instance))
-        {
-            return null;
-        }
-
-        if (!CanAccessInstance(instance, tenantId, userId, accessProfile))
+        var instance = TryGetAccessibleInstance(instanceId, tenantId, userId, accessProfile);
+        if (instance is null)
         {
             return null;
         }
@@ -112,7 +108,6 @@ public sealed class UmbracoProcessManagerEngine(
         string userId,
         ActorProfile accessProfile)
     {
-        return TryGetInstance(instanceId, out var instance)
-            && CanAccessInstance(instance, tenantId, userId, accessProfile);
+        return TryGetAccessibleInstance(instanceId, tenantId, userId, accessProfile) is not null;
     }
 }
