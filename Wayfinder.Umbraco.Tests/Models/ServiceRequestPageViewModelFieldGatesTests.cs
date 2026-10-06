@@ -89,6 +89,36 @@ public sealed class ServiceRequestPageViewModelFieldGatesTests
         step.HasDeviceClockDefault.Should().BeTrue();
     }
 
+    private static ServiceRequestPageViewModel StepWithUpload(params string[] acceptedFileTypes) => new()
+    {
+        Components =
+        [
+            new ComponentRenderPayload
+            {
+                Type = "fieldset",
+                Fields = [new FieldRenderPayload { FieldKey = "f", Label = "F", FieldType = "file-upload", Required = false, AcceptedFileTypes = acceptedFileTypes }],
+            },
+        ],
+    };
+
+    [Fact]
+    public void AStepWithAnImageUpload_LoadsThePreviewScript()
+    {
+        StepWithUpload(".jpg", ".png").HasImageFileField.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AStepWithADocumentUpload_DoesNotLoadThePreviewScript()
+    {
+        StepWithUpload(".pdf", ".docx").HasImageFileField.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AStepWithNoUpload_DoesNotLoadThePreviewScript()
+    {
+        StepWith("text", "date").HasImageFileField.Should().BeFalse();
+    }
+
     [Fact]
     public void AStepWithNoDeviceClockField_DoesNotLoadTheClockScript()
     {
