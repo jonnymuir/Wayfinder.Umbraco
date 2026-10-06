@@ -36,11 +36,6 @@
         <script type="application/json" data-wayfinder-live-model>@Html.Raw(Model.LiveModelJson!.Replace("</", "<\\/"))</script>
     }
 
-    @if (Model.HasLocationPickerField)
-    {
-        <script type="module" src="/_content/Wayfinder.Rendering.GovUk/location-picker/wayfinder-location-picker.js"></script>
-    }
-
     @if (Model.HasFileUploadField)
     {
         <script type="module" src="/App_Plugins/UmbracoPrism/dist/prism-file-upload.js"></script>

@@ -35,6 +35,66 @@ public sealed class ServiceRequestPageViewModelFieldGatesTests
         StepWith("text", "file-upload").HasLocationPickerField.Should().BeFalse();
     }
 
+    private static ServiceRequestPageViewModel StepWithStat(string? display, string? value = "52.2,0.1") => new()
+    {
+        Components =
+        [
+            new ComponentRenderPayload
+            {
+                Type = "stat-group",
+                Stats = [new StatItem { Label = "Where", FieldKey = "location", Value = value, Display = display }],
+            },
+        ],
+    };
+
+    [Fact]
+    public void AStepWithAMapTile_LoadsTheLocationScript_EvenWithNoPickerOnIt()
+    {
+        var step = StepWithStat("map");
+
+        step.HasLocationMap.Should().BeTrue();
+        step.NeedsLocationScript.Should().BeTrue();
+        step.HasLocationPickerField.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("text")]
+    public void AStatTileThatIsNotAMap_DoesNotLoadTheLocationScript(string? display)
+    {
+        StepWithStat(display).NeedsLocationScript.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AStepWithAPicker_NeedsTheLocationScriptToo()
+    {
+        StepWith("location-picker").NeedsLocationScript.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AStepWithAFieldThatStartsOnTheDeviceClock_LoadsTheClockScript()
+    {
+        var step = new ServiceRequestPageViewModel
+        {
+            Components =
+            [
+                new ComponentRenderPayload
+                {
+                    Type = "fieldset",
+                    Fields = [new FieldRenderPayload { FieldKey = "d", Label = "D", FieldType = "date", Required = false, DeviceDefault = "today" }],
+                },
+            ],
+        };
+
+        step.HasDeviceClockDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AStepWithNoDeviceClockField_DoesNotLoadTheClockScript()
+    {
+        StepWith("text", "date").HasDeviceClockDefault.Should().BeFalse();
+    }
+
     [Fact]
     public void ALocationPickerDoesNotTriggerTheFileUploadScript()
     {

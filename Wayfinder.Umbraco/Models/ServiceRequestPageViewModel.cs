@@ -135,6 +135,24 @@ public class ServiceRequestPageViewModel
         AllFields.Any(f => f.FieldType.Equals("location-picker", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// True when a stat tile on this step shows its value on a read-only map (<c>display: "map"</c>).
+    /// The map is drawn by the same script as the location picker, which is loaded on any stage (not just
+    /// question stages), because a confirmation or "recorded" stage is where a captured point is shown back.
+    /// </summary>
+    public bool HasLocationMap =>
+        Components.Any(c => c.Stats?.Any(s => string.Equals(s.Display, "map", StringComparison.Ordinal)) == true);
+
+    /// <summary>True when this step needs <c>wayfinder-location-picker.js</c>: a location picker or a map tile.</summary>
+    public bool NeedsLocationScript => HasLocationPickerField || HasLocationMap;
+
+    /// <summary>
+    /// True when a date or time field on this step starts on the visitor's own device clock
+    /// (<c>defaultToToday</c> / <c>defaultToCurrentTime</c>), which <c>wayfinder-device-clock.js</c> fills in.
+    /// </summary>
+    public bool HasDeviceClockDefault =>
+        AllFields.Any(f => !string.IsNullOrEmpty(f.DeviceDefault));
+
+    /// <summary>
     /// Builds the render-ready view model from a <see cref="ServiceRequestStageRenderResult"/> —
     /// the one place both <c>wayfinderServiceRequestStage.cshtml</c> and the worklist block's own
     /// "review this item" mode construct it, so <c>_WayfinderStageRender.cshtml</c> always sees
