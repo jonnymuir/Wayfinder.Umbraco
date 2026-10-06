@@ -51,12 +51,17 @@
         @await Html.PartialAsync(partialName, Model)
 
         @* Scripts that enhance markup any stage shell can render (a map tile on a confirmation page, a date
-           that starts on today), so they load here rather than in one shell's partial. Both ship as static web
+           that starts on today, a preview of the photo just chosen), so they load here rather than in one shell's partial. Both ship as static web
            assets of Wayfinder.Rendering.GovUk, so a host needs no wiring. They come after the markup they
            act on. *@
         @if (Model.NeedsLocationScript)
         {
             <script type="module" src="/_content/Wayfinder.Rendering.GovUk/location-picker/wayfinder-location-picker.js"></script>
+        }
+
+        @if (Model.HasImageFileField)
+        {
+            <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-file-preview.js"></script>
         }
 
         @if (Model.HasDeviceClockDefault)

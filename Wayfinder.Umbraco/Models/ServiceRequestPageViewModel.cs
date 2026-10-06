@@ -142,6 +142,15 @@ public class ServiceRequestPageViewModel
     public bool HasLocationMap =>
         Components.Any(c => c.Stats?.Any(s => string.Equals(s.Display, "map", StringComparison.Ordinal)) == true);
 
+    /// <summary>
+    /// True when this step renders a <c>file-upload</c> that accepts images, so <c>wayfinder-file-preview.js</c> can
+    /// show what was chosen: the control a browser draws for a chosen file is not a reliable preview (a phone's
+    /// webview can draw it black). Uses the same rule the package's renderer marks the input with.
+    /// </summary>
+    public bool HasImageFileField =>
+        AllFields.Any(f => f.FieldType.Equals("file-upload", StringComparison.OrdinalIgnoreCase)
+            && Wayfinder.Rendering.GovUk.GovUkFileUploadField.AcceptsImages(f.AcceptedFileTypes));
+
     /// <summary>True when this step needs <c>wayfinder-location-picker.js</c>: a location picker or a map tile.</summary>
     public bool NeedsLocationScript => HasLocationPickerField || HasLocationMap;
 
