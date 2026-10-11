@@ -27,7 +27,7 @@ public class ServiceRequestPollController(IProcessManager processManager, IOptio
     /// A JSON object with <c>changed</c> (bool), <c>newStateVersion</c> (int), and <c>stepType</c> (string).
     /// </returns>
     [HttpGet("poll")]
-    public IActionResult Poll(
+    public async Task<IActionResult> Poll(
         [FromQuery] string blueprintKey,
         [FromQuery] string instanceId,
         [FromQuery] int knownStateVersion)
@@ -38,7 +38,7 @@ public class ServiceRequestPollController(IProcessManager processManager, IOptio
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(HttpContext);
         var userId = options.ResolveUserId(HttpContext);
-        var accessProfile = options.ResolveAccessProfile!(HttpContext, blueprintKey);
+        var accessProfile = await options.ResolveAccessProfile!(HttpContext, blueprintKey);
 
         var envelope = processManager.GetCurrent(blueprintKey, tenantId, userId, accessProfile, instanceId);
 

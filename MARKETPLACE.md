@@ -227,7 +227,7 @@ public class YourSiteComposer : IComposer
         {
             options.ResolveTenantId      = _   => "default";               // single-tenant
             options.ResolveUserId        = ctx => ctx.User.Identity!.Name!;
-            options.ResolveAccessProfile = _   => YourQueues.AccessProfile;
+            options.ResolveAccessProfile = _   => Task.FromResult(YourQueues.AccessProfile); // async: cache any lookup
         });
     }
 }

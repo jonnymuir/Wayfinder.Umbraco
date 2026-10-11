@@ -26,7 +26,7 @@ public class ServiceRequestWorklistService(
     /// resolving identity via <see cref="WayfinderServiceDesignOptions"/> the same way every other
     /// method on this class does.
     /// </summary>
-    public QueueWorkListEnvelope GetWorklist(
+    public async Task<QueueWorkListEnvelope> GetWorklistAsync(
         HttpContext ctx,
         IReadOnlyCollection<QueueWorkItemStatus>? statuses = null,
         QueueWorkListSort sort = QueueWorkListSort.Default,
@@ -39,31 +39,31 @@ public class ServiceRequestWorklistService(
         var userId = options.ResolveUserId(ctx);
         // Genuinely no single blueprint in scope here — a caseworker's worklist spans whatever
         // queues their ActorProfile can see, across every blueprint using them, not one.
-        var accessProfile = options.ResolveAccessProfile!(ctx, null);
+        var accessProfile = await options.ResolveAccessProfile!(ctx, null);
 
         return processManager.GetQueueWorkItems(tenantId, userId, accessProfile, statuses, sort, searchText, pageIndex, pageSize);
     }
 
     /// <summary>Claims a shared queue's work item cursor for the calling caseworker, so nobody else can act on it until they put it back.</summary>
-    public ServiceRequestResponseEnvelope Pickup(HttpContext ctx, string instanceId, string cursorId)
+    public async Task<ServiceRequestResponseEnvelope> PickupAsync(HttpContext ctx, string instanceId, string cursorId)
     {
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
         // Pickup/putback are queue-membership actions, not blueprint-specific ones — same
-        // reasoning as GetWorklist above.
-        var accessProfile = options.ResolveAccessProfile!(ctx, null);
+        // reasoning as GetWorklistAsync above.
+        var accessProfile = await options.ResolveAccessProfile!(ctx, null);
 
         return processManager.PickupWorkItem(instanceId, cursorId, tenantId, userId, accessProfile);
     }
 
     /// <summary>Releases a work item cursor the calling caseworker previously picked up, returning it to the shared queue for anyone eligible to claim.</summary>
-    public ServiceRequestResponseEnvelope Putback(HttpContext ctx, string instanceId, string cursorId)
+    public async Task<ServiceRequestResponseEnvelope> PutbackAsync(HttpContext ctx, string instanceId, string cursorId)
     {
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
-        var accessProfile = options.ResolveAccessProfile!(ctx, null);
+        var accessProfile = await options.ResolveAccessProfile!(ctx, null);
 
         return processManager.PutbackWorkItem(instanceId, cursorId, tenantId, userId, accessProfile);
     }

@@ -70,7 +70,7 @@
         defaultPageSize: configuredPageSize);
 
     var searchText = Context.Request.Query["q"].ToString();
-    var envelope = WorklistService.GetWorklist(
+    var envelope = await WorklistService.GetWorklistAsync(
         Context, statuses, sort, string.IsNullOrEmpty(searchText) ? null : searchText, pageIndex, pageSize);
 
     var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
