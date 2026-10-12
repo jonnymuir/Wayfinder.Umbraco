@@ -44,13 +44,16 @@ public class WayfinderServiceDesignOptions
     /// 404'd on every attempt. Passing the already-resolved key removes the entire bug class: a
     /// host never has to know or keep up with this package's own internal route shapes.
     /// <para/>
+    /// Async so a host can look up queue membership (a database, a directory) without blocking a
+    /// request thread; called on every citizen/caseworker request, so keep it cheap or cache it.
+    /// <para/>
     /// Defaults to <see cref="NoQueueAccessProfile"/>, a profile that can start/view/act on no
     /// real queue at all: a stage block renders "access denied" for every journey rather than a
     /// host getting an <c>OptionsValidationException</c> at startup for the entire package. A host
     /// wanting citizen/caseworker journeys to actually work overrides this with its own real
     /// identity-derived profile.
     /// </summary>
-    public Func<HttpContext, string?, ActorProfile>? ResolveAccessProfile { get; set; } = static (_, _) => NoQueueAccessProfile;
+    public Func<HttpContext, string?, Task<ActorProfile>>? ResolveAccessProfile { get; set; } = static (_, _) => Task.FromResult(NoQueueAccessProfile);
 
     /// <summary>
     /// A profile restricted to a queue key no real blueprint will ever declare — <see cref="ActorProfile.CanViewQueue"/>/

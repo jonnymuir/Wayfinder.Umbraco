@@ -23,7 +23,7 @@ namespace Wayfinder.Umbraco.Tests.Controllers;
 public sealed class ServiceRequestPollControllerTests
 {
     [Fact]
-    public void Poll_PassesItsOwnBlueprintKey_ToResolveAccessProfile()
+    public async Task Poll_PassesItsOwnBlueprintKey_ToResolveAccessProfile()
     {
         string? observedBlueprintKey = "not-called";
         var options = Options.Create(new WayfinderServiceDesignOptions
@@ -33,7 +33,7 @@ public sealed class ServiceRequestPollControllerTests
             ResolveAccessProfile = (_, blueprintKey) =>
             {
                 observedBlueprintKey = blueprintKey;
-                return new ActorProfile();
+                return Task.FromResult(new ActorProfile());
             },
         });
 
@@ -56,7 +56,7 @@ public sealed class ServiceRequestPollControllerTests
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
 
-        controller.Poll("apply-for-a-juggling-licence", "instance-1", knownStateVersion: 4);
+        await controller.Poll("apply-for-a-juggling-licence", "instance-1", knownStateVersion: 4);
 
         observedBlueprintKey.Should().Be("apply-for-a-juggling-licence",
             "the poll endpoint's own blueprintKey query parameter must reach the host's resolver, not get dropped");

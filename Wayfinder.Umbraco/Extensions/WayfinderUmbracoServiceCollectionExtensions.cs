@@ -71,7 +71,9 @@ public static class WayfinderUmbracoServiceCollectionExtensions
 
         // Authoring-side store — a save reaches the live engine immediately (see
         // UmbracoServiceBlueprintStore's own remarks).
-        services.TryAddSingleton<IServiceBlueprintSourceStore, UmbracoServiceBlueprintStore>();
+        services.TryAddSingleton<UmbracoServiceBlueprintStore>();
+        services.TryAddSingleton<IServiceBlueprintSourceStore>(sp => sp.GetRequiredService<UmbracoServiceBlueprintStore>());
+        services.TryAddSingleton<IBlueprintQueueDirectory>(sp => sp.GetRequiredService<UmbracoServiceBlueprintStore>());
 
         services.AddServiceBlueprintAuthoring();
 

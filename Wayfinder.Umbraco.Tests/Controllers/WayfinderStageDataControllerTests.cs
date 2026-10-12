@@ -73,7 +73,7 @@ public sealed class WayfinderStageDataControllerTests
         var options = new WayfinderServiceDesignOptions
         {
             ResolveTenantId = _ => TenantId,
-            ResolveAccessProfile = (_, _) => new ActorProfile(),
+            ResolveAccessProfile = (_, _) => Task.FromResult(new ActorProfile()),
             ResolveUserId = ctx => (string)ctx.Items["UserId"]!,
         };
 

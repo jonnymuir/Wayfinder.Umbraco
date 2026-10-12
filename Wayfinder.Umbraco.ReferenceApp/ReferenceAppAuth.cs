@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.ReferenceApp;
 
@@ -45,10 +46,10 @@ public static class ReferenceAppAuth
 
     private static readonly DemoUser[] AllUsers = [Citizen, Caseworker, SecondCaseworker];
 
-    public static ActorProfile ResolveAccessProfile(HttpContext ctx, string? blueprintKey)
+    public static async Task<ActorProfile> ResolveAccessProfile(HttpContext ctx, string? blueprintKey)
     {
         var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
-        var store = ctx.RequestServices.GetRequiredService<IServiceBlueprintSourceStore>();
+        var queues = ctx.RequestServices.GetRequiredService<IBlueprintQueueDirectory>();
 
         return role switch
         {
@@ -57,9 +58,9 @@ public static class ReferenceAppAuth
             // against an independently-designed blueprint.
             "caseworker" => new ActorProfile
             {
-                VisibleQueues = QueueKeysForActor(store, "caseworker"),
+                VisibleQueues = await queues.QueueKeysForActorAsync("caseworker"),
                 StartableQueues = [],
-                ActionableQueues = QueueKeysForActor(store, "caseworker"),
+                ActionableQueues = await queues.QueueKeysForActorAsync("caseworker"),
                 RestrictToInstanceOwner = false,
                 TeamIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CoachingRegistrarsTeam }
             },
@@ -84,37 +85,12 @@ public static class ReferenceAppAuth
             // the real boundary (citizen queues only) without hardcoding any specific name.
             _ => new ActorProfile
             {
-                VisibleQueues = QueueKeysForActor(store, "citizen"),
-                StartableQueues = QueueKeysForActor(store, "citizen"),
-                ActionableQueues = QueueKeysForActor(store, "citizen"),
+                VisibleQueues = await queues.QueueKeysForActorAsync("citizen"),
+                StartableQueues = await queues.QueueKeysForActorAsync("citizen"),
+                ActionableQueues = await queues.QueueKeysForActorAsync("citizen"),
                 RestrictToInstanceOwner = true
             }
         };
-    }
-
-    /// <summary>
-    /// Every queue key, across every saved blueprint, whose own declared <c>Actor</c> matches
-    /// <paramref name="actor"/> — resolved fresh per call (a low-traffic reference app, not worth
-    /// caching) rather than assuming a fixed name, since only the blueprint author actually knows
-    /// what a given queue is called. GetAwaiter().GetResult() rather than making this async:
-    /// WayfinderServiceDesignOptions.ResolveAccessProfile is a synchronous
-    /// Func&lt;HttpContext, string?, ActorProfile&gt; (Wayfinder.Umbraco's own delegate shape, not
-    /// this app's to change) — acceptable here since IServiceBlueprintSourceStore's real implementation
-    /// in this app is in-memory/DB-local, not a genuinely slow remote call.
-    /// </summary>
-    private static IReadOnlyList<string> QueueKeysForActor(IServiceBlueprintSourceStore store, string actor)
-    {
-        var summaries = store.ListAsync().GetAwaiter().GetResult();
-        var keys = new List<string>();
-        foreach (var summary in summaries)
-        {
-            var blueprint = store.LoadAsync(summary.DefinitionKey).GetAwaiter().GetResult();
-            if (blueprint?.Queues is null) continue;
-            keys.AddRange(blueprint.Queues
-                .Where(q => string.Equals(q.Actor, actor, StringComparison.OrdinalIgnoreCase))
-                .Select(q => q.Key));
-        }
-        return keys.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public static void MapDemoLoginRoutes(WebApplication app)

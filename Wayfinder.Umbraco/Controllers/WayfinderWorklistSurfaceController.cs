@@ -70,18 +70,18 @@ public class WayfinderWorklistSurfaceController(
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Route(ItemUrlPrefix + "/{blueprintKey}/{instanceId}/pickup")]
-    public IActionResult Pickup(string blueprintKey, string instanceId, string cursorId, string returnTo)
+    public async Task<IActionResult> Pickup(string blueprintKey, string instanceId, string cursorId, string returnTo)
     {
-        worklistService.Pickup(HttpContext, instanceId, cursorId);
+        await worklistService.PickupAsync(HttpContext, instanceId, cursorId);
         return Redirect(Url.IsLocalUrl(returnTo) ? returnTo : "/");
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Route(ItemUrlPrefix + "/{blueprintKey}/{instanceId}/putback")]
-    public IActionResult Putback(string blueprintKey, string instanceId, string cursorId, string returnTo)
+    public async Task<IActionResult> Putback(string blueprintKey, string instanceId, string cursorId, string returnTo)
     {
-        worklistService.Putback(HttpContext, instanceId, cursorId);
+        await worklistService.PutbackAsync(HttpContext, instanceId, cursorId);
         return Redirect(Url.IsLocalUrl(returnTo) ? returnTo : "/");
     }
 }

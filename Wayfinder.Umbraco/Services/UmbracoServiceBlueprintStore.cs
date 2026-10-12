@@ -13,11 +13,95 @@ namespace Wayfinder.Umbraco.Services;
 /// MockBusinessApp's memory-only reference store. A successful save is pushed straight into
 /// <paramref name="engine"/> so the live engine reflects it immediately, matching the promise
 /// the AI-authoring surface already makes.
+/// <para/>
+/// Reads are served from an in-memory snapshot of the table: hosts resolve a caller's queues
+/// from the saved blueprints on every citizen/caseworker request (see
+/// <see cref="Configuration.WayfinderServiceDesignOptions.ResolveAccessProfile"/>), which used to
+/// cost one query plus one query and JSON parse per blueprint, every time. The snapshot holds
+/// the blueprints' JSON text and a queue-key index of plain strings, never parsed blueprints, so
+/// each <see cref="LoadAsync"/> hands back its own copy and nothing a caller does to it can reach
+/// another request. Saves and deletes
+/// through this store drop the snapshot at once; a write that bypasses it (a uSync import, another
+/// server in a load-balanced deployment) becomes visible when the snapshot's
+/// <see cref="SnapshotLifetime"/> lapses.
 /// </summary>
 public sealed class UmbracoServiceBlueprintStore(
     IUmbracoDatabaseFactory databaseFactory,
-    IProcessManager engine) : IServiceBlueprintSourceStore
+    IProcessManager engine,
+    TimeProvider? timeProvider = null) : IServiceBlueprintSourceStore, IBlueprintQueueDirectory
 {
+    public static readonly TimeSpan SnapshotLifetime = TimeSpan.FromSeconds(30);
+
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+    private readonly object snapshotGate = new();
+    private Snapshot? snapshot;
+    // Bumped by every write so a read that started before it can't re-cache the old rows.
+    private long generation;
+
+    // Only the JSON text and strings are shared. The queue index is Lazy so one blueprint that
+    // fails to parse breaks the index, never ListAsync or another blueprint's LoadAsync.
+    private sealed record Snapshot(
+        DateTimeOffset LoadedAt,
+        IReadOnlyList<ServiceBlueprintSourceSummary> Summaries,
+        IReadOnlyDictionary<string, (string Json, int Version)> Rows,
+        Lazy<ILookup<string, string>> QueueKeysByActor);
+
+    private Snapshot GetSnapshot()
+    {
+        long startedAt;
+        lock (snapshotGate)
+        {
+            if (snapshot is { } current && clock.GetUtcNow() - current.LoadedAt < SnapshotLifetime)
+            {
+                return current;
+            }
+
+            startedAt = generation;
+        }
+
+        using var db = databaseFactory.CreateDatabase();
+        var rows = db.Fetch<ServiceBlueprintSchema>("SELECT * FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
+        var byKey = rows.ToDictionary(row => row.DefinitionKey, row => (row.Json, row.Version));
+        var loaded = new Snapshot(
+            clock.GetUtcNow(),
+            rows.Select(row => new ServiceBlueprintSourceSummary(row.DefinitionKey, row.DisplayName)).ToArray(),
+            byKey,
+            new Lazy<ILookup<string, string>>(() => BuildQueueIndex(byKey.Values)));
+
+        lock (snapshotGate)
+        {
+            if (generation == startedAt)
+            {
+                snapshot = loaded;
+            }
+        }
+
+        return loaded;
+    }
+
+    private static ServiceBlueprint? Parse(string json, int version) =>
+        JsonSerializer.Deserialize<ServiceBlueprint>(json, ReadOptions) is { } blueprint
+            ? blueprint with { Version = version }
+            : null;
+
+    private static ILookup<string, string> BuildQueueIndex(IEnumerable<(string Json, int Version)> rows) =>
+        rows.Select(row => Parse(row.Json, row.Version))
+            .Where(blueprint => blueprint?.Queues is not null)
+            .SelectMany(blueprint => blueprint!.Queues!)
+            .Where(queue => queue.Actor is not null)
+            .Select(queue => (Actor: queue.Actor!, queue.Key))
+            .Distinct()
+            .ToLookup(queue => queue.Actor, queue => queue.Key, StringComparer.OrdinalIgnoreCase);
+
+    private void InvalidateSnapshot()
+    {
+        lock (snapshotGate)
+        {
+            generation++;
+            snapshot = null;
+        }
+    }
+
     private static readonly JsonSerializerOptions ReadOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -36,31 +120,21 @@ public sealed class UmbracoServiceBlueprintStore(
     public Task<IReadOnlyList<ServiceBlueprintSourceSummary>> ListAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var db = databaseFactory.CreateDatabase();
-        var rows = db.Fetch<ServiceBlueprintSchema>(
-            "SELECT DefinitionKey, DisplayName FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
-
-        IReadOnlyList<ServiceBlueprintSourceSummary> summaries = rows
-            .Select(row => new ServiceBlueprintSourceSummary(row.DefinitionKey, row.DisplayName))
-            .ToArray();
-
-        return Task.FromResult(summaries);
+        return Task.FromResult(GetSnapshot().Summaries);
     }
 
     public Task<ServiceBlueprint?> LoadAsync(string definitionKey, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var db = databaseFactory.CreateDatabase();
-        var row = db.FirstOrDefault<ServiceBlueprintSchema>(
-            "SELECT * FROM wayfinderServiceBlueprint WHERE DefinitionKey = @0", definitionKey);
+        return Task.FromResult(
+            GetSnapshot().Rows.TryGetValue(definitionKey, out var row) ? Parse(row.Json, row.Version) : null);
+    }
 
-        if (row is null)
-        {
-            return Task.FromResult<ServiceBlueprint?>(null);
-        }
-
-        var blueprint = JsonSerializer.Deserialize<ServiceBlueprint>(row.Json, ReadOptions);
-        return Task.FromResult(blueprint is null ? null : blueprint with { Version = row.Version });
+    public Task<IReadOnlyList<string>> QueueKeysForActorAsync(string actor, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        IReadOnlyList<string> keys = GetSnapshot().QueueKeysByActor.Value[actor].Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return Task.FromResult(keys);
     }
 
     public Task<ServiceBlueprintSaveResult> SaveAsync(
@@ -89,6 +163,7 @@ public sealed class UmbracoServiceBlueprintStore(
                 UpdatedUtc = DateTime.UtcNow
             };
             db.Insert(newRow);
+            InvalidateSnapshot();
 
             engine.UpdateDefinition(blueprint.DefinitionKey, blueprint with { Version = 1 });
             return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: 1, Location: "wayfinderServiceBlueprint"));
@@ -122,6 +197,7 @@ public sealed class UmbracoServiceBlueprintStore(
                 Saved: false, CurrentVersion: current?.Version ?? existing.Version, Location: "wayfinderServiceBlueprint"));
         }
 
+        InvalidateSnapshot();
         engine.UpdateDefinition(blueprint.DefinitionKey, toSave);
         return Task.FromResult(new ServiceBlueprintSaveResult(Saved: true, CurrentVersion: newVersion, Location: "wayfinderServiceBlueprint"));
     }
@@ -135,6 +211,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
         if (rowsAffected > 0)
         {
+            InvalidateSnapshot();
             engine.RemoveDefinition(definitionKey);
         }
 
