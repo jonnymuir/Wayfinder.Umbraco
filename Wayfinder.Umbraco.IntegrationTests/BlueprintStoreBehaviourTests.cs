@@ -1,13 +1,16 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Wayfinder.Engine.Abstractions;
+using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.IntegrationTests;
 
 /// <summary>
 /// The blueprint store serves reads from a cached snapshot (hosts resolve every caller's queues
 /// from it on each request), so a save or delete through the store must show up in the very next
-/// read — a stale snapshot would silently hand a caller yesterday's queues.
+/// read — a stale snapshot would silently hand a caller yesterday's queues. And because that
+/// snapshot is shared by every request, what one caller does to a loaded blueprint must never be
+/// visible to another.
 /// </summary>
 [Collection(BootedReferenceHost.Name)]
 public sealed class BlueprintStoreBehaviourTests(ReferenceAppFactory factory)
@@ -42,5 +45,47 @@ public sealed class BlueprintStoreBehaviourTests(ReferenceAppFactory factory)
 
         (await store.ListAsync()).Should().NotContain(s => s.DefinitionKey == key);
         (await store.LoadAsync(key)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EachLoadOfABlueprint_IsItsOwnCopy()
+    {
+        var store = factory.Services.GetRequiredService<IServiceBlueprintSourceStore>();
+
+        var first = await store.LoadAsync("reference-demo");
+        var second = await store.LoadAsync("reference-demo");
+
+        first.Should().NotBeNull();
+        first.Should().NotBeSameAs(second, "a caller altering its copy must not be able to change what the next request sees");
+        first.Should().BeEquivalentTo(second);
+    }
+
+    [Fact]
+    public async Task TheQueueDirectory_FollowsASaveImmediately()
+    {
+        var store = factory.Services.GetRequiredService<IServiceBlueprintSourceStore>();
+        var directory = factory.Services.GetRequiredService<IBlueprintQueueDirectory>();
+        var key = $"queue-probe-{Guid.NewGuid():N}";
+        var template = (await store.LoadAsync("reference-demo"))!;
+        var citizenQueues = await directory.QueueKeysForActorAsync("citizen");
+        citizenQueues.Should().NotBeEmpty("the reference blueprints declare citizen queues");
+
+        var renamed = template with
+        {
+            DefinitionKey = key,
+            Queues = template.Queues!.Select(q => q with { Key = $"{q.Key}-{key}" }).ToArray(),
+        };
+        (await store.SaveAsync(renamed, expectedVersion: 0)).Saved.Should().BeTrue();
+        try
+        {
+            (await directory.QueueKeysForActorAsync("citizen"))
+                .Should().Contain(renamed.Queues!.First(q => q.Actor == "citizen").Key);
+        }
+        finally
+        {
+            await store.DeleteAsync(key);
+        }
+
+        (await directory.QueueKeysForActorAsync("citizen")).Should().BeEquivalentTo(citizenQueues);
     }
 }

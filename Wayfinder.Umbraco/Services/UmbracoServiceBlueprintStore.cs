@@ -14,10 +14,13 @@ namespace Wayfinder.Umbraco.Services;
 /// <paramref name="engine"/> so the live engine reflects it immediately, matching the promise
 /// the AI-authoring surface already makes.
 /// <para/>
-/// Reads are served from an in-memory snapshot of the whole table: hosts resolve a caller's queues
+/// Reads are served from an in-memory snapshot of the table: hosts resolve a caller's queues
 /// from the saved blueprints on every citizen/caseworker request (see
 /// <see cref="Configuration.WayfinderServiceDesignOptions.ResolveAccessProfile"/>), which used to
-/// cost one query plus one query and JSON parse per blueprint, every time. Saves and deletes
+/// cost one query plus one query and JSON parse per blueprint, every time. The snapshot holds
+/// the blueprints' JSON text and a queue-key index of plain strings, never parsed blueprints, so
+/// each <see cref="LoadAsync"/> hands back its own copy and nothing a caller does to it can reach
+/// another request. Saves and deletes
 /// through this store drop the snapshot at once; a write that bypasses it (a uSync import, another
 /// server in a load-balanced deployment) becomes visible when the snapshot's
 /// <see cref="SnapshotLifetime"/> lapses.
@@ -25,7 +28,7 @@ namespace Wayfinder.Umbraco.Services;
 public sealed class UmbracoServiceBlueprintStore(
     IUmbracoDatabaseFactory databaseFactory,
     IProcessManager engine,
-    TimeProvider? timeProvider = null) : IServiceBlueprintSourceStore
+    TimeProvider? timeProvider = null) : IServiceBlueprintSourceStore, IBlueprintQueueDirectory
 {
     public static readonly TimeSpan SnapshotLifetime = TimeSpan.FromSeconds(30);
 
@@ -35,11 +38,13 @@ public sealed class UmbracoServiceBlueprintStore(
     // Bumped by every write so a read that started before it can't re-cache the old rows.
     private long generation;
 
-    // Lazy per blueprint: one row that fails to parse still fails only its own LoadAsync.
+    // Only the JSON text and strings are shared. The queue index is Lazy so one blueprint that
+    // fails to parse breaks the index, never ListAsync or another blueprint's LoadAsync.
     private sealed record Snapshot(
         DateTimeOffset LoadedAt,
         IReadOnlyList<ServiceBlueprintSourceSummary> Summaries,
-        IReadOnlyDictionary<string, Lazy<ServiceBlueprint?>> Blueprints);
+        IReadOnlyDictionary<string, (string Json, int Version)> Rows,
+        Lazy<ILookup<string, string>> QueueKeysByActor);
 
     private Snapshot GetSnapshot()
     {
@@ -56,15 +61,12 @@ public sealed class UmbracoServiceBlueprintStore(
 
         using var db = databaseFactory.CreateDatabase();
         var rows = db.Fetch<ServiceBlueprintSchema>("SELECT * FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
+        var byKey = rows.ToDictionary(row => row.DefinitionKey, row => (row.Json, row.Version));
         var loaded = new Snapshot(
             clock.GetUtcNow(),
             rows.Select(row => new ServiceBlueprintSourceSummary(row.DefinitionKey, row.DisplayName)).ToArray(),
-            rows.ToDictionary(
-                row => row.DefinitionKey,
-                row => new Lazy<ServiceBlueprint?>(() =>
-                    JsonSerializer.Deserialize<ServiceBlueprint>(row.Json, ReadOptions) is { } blueprint
-                        ? blueprint with { Version = row.Version }
-                        : null)));
+            byKey,
+            new Lazy<ILookup<string, string>>(() => BuildQueueIndex(byKey.Values)));
 
         lock (snapshotGate)
         {
@@ -76,6 +78,20 @@ public sealed class UmbracoServiceBlueprintStore(
 
         return loaded;
     }
+
+    private static ServiceBlueprint? Parse(string json, int version) =>
+        JsonSerializer.Deserialize<ServiceBlueprint>(json, ReadOptions) is { } blueprint
+            ? blueprint with { Version = version }
+            : null;
+
+    private static ILookup<string, string> BuildQueueIndex(IEnumerable<(string Json, int Version)> rows) =>
+        rows.Select(row => Parse(row.Json, row.Version))
+            .Where(blueprint => blueprint?.Queues is not null)
+            .SelectMany(blueprint => blueprint!.Queues!)
+            .Where(queue => queue.Actor is not null)
+            .Select(queue => (Actor: queue.Actor!, queue.Key))
+            .Distinct()
+            .ToLookup(queue => queue.Actor, queue => queue.Key, StringComparer.OrdinalIgnoreCase);
 
     private void InvalidateSnapshot()
     {
@@ -111,7 +127,14 @@ public sealed class UmbracoServiceBlueprintStore(
     {
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(
-            GetSnapshot().Blueprints.TryGetValue(definitionKey, out var blueprint) ? blueprint.Value : null);
+            GetSnapshot().Rows.TryGetValue(definitionKey, out var row) ? Parse(row.Json, row.Version) : null);
+    }
+
+    public Task<IReadOnlyList<string>> QueueKeysForActorAsync(string actor, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        IReadOnlyList<string> keys = GetSnapshot().QueueKeysByActor.Value[actor].Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return Task.FromResult(keys);
     }
 
     public Task<ServiceBlueprintSaveResult> SaveAsync(

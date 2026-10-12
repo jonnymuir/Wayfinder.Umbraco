@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.ReferenceApp;
 
@@ -48,7 +49,7 @@ public static class ReferenceAppAuth
     public static async Task<ActorProfile> ResolveAccessProfile(HttpContext ctx, string? blueprintKey)
     {
         var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
-        var store = ctx.RequestServices.GetRequiredService<IServiceBlueprintSourceStore>();
+        var queues = ctx.RequestServices.GetRequiredService<IBlueprintQueueDirectory>();
 
         return role switch
         {
@@ -57,9 +58,9 @@ public static class ReferenceAppAuth
             // against an independently-designed blueprint.
             "caseworker" => new ActorProfile
             {
-                VisibleQueues = await QueueKeysForActor(store, "caseworker"),
+                VisibleQueues = await queues.QueueKeysForActorAsync("caseworker"),
                 StartableQueues = [],
-                ActionableQueues = await QueueKeysForActor(store, "caseworker"),
+                ActionableQueues = await queues.QueueKeysForActorAsync("caseworker"),
                 RestrictToInstanceOwner = false,
                 TeamIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CoachingRegistrarsTeam }
             },
@@ -84,33 +85,12 @@ public static class ReferenceAppAuth
             // the real boundary (citizen queues only) without hardcoding any specific name.
             _ => new ActorProfile
             {
-                VisibleQueues = await QueueKeysForActor(store, "citizen"),
-                StartableQueues = await QueueKeysForActor(store, "citizen"),
-                ActionableQueues = await QueueKeysForActor(store, "citizen"),
+                VisibleQueues = await queues.QueueKeysForActorAsync("citizen"),
+                StartableQueues = await queues.QueueKeysForActorAsync("citizen"),
+                ActionableQueues = await queues.QueueKeysForActorAsync("citizen"),
                 RestrictToInstanceOwner = true
             }
         };
-    }
-
-    /// <summary>
-    /// Every queue key, across every saved blueprint, whose own declared <c>Actor</c> matches
-    /// <paramref name="actor"/> — resolved per call rather than assuming a fixed name, since only
-    /// the blueprint author actually knows what a given queue is called. Cheap per call because
-    /// the package's blueprint store serves reads from an in-memory snapshot.
-    /// </summary>
-    private static async Task<IReadOnlyList<string>> QueueKeysForActor(IServiceBlueprintSourceStore store, string actor)
-    {
-        var summaries = await store.ListAsync();
-        var keys = new List<string>();
-        foreach (var summary in summaries)
-        {
-            var blueprint = await store.LoadAsync(summary.DefinitionKey);
-            if (blueprint?.Queues is null) continue;
-            keys.AddRange(blueprint.Queues
-                .Where(q => string.Equals(q.Actor, actor, StringComparison.OrdinalIgnoreCase))
-                .Select(q => q.Key));
-        }
-        return keys.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public static void MapDemoLoginRoutes(WebApplication app)
