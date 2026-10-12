@@ -11,5 +11,21 @@
 #   GHSA-xxxx-xxxx-xxxx  # <pkg> <ver>: compile-time only, no untrusted input reaches it.
 #                        # Revisit when <upstream> ships a fix (tracking: <link>).
 #
-# (empty — nothing is currently accepted. The gate only blocks High/Critical; the known
-#  AngleSharp 0.17.1 Moderate advisory, via HtmlSanitizer, is reported but not blocking.)
+# SixLabors.ImageSharp 3.1.12 arrives transitively through Umbraco CMS imaging, in the reference
+# app and the integration tests only: the published Wayfinder.Umbraco package does not depend on
+# it, so hosts take whichever version their own Umbraco brings. The fixes ship only in 4.1.2+,
+# a major version that needs a paid Six Labors license and that Umbraco 17 is not built against,
+# so we leave the upgrade to Umbraco rather than override its dependency. Accepted 2026-10-12
+# (same decision as Umbraco.Prism, 2026-10-10); revisit when Umbraco ships a release on a
+# patched ImageSharp. Nothing in this repo's source references ImageSharp, histogram
+# equalization or TIFF encoding.
+#
+# The two Moderate ImageSharp advisories (GHSA-gwg2-r3hj-4w44 ICC CLUT parsing, GHSA-wmxv-xphr-5c9g
+# BigTIFF decoder loop) are not gated and the reference app does decode visitor-uploaded images,
+# so they are reachable there. Both are denial-of-service class, not code execution. The gate only
+# blocks High/Critical; the known AngleSharp 0.17.1 Moderate advisory, via HtmlSanitizer, is
+# likewise reported but not blocking.
+
+GHSA-j3p4-wp97-rph4  # HistogramEqualization: an image processor nothing in this repo invokes.
+GHSA-j9gm-c75j-xc9q  # TIFF CCITT T4 encoder: only reached when writing TIFF; nothing here encodes TIFF.
+GHSA-jjfr-hcj7-qf5w  # TIFF CCITT T6 encoder: same as above.
