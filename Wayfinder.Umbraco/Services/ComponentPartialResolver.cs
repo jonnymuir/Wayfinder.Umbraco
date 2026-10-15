@@ -7,7 +7,7 @@ namespace Wayfinder.Umbraco.Services;
 /// Resolves a host's own Razor override for a given component/field type, if one exists, at the
 /// documented convention path — <c>~/Views/Partials/Components/_Component-{Type}.cshtml</c> and
 /// <c>~/Views/Partials/Fields/_Component-{Type}.cshtml</c> (see
-/// docs/guides/service-request-customisation.md in Umbraco.Prism). Returns <c>null</c> when no
+/// docs/customising-rendering.md in this repo). Returns <c>null</c> when no
 /// host override exists, in which case <c>ComponentTagHelper</c> falls through to
 /// <c>Wayfinder.Rendering.GovUk</c>'s <c>GovUkComponentRenderer</c> — the shared package's own
 /// built-in catalog plus whatever Wayfinder.Umbraco itself has registered as overrides there

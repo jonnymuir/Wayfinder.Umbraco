@@ -247,7 +247,8 @@ Install the package and call `AddWayfinderUmbraco()`:
   what the signed-in actor's `ActorProfile` can see.
 - **A GOV.UK component and field catalog**, overridable one type at a time by placing
   `~/Views/Partials/Components/_Component-{Type}.cshtml` (or `Fields/` for an input field) in your
-  own app — e.g. `_Component-SummaryList.cshtml` overrides the `summary-list` component.
+  own app — e.g. `_Component-SummaryList.cshtml` overrides the `summary-list` component. See
+  [Customising how components render](docs/customising-rendering.md).
 - **Support systems, integrated through Umbraco Automate.** Register an external system in
   `appsettings.json`, build the integration as an automation on the same site, and a stage can call
   it and wait for its outcome. See [Connect other systems with Umbraco Automate](#connect-other-systems-with-umbraco-automate).
