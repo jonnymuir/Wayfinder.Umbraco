@@ -129,7 +129,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
     await page.waitForTimeout(800);
 
     await waitForPaneStable();
-    await sendTerminalText('export NODE_TLS_REJECT_UNAUTHORIZED=0');
+    await sendTerminalText('export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem');
     sendTerminalKey('Enter');
     await waitForPaneStable();
     await sendTerminalText('export BROWSER=true');

@@ -219,7 +219,7 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
     await page.goto('/demo/login');
     await page.getByRole('button', { name: /Casey Caseworker/i }).click();
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-    await page.getByRole('link', { name: 'Caseworker queue', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Menu' }).getByRole('link', { name: 'Caseworker queue', exact: true }).click();
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
     await page.locator('#main-content').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(800);

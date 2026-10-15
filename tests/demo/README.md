@@ -14,7 +14,7 @@ in CI.
   narrated take with no AI agent involved: a coach applies to join the NJF coaching register, a
   registrar reviews it and runs the coaching-standards check, that check is a real Umbraco Automate
   automation (branch, email, human approval), and the decision resolves back to the applicant.
-  Mirrors [`../automate-support-system-walkthrough.md`](../automate-support-system-walkthrough.md)'s
+  Mirrors [`../../docs/automate-support-system-walkthrough.md`](../../docs/automate-support-system-walkthrough.md)'s
   "Run the journey" section. Needs the full Aspire stack (Mailpit, not just the bare reference
   app), see its own setup note below.
 
@@ -60,13 +60,19 @@ as the only valid "the agent is done" signal).
      dotnet run --project ../../Wayfinder.Umbraco.ReferenceApp --launch-profile Wayfinder.Umbraco.ReferenceApp
    ```
    Wait for it to finish its unattended install and start serving `https://localhost:44399`.
-2. **Install this directory's own dependencies** (separate from the rest of the repo, this is
+2. **Trust the dev certificate for Claude Code, once per machine.** The recording types
+   `export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem` on camera, so that file must exist:
+   ```
+   dotnet dev-certs https --export-path ~/.aspnet/dev-cert.pem --format Pem --no-password
+   rm ~/.aspnet/dev-cert.key
+   ```
+3. **Install this directory's own dependencies** (separate from the rest of the repo, this is
    the only place in Wayfinder.Umbraco that needs Playwright):
    ```
    npm install
    npx playwright install chromium
    ```
-3. **Run it:**
+4. **Run it:**
    ```
    npm run demo:record
    ```
