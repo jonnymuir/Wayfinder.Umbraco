@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/jonnymuir/Wayfinder.Umbraco/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnymuir/Wayfinder.Umbraco/actions/workflows/ci.yml)
 [![Wayfinder.Umbraco](https://img.shields.io/nuget/v/Wayfinder.Umbraco.svg?label=Wayfinder.Umbraco)](https://www.nuget.org/packages/Wayfinder.Umbraco)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/LICENSE)
 
 **Wayfinder for Umbraco puts service design into the CMS your team already runs.** Describe a
 public-facing service, get a working GOV.UK-styled journey with a caseworker queue behind it, and
@@ -75,6 +75,64 @@ it as an applicant and a caseworker.
   the whole cycle step by step against the reference app.
 - **Video:** the same walkthrough recorded as one continuous take (see `tests/demo/`).
 
+### Turning on MCP authoring in your own site
+
+The MCP endpoint is opt-in: installing `Wayfinder.Umbraco` alone gives you the visual editor,
+not MCP. Add the MCP package:
+
+```bash
+dotnet add package Wayfinder.Engine.Mcp
+```
+
+Then wire five calls into `Program.cs`. This is the reference app's own wiring
+([`Program.cs`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.ReferenceApp/Program.cs)), trimmed to what MCP needs:
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Umbraco.Cms.Core;
+using Wayfinder.Engine.Mcp;
+using Wayfinder.Umbraco;
+using Wayfinder.Umbraco.Extensions;
+using Wayfinder.Umbraco.Mcp;
+
+const string McpEndpointPath = "/wayfinder/service-blueprint-authoring/mcp";
+
+builder.Services.AddServiceBlueprintAuthoringMcp();            // 1. the MCP server
+
+builder.CreateUmbracoBuilder()
+    .AddBackOffice()
+    .AddWebsite()
+    .AddComposers()
+    .AddWayfinderUmbracoMcpAuthentication()                    // 2. the backoffice OAuth client
+    .Build();
+
+var app = builder.Build();
+app.UseWayfinderUmbracoMcpAuthChallenge(McpEndpointPath);      // 3. outermost: adds the RFC 9728 hint to the 401
+
+await app.BootUmbracoAsync();
+app.UseUmbraco() /* ...your usual WithMiddleware / WithEndpoints... */;
+
+app.MapServiceBlueprintAuthoringMcp(McpEndpointPath)           // 4. the endpoint, admins only
+   .RequireAuthorization(new AuthorizeAttribute
+   {
+       Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin,
+       AuthenticationSchemes = $"{Constants.Security.BackOfficeAuthenticationType},OpenIddict.Validation.AspNetCore",
+   });
+app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);     // 5. the discovery documents
+```
+
+- The endpoint is deny-by-default even without step 4. Step 4 narrows it to the same
+  `BlueprintsAdmin` policy the backoffice Blueprints screen uses. `AuthenticationSchemes` is
+  required: a minimal API mapped outside Umbraco's Management API doesn't inherit the backoffice
+  schemes, so without it the endpoint challenges your site's default (front-end) scheme.
+- Step 3 must run before `BootUmbracoAsync`, so it wraps the whole pipeline and sees the 401.
+- In Development, the client's loopback callback (`http://localhost:33418/callback`) is
+  registered for you. Anywhere else, list your MCP client's real callback URLs under
+  `Wayfinder:Mcp:RedirectUris` in `appsettings.json`.
+
+The [reference app README](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.ReferenceApp/README.md#mcp-service-blueprint-authoring)
+shows how to connect Claude Code, including the headless client-credentials option.
+
 ![Settings, Blueprints: an authored service alongside the seeded example](https://raw.githubusercontent.com/jonnymuir/Wayfinder.Umbraco/main/assets/screenshots/blueprints-list.png)
 
 ## Connect other systems with Umbraco Automate
@@ -85,19 +143,11 @@ payments provider. Wayfinder models each one as a **support system**, and
 [Umbraco Automate](https://docs.umbraco.com/umbraco-automate) is the integration engine behind it.
 
 You register the support system in `appsettings.json` and build the integration as an Automate
-automation on the same site. There is no support-system C# to write.
+automation on the same site. The integration itself needs no C#: the only code is one small
+Automate action that hands the outcome back to Wayfinder, which you can copy from the reference
+app (see below).
 
-```mermaid
-flowchart LR
-  subgraph Site["One Umbraco site"]
-    BP["Service blueprint<br/>support-system-call action"] --> ENG["Wayfinder engine"]
-    CFG["appsettings.json<br/>Wayfinder:SupportSystems<br/>url, auth, inputs, outcomes"] --> ENG
-    ENG -- "signed webhook POST" --> AUT["Umbraco Automate<br/>automation"]
-    AUT -- "resolve outcome" --> ENG
-    AUT --> BO["Backoffice Automate section<br/>run history and approvals"]
-  end
-  AUT -. "email, HTTP requests" .-> EXT["External systems<br/>and people"]
-```
+*[View this diagram on GitHub](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md).*
 
 - **Wayfinder calls out.** A stage carries a `support-system-call` action. When the stage opens,
   Wayfinder POSTs a signed invocation to the automation's webhook trigger and parks the request on
@@ -128,31 +178,18 @@ The reference app's coaching register shows the whole path. Two or more years of
 disclosure reference auto-accredit the applicant. Anything else emails the standards officer and
 waits for an approval, where approve means `provisional` and reject means `referred`:
 
-```mermaid
-sequenceDiagram
-  autonumber
-  actor Registrar as Registrar (caseworker)
-  participant WF as Wayfinder engine
-  participant AU as Automate automation
-  actor Officer as Standards officer
-
-  Registrar->>WF: Run coaching-standards check
-  WF->>AU: Signed webhook POST with invocationId and inputs
-  WF-->>Registrar: Wait screen while the check runs
-  alt Two or more years and a disclosure reference
-    AU->>WF: Resolve outcome accredited
-  else Needs a human decision
-    AU->>Officer: Send email
-    Officer->>AU: Approve or reject in the Automate section
-    AU->>WF: Resolve outcome provisional or referred
-  end
-  WF-->>Registrar: Wait screen releases and the matching route fires
-```
+*[View this diagram on GitHub](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md).*
 
 An automation on the same site delivers the outcome in process, through a small custom Automate
-action (`ResolveSupportSystemOutcomeAction` in the reference app, ready to copy), because
-Automate's built-in HTTP Request step blocks loopback addresses. An automation on another host
-delivers it to Wayfinder's HTTP callback route instead.
+action
+([`ResolveSupportSystemOutcomeAction`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.ReferenceApp/ResolveSupportSystemOutcomeAction.cs)
+in the reference app, ready to copy), because Automate's built-in HTTP Request step blocks
+loopback addresses. An automation on another host (or Zapier, Make, n8n) delivers it to
+Wayfinder's HTTP callback route instead, which a host maps with
+`MapWebhookSupportSystemCallbacks` from the `Wayfinder.Engine.Http` package.
+
+To use Automate you need the `Umbraco.Automate` package (plus its persistence package for your
+database) alongside `Wayfinder.Umbraco`; it registers itself through its own composer.
 
 - **Walkthrough:** [`docs/automate-support-system-walkthrough.md`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/docs/automate-support-system-walkthrough.md)
   runs it step by step against the reference app.
@@ -225,13 +262,18 @@ public class YourSiteComposer : IComposer
     {
         builder.Services.AddWayfinderUmbraco(options =>
         {
-            options.ResolveTenantId      = _   => "default";               // single-tenant
-            options.ResolveUserId        = ctx => ctx.User.Identity!.Name!;
-            options.ResolveAccessProfile = _   => Task.FromResult(YourQueues.AccessProfile); // async: cache any lookup
+            options.ResolveTenantId      = _ => "default";               // single-tenant
+            options.ResolveAccessProfile = (ctx, blueprintKey) => YourQueues.AccessProfileAsync(ctx, blueprintKey);
+            // ResolveUserId defaults to the NameIdentifier claim. Override it only with another
+            // stable, unforgeable id, never a display name the person can change.
         });
     }
 }
 ```
+
+`ResolveAccessProfile` is asynchronous and receives the blueprint key being rendered (`null` for
+a worklist that spans blueprints), so a host can scope access per service. It runs on every stage
+render and form post, so cache any lookup it makes.
 
 Then drop the `wayfinderServiceRequestStage` block onto any Block Grid page and set its
 `blueprintKey`.
@@ -241,9 +283,10 @@ Then drop the `wayfinderServiceRequestStage` block onto any Block Grid page and 
 Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wires:
 
 - **Identity and tenancy**, via `WayfinderServiceDesignOptions.ResolveTenantId` / `ResolveUserId` /
-  `ResolveAccessProfile`. All three default to safe, no-real-access values (a fixed `"default"`
-  tenant, and an `ActorProfile` that can view/start/act on no real queue) so a bare package
-  reference boots — override them for citizen/caseworker journeys to actually work.
+  `ResolveAccessProfile`. The defaults are safe so a bare package reference boots: a fixed
+  `"default"` tenant, the user id from the `NameIdentifier` claim, and an `ActorProfile` that can
+  view, start and act on no real queue. Override `ResolveAccessProfile` (and the tenant, if you
+  have more than one) for citizen and caseworker journeys to actually work.
 - **The polling policy, only if the default doesn't fit.** The live-update endpoint
   (`ServiceRequestPollController`) sits behind the
   `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` named policy; the package registers
@@ -253,18 +296,29 @@ Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wi
 
 ## Security responsibilities
 
-The package enforces two named authorization policies:
+What the package protects itself, and what a host must add. Every route below is the package's
+own unless it says otherwise.
 
-| Policy | Guards | Registered by |
+| Surface | Route | Protected by |
 |---|---|---|
-| `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin` | The backoffice authoring API (`ServiceBlueprintAuthoringController`) | This package, automatically — checked against `WayfinderServiceDesignOptions.AdminGroupAliases` |
-| `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` | The live-update poll endpoint (`ServiceRequestPollController`) | This package, with a `RequireAuthenticatedUser()` default a host can override |
+| Backoffice authoring API (`ServiceBlueprintAuthoringController`) | Umbraco Management API, `/umbraco/management/api/v1/wayfinder/...` | The `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin` policy, registered by the package and checked against `WayfinderServiceDesignOptions.AdminGroupAliases`. |
+| Live-update polling (`ServiceRequestPollController`) | `/api/wayfinder/workflow/poll` | The `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` policy. The package's default is `RequireAuthenticatedUser()`; a host can replace it (see above). |
+| Stage form posts (`WayfinderStageSurfaceController`) | Umbraco surface controller | Antiforgery validation, a per-instance nonce, and the engine's ownership check. Uploaded files arrive with this form post. |
+| Uploaded-file downloads and bulk-data-review data (`WayfinderStageDataController`) | `/umbraco/wayfinder-stage/{blueprintKey}/{instanceId}/...` | The engine's ownership check (`IsOwnedInstance`) against the caller's host-resolved identity, on every action. It carries `[AllowAnonymous]` deliberately, so an anonymous citizen journey still works; the ownership check is the boundary. |
+| MCP authoring endpoint (only if you turn it on) | Wherever you map it | Deny-by-default in `Wayfinder.Engine.Mcp`; narrow it to `BlueprintsAdmin` as shown in [Turning on MCP authoring](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#turning-on-mcp-authoring-in-your-own-site). |
 
-Everything else the package renders — `wayfinderServiceRequestStage`'s file upload/download links,
-in particular — resolves through `WayfinderServiceDesignOptions.FileEndpointBasePath`, and **the
-package does not serve those routes itself**. A host mounts its own upload/download controllers at
-that base path, and each one must verify the caller actually owns the instance it's serving,
-exactly like `UmbracoPrism.TestSite`'s reference controllers do:
+Because the ownership check runs against the identity *your* resolvers return, the resolvers
+are part of the security boundary. `ResolveUserId` must return a stable, unforgeable id for the
+signed-in person (not a display name they can change), and `ResolveAccessProfile` must only grant
+the queues that person may work.
+
+### If you add progressive file uploads
+
+The `file-upload` component also renders markup for an asynchronous, progress-bar upload. The
+package doesn't ship the script or the endpoints for it: a host that wants it (Umbraco Prism's
+reference site does) adds its own script and mounts upload and download controllers under
+`WayfinderServiceDesignOptions.FileEndpointBasePath` (default `/service-request`). Each of those
+controllers must verify the caller owns the instance before reading or writing anything:
 
 ```csharp
 if (!engine.IsOwnedInstance(instanceId, tenantId, userId, accessProfile))
@@ -273,48 +327,81 @@ if (!engine.IsOwnedInstance(instanceId, tenantId, userId, accessProfile))
 }
 ```
 
-Skipping this check is an IDOR: anyone who knows (or guesses) an `instanceId` could read or
-download another citizen's uploaded file. See `PublicServiceRequestFileUploadController`/
-`PublicServiceRequestFileDownloadController` in `UmbracoPrism.TestSite` for the full pattern,
-including nonce validation.
+Skipping this check is an IDOR: anyone who knows or guesses an `instanceId` could upload to, or
+download from, another citizen's application. Umbraco Prism's
+[`PublicServiceRequestFileUploadController`](https://github.com/jonnymuir/Umbraco.Prism/blob/main/src/UmbracoPrism.TestSite/Controllers/PublicServiceRequestFileUploadController.cs)
+shows the full pattern, including nonce validation.
+
+To report a vulnerability, see [SECURITY.md](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/SECURITY.md).
 
 ## Reference app
 
 [`Wayfinder.Umbraco.ReferenceApp`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.ReferenceApp/README.md) is a real, bootable
 Umbraco 17 site that runs this package end to end: the citizen stage block, the caseworker
-worklist, pickup and putback, access control, and the MCP authoring surface. Backoffice and demo
-logins are documented there.
+worklist, pickup and putback, access control, the Automate-driven support system, and the MCP
+authoring surface. Backoffice and demo logins are documented there.
+
+## Requirements and compatibility
+
+| | |
+|---|---|
+| **Umbraco** | 17.x (17.7.0 or later). The package targets one Umbraco major at a time, and restore fails on Umbraco 18 rather than loading against an untested API. |
+| **.NET** | 10 |
+| **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
+| **Umbraco Automate** | Optional, 17.x, for [support systems](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#connect-other-systems-with-umbraco-automate) |
+
+Wayfinder.Umbraco 3.0.0 depends on these Wayfinder packages, installed for you:
+
+| Package | Version | What it provides |
+|---|---|---|
+| `Wayfinder` | 0.19.0 | The domain model and calculation engine. |
+| `Wayfinder.Engine` | 0.19.0 | The state-machine engine. |
+| `Wayfinder.Rendering.GovUk` | 0.9.0 | GOV.UK Design System rendering and the component catalog. |
+| `Wayfinder.Editor` | 0.8.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
+| `Wayfinder.Engine.Worklist` | 0.4.0 | The caseworker worklist rendering. |
+
+Two more are optional and added by the host: `Wayfinder.Engine.Mcp` for
+[MCP authoring](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#turning-on-mcp-authoring-in-your-own-site), and `Wayfinder.Engine.Http` for an
+out-of-process support system's callback route. Use the same Wayfinder version line as the table
+above. The [changelog](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/CHANGELOG.md) lists what changed in each release and how to upgrade.
 
 ## How it fits together
 
-```mermaid
-graph LR
-  WF["Wayfinder<br/>core engine<br/>(framework-agnostic)"] --> WFU["Wayfinder.Umbraco<br/>CMS binding<br/>(this package)"]
-  WFU --> PRISM["Umbraco Prism<br/>multi-tenant host<br/>(OIDC, branding)"]
-```
+*[View this diagram on GitHub](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md).*
+
+Each arrow points from a project to the one it builds on.
 
 - **[`Wayfinder`](https://github.com/jonnymuir/Wayfinder)** is the framework-agnostic core: the
-  domain model, the calculation engine, and the state-machine engine. No Umbraco, no hosting
-  assumptions.
-- **`Wayfinder.Umbraco`** (this package) is the Umbraco host: the store, the blocks, the authoring
-  UI, and the GOV.UK rendering.
-- **[Umbraco Prism](https://github.com/jonnymuir/Umbraco.Prism)** is the reference consumer for
-  multi-tenancy and branding. `UmbracoPrism.Core` carries no service-design opinion; only its test
-  site installs this package.
+  domain model, the calculation engine, the state-machine engine, GOV.UK rendering and the visual
+  editor. No Umbraco, no hosting assumptions. Its
+  [glossary](https://github.com/jonnymuir/Wayfinder/blob/main/docs/glossary.md) maps the NN/g
+  terms to the ones used here.
+- **`Wayfinder.Umbraco`** (this package) is the Umbraco host: the database-backed store, the
+  blocks, and the backoffice authoring UI.
+- **[Umbraco Prism](https://github.com/jonnymuir/Umbraco.Prism)** adds multi-tenancy, branding and
+  mobile to Umbraco. `UmbracoPrism.Core` has no Wayfinder dependency; only its reference site
+  installs this package, the way any other site would.
 
-All three publish to nuget.org, the only source this package restores or publishes against.
-
-## Depends on
-
-- [`Wayfinder`](https://github.com/jonnymuir/Wayfinder): domain models, calculation engine.
-- [`Wayfinder.Engine`](https://github.com/jonnymuir/Wayfinder): the state-machine engine.
+All three publish to nuget.org only.
 
 ## Building
 
+You need the .NET 10 SDK and Node 20+. The backoffice bundles are packed as static web assets, so
+build them before `dotnet build`:
+
 ```bash
-dotnet build Wayfinder.Umbraco.slnx
-dotnet pack Wayfinder.Umbraco.slnx
+cd Wayfinder.Umbraco.Client && npm ci && npm run build && cd ..
+dotnet build Wayfinder.Umbraco.slnx -c Release
+dotnet test  Wayfinder.Umbraco.slnx -c Release --no-build
+dotnet pack  Wayfinder.Umbraco.slnx -c Release --no-build -o ./artifacts
 ```
+
+## Contributing and security
+
+Changes reach `main` through pull requests with [Conventional Commits](https://www.conventionalcommits.org/)
+titles; [`CLAUDE.md`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/CLAUDE.md) holds the full conventions. To report a vulnerability, use
+[GitHub's private reporting](https://github.com/jonnymuir/Wayfinder.Umbraco/security/advisories/new)
+as described in [SECURITY.md](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/SECURITY.md), not a public issue.
 
 ## License
 

@@ -37,7 +37,7 @@ Wait for `referenceapp` to finish its unattended install.
 | | |
 |---|---|
 | **Backoffice login** | `admin@example.test` / `Wayfinder123!` |
-| **Demo personas** | `/demo/login` on the site: a coach (citizen) and a registrar (caseworker) |
+| **Demo personas** | `/demo/login` on the site: **Alex Applicant** plays the coach, **Casey Caseworker** the registrar |
 
 `dotnet run --project Wayfinder.Umbraco.ReferenceApp` directly also works. Without Mailpit the
 "Send Email" step has nowhere to deliver (the run continues), and if `NJF_STANDARDS_SIGNING_KEY`
@@ -83,21 +83,24 @@ There is nothing to build by hand.
 
 ## Run the journey
 
-1. **As the coach** (`/demo/login`), open **Apply to coach** and submit: a name, an email,
-   `yearsCoaching` = `1` (this forces the review path), a disclosure reference, and a first-aid
-   expiry date. You land on a "we are reviewing your application" wait screen.
-2. **As the registrar**, open **Coaching register queue**, pick up the application, open **Review
-   application**, and click **Run coaching-standards check**. The stage shows a waiting screen.
+1. **As the coach**: at `/demo/login` choose **Alex Applicant**, open **Apply to coach** and
+   submit a name, an email, `yearsCoaching` = `1` (this forces the review path), a disclosure
+   reference, and a first-aid expiry date. You land on a "we are reviewing your application"
+   wait screen.
+2. **As the registrar**: sign out, choose **Casey Caseworker** at `/demo/login`, open
+   **Coaching register queue**, pick up the application, open **Review application**, and click
+   **Run coaching-standards check**. The stage shows a waiting screen.
 3. **In Mailpit**, the "needs review" email to the standards officer has arrived.
-4. **In the backoffice Automate section**, open the run for the automation and its **Pending
-   approvals**; approve. The run history shows the **Resolve: provisional** step completing.
-5. **Back as the registrar**, the case is still yours (the `registrar` queue is `team-tray`, so
-   pickup ownership survives the send-and-wait round trip) — it shows **With you**, not as a
-   fresh pick-up. The wait screen has released into **Confirm the outcome**, showing
-   `coachingStandardsOutcome` = `provisional` and the standards officer's note. Click **Record
-   and notify the applicant**.
-6. **As the coach**, the wait screen releases into **Application complete**, showing the outcome
-   and the note.
+4. **In the backoffice Automate section** (`/umbraco`, signed in as `admin@example.test`), open
+   the run for the automation and its **Pending approvals**; approve. The run history shows the
+   **Resolve: provisional** step completing.
+5. **Back as the registrar** (Casey), the case is still yours: the `registrar` queue is
+   `team-tray`, so pickup ownership survives the send-and-wait round trip, and it shows
+   **With you** rather than as a fresh pick-up. The wait screen has released into **Confirm the
+   outcome**, showing `coachingStandardsOutcome` = `provisional` and the standards officer's
+   note. Click **Record and notify the applicant**.
+6. **As the coach** (Alex), the wait screen releases into **Application complete**, showing the
+   outcome and the note.
 
 Re-run with `yearsCoaching` = `5` and a disclosure reference to see the auto-`accredited` path
 resolve with no human step (the **If** branch takes the true edge straight to a

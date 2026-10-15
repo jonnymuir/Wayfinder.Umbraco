@@ -127,6 +127,31 @@ as the behavioural-testing rules above.
 8. **Report security findings plainly.** No minimising language: "just a hack", "edge case".
    Name the defect and its impact.
 
+### Umbraco version support
+
+The package targets one Umbraco major at a time (currently 17). `Directory.Build.props` holds
+`UmbracoMajor`, `UmbracoVersion` (the exact patch built and tested against), `USyncVersion` and
+`OpenIddictVersion`; the `Umbraco.Cms.*` and uSync references float from that patch up to, but not
+including, the next major, so a host on the next major gets a restore-time conflict rather than
+v17 assemblies loading against an untested API. Moving to a new major means bumping all four
+together, running both test suites and the reference app, and updating the README's requirements
+table.
+
+### Documentation
+
+- `README.md` is the source; `MARKETPLACE.md` (the NuGet and Marketplace readme) is generated
+  from it by `npm run generate:marketplace`, and CI fails if it is stale. Never edit it by hand.
+- A user-visible change adds a line under `CHANGELOG.md`'s `[Unreleased]` heading in the same PR;
+  a breaking change says how to upgrade. The release PR moves those lines under the version
+  heading and updates the README's "Requirements and compatibility" table to the Wayfinder
+  versions it ships with.
+- `node scripts/check-doc-links.mjs` (CI) fails on a broken relative link or heading anchor.
+- README screenshots in `assets/screenshots/` come from `tests/demo/screenshots.spec.ts`
+  (`npm run demo:screenshots` against a running reference app); regenerate them after a visible
+  UI change.
+- Use the vocabulary in Wayfinder's
+  [`docs/glossary.md`](https://github.com/jonnymuir/Wayfinder/blob/main/docs/glossary.md).
+
 ### Branch policy
 
 Every change goes through a feature branch + PR: `{type}/{kebab-slug}`. `main` is protected
