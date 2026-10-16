@@ -16,6 +16,8 @@
          reference app, never in the Wayfinder.Umbraco package itself. -->
     <PackageReference Include="Umbraco.Automate" Version="17.4.0" />
     <PackageReference Include="Umbraco.Automate.Persistence.Sqlite" Version="17.4.0" />
+    <!-- The integration suite also boots this app against SQL Server in CI. -->
+    <PackageReference Include="Umbraco.Automate.Persistence.SqlServer" Version="17.4.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +29,7 @@
          Wayfinder.ReferenceApp does in the core repo, chaining its own RequireAuthorization()
          onto it (WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin) instead of leaving it
          anonymous. -->
-    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.19.0" />
+    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.20.0" />
     <!-- MapWebhookSupportSystemCallbacks — the inbound half of the config-driven webhook
          support system (Wayfinder.Umbraco itself has no runtime-route opinion, same as MCP). -->
     <PackageReference Include="Wayfinder.Engine.Http" Version="0.4.1" />

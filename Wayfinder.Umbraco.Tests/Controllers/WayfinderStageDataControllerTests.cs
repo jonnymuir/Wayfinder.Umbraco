@@ -93,7 +93,10 @@ public sealed class WayfinderStageDataControllerTests
             new SingleDefinitionServiceBlueprintStore(definition),
             new PassthroughContentSanitizer(),
             new InMemoryServiceRequestStore(),
+            new InMemoryAuditLogStore(),
             new SingleHttpContextAccessor(new DefaultHttpContext()),
+            supportSystemClients: [],
+            requestConcurrencyPolicies: [],
             bulkDatasetStore: bulkDatasetStore);
 
         var started = engine.GetCurrent(DefinitionKey, TenantId, OwnerUserId, new ActorProfile());

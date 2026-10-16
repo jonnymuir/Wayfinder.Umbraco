@@ -9,6 +9,44 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-10-16
+
+### Breaking changes
+
+- `UmbracoProcessManagerEngine`'s constructor takes `IAuditLogStore` and the registered
+  `IRequestConcurrencyPolicy`s, and takes an optional `IServiceInputsResolver` instead of a
+  resolver delegate. A host resolves the engine from DI and never constructs it.
+
+  **To upgrade**, a host that built the engine by hand to pass a `serviceInputsResolver`
+  registers the resolver instead and deletes its engine construction:
+
+  ```csharp
+  // 3.x
+  builder.Services.AddSingleton(sp => new UmbracoProcessManagerEngine(..., serviceInputsResolver: MyInputs.Resolve));
+  // 4.0
+  builder.Services.AddSingleton<IServiceInputsResolver, MyInputs>();
+  ```
+
+  A resolver no longer needs to copy stored values back for the fields it doesn't supply.
+  Wayfinder 0.20.0 keeps each `source: "service"` field's stored value unless the resolver
+  supplies one.
+
+### Fixed
+
+- **Blueprints and requests could not be saved on SQL Server.** Their JSON columns were created
+  as `NVARCHAR(255)`, so any real blueprint failed with "String or binary data would be
+  truncated". They are now `NVARCHAR(MAX)`, and a migration widens existing tables on upgrade.
+  SQLite was not affected.
+- The audit log store and concurrency policies a host registered were never passed to the
+  engine. A registered `IRequestConcurrencyPolicy` now decides whether a request starts.
+
+### Added
+
+- Audit events are kept in the database (`wayfinderAuditEvent`) instead of in memory, where they
+  were lost on restart and grew without limit. Events older than `Wayfinder:AuditRetention` are
+  removed; the default is 365 days, and `00:00:00` keeps them forever.
+- CI runs the integration suite against SQL Server as well as SQLite.
+
 ### Documentation
 
 - The README quickstart compiles against 3.0.0 and keeps the safe `NameIdentifier` user id default.
@@ -16,6 +54,11 @@ Releases before 3.0.0 are listed on
   and a rewritten "Security responsibilities" section that matches what the package serves.
 - Connecting Claude Code over HTTPS now trusts the dev certificate with `NODE_EXTRA_CA_CERTS`
   instead of turning certificate checks off.
+
+### Dependencies
+
+`Wayfinder` and `Wayfinder.Engine` 0.20.0, `Wayfinder.Rendering.GovUk` 0.9.0, `Wayfinder.Editor`
+0.8.0, `Wayfinder.Engine.Worklist` 0.4.0. Umbraco 17.7.0 or later.
 
 ## [3.0.0] — 2026-10-12
 

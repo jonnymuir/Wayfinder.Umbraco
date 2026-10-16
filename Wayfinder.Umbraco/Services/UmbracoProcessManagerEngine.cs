@@ -13,25 +13,34 @@ namespace Wayfinder.Umbraco.Services;
 /// authoritative engine for every Wayfinder.Umbraco-hosted service request; a distinctly named
 /// singleton so it's discoverable in DI registration/debugging. Beyond identity and the
 /// built-in <c>user</c> service value (<see cref="CurrentUserServiceValue"/>) no override logic
-/// lives here: <c>serviceInputsResolver</c> (the toolkit's existing extension point for
-/// <c>source: "service"</c> calculation fields — see <see cref="ProcessManagerEngine.ResolveServiceInputs"/>)
-/// is supplied as a plain delegate at registration time, so a demo host (e.g. TestSite's
-/// juggling-society membership lookup) needs no subclass of its own. Likewise
-/// <paramref name="supportSystemClients"/> forwards straight to the base engine — a host wanting
-/// a real downstream support-system integration (see docs/guides/support-systems.md in the core
-/// Wayfinder repo) registers its own <c>ISupportSystemClient</c> implementations and they're
-/// picked up automatically.
+/// lives here. Every extension point the base engine has is taken from DI and passed straight
+/// through, so a host customises the engine by registering services, never by constructing it:
+/// an <see cref="IServiceInputsResolver"/> for <c>source: "service"</c> fields, its own
+/// <c>ISupportSystemClient</c>s (see docs/guides/support-systems.md in the core Wayfinder repo),
+/// <c>IRequestConcurrencyPolicy</c>s, and a replacement <c>IAuditLogStore</c> if the
+/// database-backed <see cref="UmbracoAuditLogStore"/> doesn't suit it.
 /// </summary>
 public sealed class UmbracoProcessManagerEngine(
     ILogger<UmbracoProcessManagerEngine> logger,
     IServiceBlueprintStore definitionStore,
     IServiceContentSanitizer sanitizer,
     IServiceRequestStore instanceStore,
+    IAuditLogStore auditLogStore,
     IHttpContextAccessor httpContextAccessor,
-    Func<ServiceRequest, ServiceBlueprint, StageDefinition, IReadOnlyDictionary<string, object?>?>? serviceInputsResolver = null,
-    IEnumerable<ISupportSystemClient>? supportSystemClients = null,
-    IBulkDatasetStore? bulkDatasetStore = null)
-    : ProcessManagerEngine(logger, definitionStore, sanitizer, serviceInputsResolver, instanceStore, supportSystemClients, bulkDatasetStore)
+    IEnumerable<ISupportSystemClient> supportSystemClients,
+    IEnumerable<IRequestConcurrencyPolicy> requestConcurrencyPolicies,
+    IBulkDatasetStore? bulkDatasetStore = null,
+    IServiceInputsResolver? serviceInputsResolver = null)
+    : ProcessManagerEngine(
+        logger,
+        definitionStore,
+        sanitizer,
+        serviceInputsResolver is null ? null : serviceInputsResolver.Resolve,
+        instanceStore,
+        supportSystemClients,
+        bulkDatasetStore,
+        requestConcurrencyPolicies,
+        auditLogStore)
 {
     /// <summary>
     /// A new instance is authenticated when the request creating it belongs to a signed-in
@@ -46,7 +55,7 @@ public sealed class UmbracoProcessManagerEngine(
     /// <summary>
     /// Adds the built-in <see cref="CurrentUserServiceValue"/> when the blueprint declares a
     /// <c>source: "service"</c> field named <c>user</c>, so a blueprint can default inputs from
-    /// the signed-in user declaratively. A host's own <c>serviceInputsResolver</c> that supplies
+    /// the signed-in user declaratively. A host's own <see cref="IServiceInputsResolver"/> that supplies
     /// <c>user</c> itself takes precedence.
     /// </summary>
     protected override IReadOnlyDictionary<string, object?>? ResolveServiceInputs(

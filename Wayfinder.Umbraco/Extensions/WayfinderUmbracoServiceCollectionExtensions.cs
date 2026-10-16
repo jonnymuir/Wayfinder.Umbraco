@@ -57,6 +57,10 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         // Durable, session-scoped instance storage.
         services.TryAddSingleton<IServiceRequestStore, UmbracoServiceRequestStore>();
 
+        // Durable audit trail, read back by an admin or auditor tool. A host can register its
+        // own IAuditLogStore first (TryAdd), and then owns its retention too.
+        services.TryAddSingleton<IAuditLogStore, UmbracoAuditLogStore>();
+
         services.TryAddSingleton<UmbracoProcessManagerEngine>();
         services.TryAddSingleton<IProcessManager>(sp => sp.GetRequiredService<UmbracoProcessManagerEngine>());
 

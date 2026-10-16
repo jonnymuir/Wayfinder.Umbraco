@@ -37,7 +37,10 @@ public sealed class UserServiceValueDefaultingTests
             new SingleDefinitionServiceBlueprintStore(definition),
             new PassthroughContentSanitizer(),
             new InMemoryServiceRequestStore(),
-            new FixedHttpContextAccessor(new DefaultHttpContext { User = user }));
+            new InMemoryAuditLogStore(),
+            new FixedHttpContextAccessor(new DefaultHttpContext { User = user }),
+            supportSystemClients: [],
+            requestConcurrencyPolicies: []);
 
         var result = engine.GetCurrent(definition.DefinitionKey, TenantId, "user-1", new ActorProfile());
 
