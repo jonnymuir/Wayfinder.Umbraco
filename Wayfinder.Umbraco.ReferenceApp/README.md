@@ -1,60 +1,79 @@
 # Wayfinder.Umbraco.ReferenceApp
 
-A real, bootable Umbraco 17 site that proves `Wayfinder.Umbraco` works end to end, the citizen
-stage block, the caseworker worklist block, pickup/putback, access control, against a real
-backoffice and a real content pipeline, not a mock. It sits next to the package in this repo/
-solution and never ships in the NuGet package itself; it's the host for future end-to-end tests
-and demo/documentation footage.
+A real, bootable Umbraco 17 site that proves `Wayfinder.Umbraco` works end to end against a real
+backoffice and a real content pipeline: the citizen stage block, the caseworker worklist block,
+pickup and putback, access control, an Umbraco Automate-driven support system, and the MCP
+authoring surface. It sits next to the package in this solution and never ships in the NuGet
+package. Three other things run against it:
 
-Not for production deployment, it's an unattended-install dev host — its SQLite database
-(`Umbraco.sqlite.db`) persists across restarts like any other Umbraco site's; delete it yourself
-if you want a clean slate.
+- `Wayfinder.Umbraco.IntegrationTests` boots it in-process with `WebApplicationFactory` for the
+  behaviour that only emerges from a real host (authorization, routing, middleware order).
+- `tests/perf/` holds the k6 load test the nightly performance workflow runs.
+- `tests/demo/` records the walkthrough videos and the README screenshots.
+
+It's an unattended-install dev host, not for production. Its SQLite database
+(`umbraco/Data/Umbraco.sqlite.db`, gitignored) persists across restarts like any Umbraco site's;
+delete `umbraco/Data/` for a clean slate.
 
 ## Running it
 
 ```bash
+cd Wayfinder.Umbraco.Client && npm ci && npm run build && cd ..   # once: the backoffice bundles
 dotnet run --project Wayfinder.Umbraco.ReferenceApp --launch-profile Wayfinder.Umbraco.ReferenceApp
 ```
 
-or via the Aspire orchestrator (`Wayfinder.Umbraco.AppHost`), or the `.vscode/launch.json`
-configs at the repo root ("C#: Aspire (Wayfinder.Umbraco.ReferenceApp)" / standalone).
+Or run the Aspire orchestrator (`dotnet run --project Wayfinder.Umbraco.AppHost`), which adds
+Mailpit for the Automate demo's email step and a per-run signing key. The `.vscode/launch.json`
+configs at the repo root do the same ("C#: Aspire (Wayfinder.Umbraco.ReferenceApp)" / standalone).
 
-On first boot it unattended-installs into its own local SQLite file (`umbraco/Data/`, gitignored)
-and seeds three pages plus a demo blueprint, see [`ReferenceContentSeeder.cs`](ReferenceContentSeeder.cs)/
+On first boot it unattended-installs and seeds two blueprints and five pages, see
+[`ReferenceContentSeeder.cs`](ReferenceContentSeeder.cs) and
 [`ReferenceBlueprintSeeder.cs`](ReferenceBlueprintSeeder.cs):
 
-- `/`, Home, a plain landing page explaining what this app is and linking everywhere else.
-- `/apply`, the citizen-facing stage block.
-- `/caseworker-queue`, the caseworker-facing worklist block.
+| Page | Blueprint | Block |
+|---|---|---|
+| `/` Home | | A landing page linking everywhere else. |
+| `/apply` Apply | `reference-demo` | The citizen stage block. |
+| `/caseworker-queue` Caseworker queue | `reference-demo` | The caseworker worklist block. |
+| `/apply-to-coach` Apply to coach | `njf-coaching-register` | The citizen stage block. |
+| `/coaching-register-queue` Coaching register queue | `njf-coaching-register` | The worklist block for the registrar team. |
+
+The coaching register's standards check is a support system run by an Umbraco Automate
+automation that [`AutomateCoachingStandardsSeeder.cs`](AutomateCoachingStandardsSeeder.cs)
+builds on boot; [the Automate walkthrough](../docs/automate-support-system-walkthrough.md) runs it.
 
 ## Logins
 
-**Backoffice** (`/umbraco`), the real Umbraco CMS admin account, from this project's own
+**Backoffice** (`/umbraco`), the real Umbraco admin account, from this project's own
 `appsettings.json` (`Umbraco:CMS:Unattended:UnattendedUser*`):
 
 - Email: `admin@example.test`
 - Password: `Wayfinder123!`
 
-**Front-end demo personas** (`/demo/login`), no password, just pick a persona. Two lanes, see
-[`ReferenceAppAuth.cs`](ReferenceAppAuth.cs):
+**Front-end demo personas** (`/demo/login`): no password, just pick one. See
+[`ReferenceAppAuth.cs`](ReferenceAppAuth.cs).
 
-- **Alex Applicant** (citizen), `/apply`, the citizen-facing stage block.
-- **Casey Caseworker** / **Jordan Caseworker** (caseworker), `/caseworker-queue`, the
-  caseworker-facing worklist block. A citizen visiting this page is refused (page-level role
-  check in `Views/referenceHome.cshtml`) rather than shown a filtered-but-real worklist,
-  Wayfinder.Umbraco's own worklist block carries no access-control opinion of its own by design,
-  so this reference app owns that decision itself, the way any real host would.
+| Persona | Role | Use it for |
+|---|---|---|
+| **Alex Applicant** | citizen | Applying: `/apply` and `/apply-to-coach`. |
+| **Casey Caseworker** | caseworker | Working queues: `/caseworker-queue`, and `/coaching-register-queue` as a member of the registrar team. |
+| **Jordan Caseworker** | caseworker | The same as Casey; a second caseworker to show pickup ownership. |
+
+A citizen visiting a queue page is refused (a page-level role check in
+`Views/referenceHome.cshtml`) rather than shown a filtered worklist. Wayfinder.Umbraco's worklist
+block carries no access-control opinion of its own by design, so this app owns that decision, the
+way any real host would.
 
 ## MCP service-blueprint authoring
 
 A real backoffice-authenticated MCP surface at `/wayfinder/service-blueprint-authoring/mcp`,
-wired in this app's own `Program.cs` (`Wayfinder.Engine.Mcp`'s `AddServiceBlueprintAuthoringMcp()`/
-`MapServiceBlueprintAuthoringMcp()`, anonymous by default, so this app chains its own
-`RequireAuthorization()` onto it). Gated behind `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin`,
-the same policy the backoffice's own "Blueprints" authoring surface uses, so an MCP client needs
-a real backoffice identity in the `admin` group, not an open sandbox endpoint. Confirmed live, both
-ways: an admin-group identity gets a working MCP session; a non-admin one gets a real bearer token
-but a `403` from the MCP endpoint itself.
+wired in this app's own `Program.cs` (the
+[main README](../README.md#turning-on-mcp-authoring-in-your-own-site) walks through the same
+wiring for your own site). `Wayfinder.Engine.Mcp` maps it deny-by-default; this app narrows it to
+`WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin`, the same policy the backoffice Blueprints
+screen uses. So an MCP client needs a real backoffice identity in the `admin` group: an
+admin-group identity gets a working MCP session, and a non-admin one gets a valid bearer token but
+a `403` from the MCP endpoint.
 
 Two ways to authenticate a client, below: **interactive OAuth** (recommended, the client logs
 into the backoffice, tokens auto-refresh) and **client credentials** (headless/CI, a hand-minted,
@@ -69,7 +88,20 @@ demo video records).
 ### Connecting an MCP client (interactive OAuth: recommended)
 
 This app calls `AddWayfinderUmbracoMcpAuthentication()` (in `Program.cs`), so an MCP client
-connects by logging into the Umbraco backoffice, no token minting by hand:
+connects by logging into the Umbraco backoffice, with no token minting by hand.
+
+Claude Code's Node runtime doesn't read the OS trust store, so first trust the ASP.NET Core dev
+certificate it will see on `https://localhost:44399` (once per machine, then `export` in each new
+shell). Don't set `NODE_TLS_REJECT_UNAUTHORIZED=0`: that turns off certificate checking for every
+connection the process makes.
+
+```bash
+dotnet dev-certs https --export-path ~/.aspnet/dev-cert.pem --format Pem --no-password
+rm ~/.aspnet/dev-cert.key        # the export also writes the private key; Node only needs the certificate
+export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem
+```
+
+Then register and log in:
 
 ```bash
 claude mcp add --transport http wayfinder-umbraco \
@@ -103,10 +135,11 @@ publishes none), then runs the standard OAuth 2.1 Authorization Code + PKCE flow
 
 ### Connecting an MCP client (headless / CI: client credentials)
 
-For a non-interactive agent, the manual client-credentials flow still works. Three steps, once
-per agent identity (steps 1–2 need a bearer token from your own interactive backoffice session,
-grab it from any authenticated `/umbraco/management/api/...` request your browser makes while
-logged in). The reference app also seeds one such identity at startup
+For a non-interactive agent, the manual client-credentials flow still works. It takes three
+steps, once per agent identity. Steps 1 and 2 need a bearer token from your own interactive
+backoffice session: copy it from any authenticated `/umbraco/management/api/...` request your
+browser makes while logged in. The same `NODE_EXTRA_CA_CERTS` setup applies to step 3's
+`claude mcp` calls. The reference app also seeds one such identity at startup
 (`ReferenceMcpDemoAgentSeeder`: `wayfinder-demo-agent` / `DemoAgentLocal!12345`).
 
 1. **Create a dedicated API user**, in the `admin` group:
@@ -129,10 +162,9 @@ logged in). The reference app also seeds one such identity at startup
      -H "Authorization: Bearer <your-own-backoffice-token>" -H "Content-Type: application/json" \
      -d '{"clientId": "my-agent", "clientSecret": "<a-strong-secret>"}'
    ```
-   Umbraco silently namespaces this under the hood, confirmed live by reading
-   `umbracoOpenIddictApplications` directly: the row this creates has `ClientId =
-   "umbraco-back-office-my-agent"`, not `"my-agent"`. The token exchange below fails with
-   `invalid_client` if you forget that prefix; it isn't documented anywhere obvious.
+   Umbraco prefixes the client id: the row this creates in `umbracoOpenIddictApplications` has
+   `ClientId = "umbraco-back-office-my-agent"`, not `"my-agent"`. The token exchange below fails
+   with `invalid_client` if you leave the prefix off.
 
 3. **Exchange it for a bearer token, and register the MCP server**:
    ```bash
@@ -144,11 +176,11 @@ logged in). The reference app also seeds one such identity at startup
      --header "Authorization: Bearer $(jq -r .access_token mcp-token.json)"
    claude mcp list   # confirm "✔ Connected"
    ```
-   This token has no refresh, re-run step 3 when it expires (`expires_in` ~1800s). Steps 1–2 are
-   one-time per agent identity.
+   This token doesn't refresh: re-run step 3 when it expires (`expires_in` is about 1800s).
+   Steps 1 and 2 are one-time per agent identity. Don't commit `mcp-token.json`.
 
 ## Umbraco's generated Imaging HMAC key
 
 On every unattended-installed boot, Umbraco writes a fresh `Umbraco:CMS:Imaging:HMACSecretKey`
 into `appsettings.json`. **Don't commit it**: revert with
-`git checkout Wayfinder.Umbraco.ReferenceApp/appsettings.json` before committing anything else.
+`git checkout -- Wayfinder.Umbraco.ReferenceApp/appsettings.json` before committing anything else.

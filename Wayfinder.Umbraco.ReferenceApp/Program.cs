@@ -41,9 +41,8 @@ builder.Services.AddWayfinderUmbraco(options =>
 
 // AddWayfinderUmbraco() above already registers ServiceBlueprintAuthoringService (the same
 // transport-agnostic service the backoffice REST authoring controller uses) — this just adds
-// the MCP transport over it. Anonymous by design in Wayfinder.Engine.Mcp itself; this app
-// chains its own RequireAuthorization() onto the mapped endpoint below, same convention as
-// Wayfinder.ReferenceApp documents for the REST authoring API.
+// the MCP transport over it. Wayfinder.Engine.Mcp maps it deny-by-default (any authenticated
+// caller); this app tightens that below to the BlueprintsAdmin policy and the backoffice schemes.
 builder.Services.AddServiceBlueprintAuthoringMcp();
 
 builder.CreateUmbracoBuilder()

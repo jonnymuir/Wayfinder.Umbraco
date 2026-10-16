@@ -53,8 +53,11 @@ backoffice's own login uses. Its permissions are the permissions of the person w
 
    ```bash
    cd "$(mktemp -d)"
-   export NODE_TLS_REJECT_UNAUTHORIZED=0   # the Claude CLI's Node HTTP client doesn't read the
-                                           # OS trust store, so it rejects the self-signed dev cert
+   # Claude Code's Node runtime doesn't read the OS trust store, so trust the ASP.NET Core dev
+   # certificate explicitly (once per machine) rather than turning certificate checks off.
+   dotnet dev-certs https --export-path ~/.aspnet/dev-cert.pem --format Pem --no-password
+   rm ~/.aspnet/dev-cert.key               # the export also writes the private key; Node only needs the certificate
+   export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem
    claude mcp add --transport http wayfinder-umbraco \
      https://localhost:44399/wayfinder/service-blueprint-authoring/mcp \
      --client-id umbraco-back-office-wayfinder-mcp \
@@ -95,7 +98,8 @@ is checked against your real group membership.
 
 ## Act 2: hand over the brief
 
-1. **Launch Claude Code with the MCP toolkit**, still in the scratch directory:
+1. **Launch Claude Code with the MCP toolkit**, still in the scratch directory and the same
+   shell (so `NODE_EXTRA_CA_CERTS` is still set):
 
    ```bash
    claude --model sonnet \
@@ -132,7 +136,7 @@ is checked against your real group membership.
    it has saved the blueprint. It chooses its own internal key and display name; the brief never
    dictates either.
 
-You can watch progress in the backoffice: **Settings → Blueprints** shows the new entry appear
+You can watch progress in the backoffice: **Settings → Advanced → Blueprints** shows the new entry appear
 alongside `reference-demo` the moment the first save lands.
 
 ---
@@ -144,7 +148,7 @@ Point the existing `/apply` page at what the agent built. No restart, no redeplo
 1. Backoffice → **Content** → open the **Apply** page.
 2. Click the **service request stage** block on that page. Its **Blueprint key** currently reads
    `reference-demo`.
-3. Change **Blueprint key** to the agent's new key (from Settings → Blueprints, or the agent's own
+3. Change **Blueprint key** to the agent's new key (from Settings → Advanced → Blueprints, or the agent's own
    summary), then click **Update** on the block.
 4. **Save and publish** the page. Wait for the "published" confirmation.
 
@@ -154,7 +158,7 @@ Point the existing `/apply` page at what the agent built. No restart, no redeplo
 
 ## Act 4: review it in the visual editor
 
-1. Backoffice → **Settings** → **Blueprints** → open the new blueprint by its display name.
+1. Backoffice → **Settings** → **Advanced** → **Blueprints** → open the new blueprint by its display name.
 2. The **visual editor** opens on the graph. Click **Fit to screen** to see every stage, decision
    point, and route the agent wrote.
 3. **Find the decision point.** Click the stage with two or more outgoing routes. Each route has

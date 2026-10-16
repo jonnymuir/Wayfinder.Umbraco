@@ -62,16 +62,17 @@ async function openTerminal(page: Page): Promise<void> {
   await showTerminalMirror(page);
   await page.waitForTimeout(800);
 
-  // NODE_TLS_REJECT_UNAUTHORIZED=0: the Claude CLI's own Node HTTP client doesn't consult the
-  // system/keychain trust store `dotnet dev-certs https --trust` populates — confirmed live,
-  // `claude mcp` calls fail UNABLE_TO_VERIFY_LEAF_SIGNATURE against this self-signed dev cert
-  // until this is set. BROWSER=true (the /usr/bin/true no-op) belt-and-braces stops any browser
-  // spawn; the OAuth step below uses `claude mcp login --no-browser`, which prints the authorize
+  // NODE_EXTRA_CA_CERTS: the Claude CLI's own Node HTTP client doesn't consult the
+  // system/keychain trust store `dotnet dev-certs https --trust` populates, so `claude mcp` calls
+  // fail UNABLE_TO_VERIFY_LEAF_SIGNATURE against the self-signed dev cert. Trusting that one
+  // certificate (exported once per machine, see tests/demo/README.md) keeps every other TLS check
+  // on, which NODE_TLS_REJECT_UNAUTHORIZED=0 would not. BROWSER=true (the /usr/bin/true no-op)
+  // belt-and-braces stops any browser spawn; the OAuth step below uses `claude mcp login --no-browser`, which prints the authorize
   // URL rather than opening one, and we drive that URL in the recorded page. Both scoped to this
   // throwaway localhost session. waitForPaneStable() before EVERY send, not just the first — a
   // send-keys call made before bash has redrawn its prompt silently loses leading characters.
   await waitForPaneStable();
-  await sendTerminalText('export NODE_TLS_REJECT_UNAUTHORIZED=0');
+  await sendTerminalText('export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem');
   sendTerminalKey('Enter');
   await waitForPaneStable();
   await sendTerminalText('export BROWSER=true');
