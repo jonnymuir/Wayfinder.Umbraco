@@ -44,6 +44,7 @@ public class ServiceRequestSchema
 
     /// <summary>Gets or sets the full serialized <c>ServiceRequest</c> JSON.</summary>
     [Column("StateJson")]
+    [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
     public string StateJson { get; set; } = string.Empty;
 
     /// <summary>

@@ -17,6 +17,15 @@ public class WayfinderServiceDesignOptions
     public TimeSpan NonceExpiry { get; set; } = TimeSpan.FromHours(2);
 
     /// <summary>
+    /// How long audit events are kept (<see cref="Services.UmbracoAuditLogStore"/>). Events
+    /// outlive the request they describe and name the user who caused them, so they are removed
+    /// once they are this old. Defaults to 365 days; <see cref="TimeSpan.Zero"/> keeps them
+    /// forever. Set it to match your own retention policy (<c>Wayfinder:AuditRetention</c>, e.g.
+    /// <c>"90.00:00:00"</c>).
+    /// </summary>
+    public TimeSpan AuditRetention { get; set; } = TimeSpan.FromDays(365);
+
+    /// <summary>
     /// How this host resolves the tenant id for the current request — this package carries no
     /// multi-tenancy opinion of its own (see this class's own remarks elsewhere). Defaults to a
     /// single, fixed <c>"default"</c> tenant so a bare package reference boots and the Blueprints

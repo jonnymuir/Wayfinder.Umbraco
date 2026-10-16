@@ -16,6 +16,8 @@
          reference app, never in the Wayfinder.Umbraco package itself. -->
     <PackageReference Include="Umbraco.Automate" Version="17.4.0" />
     <PackageReference Include="Umbraco.Automate.Persistence.Sqlite" Version="17.4.0" />
+    <!-- The integration suite also boots this app against SQL Server in CI. -->
+    <PackageReference Include="Umbraco.Automate.Persistence.SqlServer" Version="17.4.0" />
   </ItemGroup>
 
   <ItemGroup>

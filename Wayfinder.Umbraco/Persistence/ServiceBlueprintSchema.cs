@@ -31,6 +31,7 @@ public class ServiceBlueprintSchema
 
     /// <summary>Gets or sets the full serialized <c>ServiceBlueprint</c> JSON.</summary>
     [Column("Json")]
+    [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
     public string Json { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optimistic-concurrency version — the source of truth for save CAS checks.</summary>

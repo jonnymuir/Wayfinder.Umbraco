@@ -25,11 +25,21 @@ public sealed class BootedReferenceHost : ICollectionFixture<ReferenceAppFactory
 /// per-run temp directory: a fresh SQLite database, the models directory, and the
 /// <c>Umbraco:CMS:Imaging:HMACSecretKey</c> (supplied here as config so Umbraco never generates
 /// and persists one back into appsettings.json). The temp directory is deleted on dispose.
+/// <para/>
+/// Set <c>WAYFINDER_INTEGRATION_SQLSERVER</c> to a SQL Server connection string (no database
+/// named) and the same suite runs against a fresh SQL Server database instead, dropped on
+/// dispose. CI runs it both ways, because a column type SQLite accepts can still truncate on SQL
+/// Server.
 /// </summary>
 public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private const string SqlServerVariable = "WAYFINDER_INTEGRATION_SQLSERVER";
+
     private readonly string _tempRoot = Path.Combine(
         Path.GetTempPath(), "wu-authcontract-" + Guid.NewGuid().ToString("N"));
+
+    private readonly SqlServerDatabase? _sqlServer =
+        Environment.GetEnvironmentVariable(SqlServerVariable) is { Length: > 0 } server ? new SqlServerDatabase(server) : null;
 
     /// <summary>
     /// Umbraco reaches its "Run" runtime level asynchronously <em>after</em> the server starts
@@ -39,6 +49,8 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
     /// </summary>
     public async Task InitializeAsync()
     {
+        _sqlServer?.Create();
+
         using var client = CreateClient(new() { AllowAutoRedirect = false });
         var deadline = DateTime.UtcNow.AddMinutes(3);
         var ok = 0;
@@ -84,9 +96,9 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:umbracoDbDSN"] =
-                    $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True",
-                ["ConnectionStrings:umbracoDbDSN_ProviderName"] = "Microsoft.Data.Sqlite",
+                ["ConnectionStrings:umbracoDbDSN"] = _sqlServer?.ConnectionString
+                    ?? $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True",
+                ["ConnectionStrings:umbracoDbDSN_ProviderName"] = _sqlServer is null ? "Microsoft.Data.Sqlite" : "Microsoft.Data.SqlClient",
 
                 // Supplied, so Umbraco does not generate one and write it back into the source
                 // appsettings.json (the "never commit the HMAC key" rule). A fixed base64 blob —
@@ -109,6 +121,7 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
         base.Dispose(disposing);
         if (disposing)
         {
+            _sqlServer?.Drop();
             try
             {
                 if (Directory.Exists(_tempRoot))
