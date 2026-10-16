@@ -266,7 +266,10 @@ Install the package and call `AddWayfinderUmbraco()`:
   ]
   ```
 
-  A `serviceInputsResolver` that supplies its own `user` value takes precedence.
+  A registered `IServiceInputsResolver` that supplies its own `user` value takes precedence.
+- **An audit trail**, DB-backed (`wayfinderAuditEvent`): every transition, pickup and putback,
+  with who did it and when, read back through `IAuditLogStore`. Events are removed once they
+  are older than `Wayfinder:AuditRetention` (365 days by default; `00:00:00` keeps them forever).
 - **The supporting infrastructure**: nonce handling, file upload, field validation, and live
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
@@ -324,6 +327,14 @@ Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wi
   a default (`RequireAuthenticatedUser()`) so a bare package reference works out of the box. A
   host only needs its own `Configure<AuthorizationOptions>` call (in its own composer) to require a
   specific authentication scheme instead.
+- **Engine extensions, only if a service needs them.** Register these next to
+  `AddWayfinderUmbraco()` and the engine picks them up. A host never constructs the engine itself.
+
+  | Register | To |
+  |---|---|
+  | `IServiceInputsResolver` | Supply `source: "service"` calculation fields from your own systems. A field you don't supply keeps its stored value. |
+  | `IRequestConcurrencyPolicy` | Decide whether someone can start another request for a blueprint, for example one open claim per person. |
+  | `IAuditLogStore` | Keep the audit trail somewhere else. Your store replaces the database one, and its retention is then yours. |
 
 ## Security responsibilities
 
@@ -378,15 +389,16 @@ authoring surface. Backoffice and demo logins are documented there.
 |---|---|
 | **Umbraco** | 17.x (17.7.0 or later). The package targets one Umbraco major at a time, and restore fails on Umbraco 18 rather than loading against an untested API. |
 | **.NET** | 10 |
+| **Database** | SQL Server or SQLite, whichever the site uses. CI runs the integration suite against both. |
 | **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 3.0.0 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 4.0.0 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|
-| `Wayfinder` | 0.19.0 | The domain model and calculation engine. |
-| `Wayfinder.Engine` | 0.19.0 | The state-machine engine. |
+| `Wayfinder` | 0.20.0 | The domain model and calculation engine. |
+| `Wayfinder.Engine` | 0.20.0 | The state-machine engine. |
 | `Wayfinder.Rendering.GovUk` | 0.9.0 | GOV.UK Design System rendering and the component catalog. |
 | `Wayfinder.Editor` | 0.8.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
 | `Wayfinder.Engine.Worklist` | 0.4.0 | The caseworker worklist rendering. |
