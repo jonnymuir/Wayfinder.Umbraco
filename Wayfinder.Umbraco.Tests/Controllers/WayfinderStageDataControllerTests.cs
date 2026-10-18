@@ -1,3 +1,4 @@
+using Moq;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
@@ -97,6 +98,7 @@ public sealed class WayfinderStageDataControllerTests
             new SingleHttpContextAccessor(new DefaultHttpContext()),
             supportSystemClients: [],
             requestConcurrencyPolicies: [],
+            eventAggregator: Mock.Of<global::Umbraco.Cms.Core.Events.IEventAggregator>(),
             bulkDatasetStore: bulkDatasetStore);
 
         var started = engine.GetCurrent(DefinitionKey, TenantId, OwnerUserId, new ActorProfile());

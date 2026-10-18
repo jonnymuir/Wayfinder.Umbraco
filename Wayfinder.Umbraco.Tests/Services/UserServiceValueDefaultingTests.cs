@@ -1,3 +1,4 @@
+using Moq;
 using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
@@ -40,7 +41,8 @@ public sealed class UserServiceValueDefaultingTests
             new InMemoryAuditLogStore(),
             new FixedHttpContextAccessor(new DefaultHttpContext { User = user }),
             supportSystemClients: [],
-            requestConcurrencyPolicies: []);
+            requestConcurrencyPolicies: [],
+            eventAggregator: Mock.Of<global::Umbraco.Cms.Core.Events.IEventAggregator>());
 
         var result = engine.GetCurrent(definition.DefinitionKey, TenantId, "user-1", new ActorProfile());
 

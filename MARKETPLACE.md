@@ -315,6 +315,7 @@ Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wi
   | `IServiceInputsResolver` | Supply `source: "service"` calculation fields from your own systems. A field you don't supply keeps its stored value. |
   | `IRequestConcurrencyPolicy` | Decide whether someone can start another request for a blueprint, for example one open claim per person. |
   | `IAuditLogStore` | Keep the audit trail somewhere else. Your store replaces the database one, and its retention is then yours. |
+  | `ServiceRequestTransitionedNotification` handler | React when a request moves stage (send an email when a reply reaches the citizen, say), with `builder.AddNotificationAsyncHandler<ServiceRequestTransitionedNotification, YourHandler>()`. Published once per saved move, whatever caused it; a handler that throws is logged and never undoes the move. |
   | `IStageSubmissionGuard` | Check every stage submission before anything changes: bot protection (a CAPTCHA, a honeypot), rate limiting. Its fields are added to every stage form, and a rejection returns the person to the stage with your message. Register as many as you need. |
 
 ## Security responsibilities

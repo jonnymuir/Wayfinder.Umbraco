@@ -15,8 +15,20 @@ Releases before 3.0.0 are listed on
   registered guard's fields are added to every stage form, and its check runs on every submission once
   the nonce is verified and before any field, file or engine work. A rejection changes nothing and
   returns the person to the stage with the guard's message. With none registered, nothing changes.
+- `ServiceRequestTransitionedNotification`, an Umbraco notification published once per saved move
+  (a submitted stage, a caseworker's action, a gateway, a support system's outcome), so a host can react
+  to one, sending an email when a reply reaches the citizen, say. It is raised from the transitions the
+  engine records, which is the only reliable signal: a caseworker's move into a queue they cannot see
+  saves, but their own response reads as access denied.
 - `_WayfinderStageForBlueprint`, the view the stage block renders through, so a host can render a
   journey from its own block or template: `Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", "blueprint-key")`.
+
+### Changed
+
+- Requires Wayfinder 0.22.0 (Rendering.GovUk 0.10.0, Editor 0.9.0). Brings the `conversation`
+  component, which renders here with no extra wiring, and the engine fix that clears a pickup when a
+  plain stage-to-stage hop moves work into a different queue: a request a caseworker sends back to the
+  citizen now stays visible to the citizen.
 
 ### Security
 
