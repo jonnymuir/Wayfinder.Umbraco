@@ -9,6 +9,8 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [4.1.0] — 2026-10-18
+
 ### Added
 
 - `IStageSubmissionGuard`, for bot protection or any other check a stage submission must pass. Each
