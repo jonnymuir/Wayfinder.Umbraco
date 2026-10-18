@@ -15,6 +15,8 @@ Releases before 3.0.0 are listed on
   registered guard's fields are added to every stage form, and its check runs on every submission once
   the nonce is verified and before any field, file or engine work. A rejection changes nothing and
   returns the person to the stage with the guard's message. With none registered, nothing changes.
+- `_WayfinderStageForBlueprint`, the view the stage block renders through, so a host can render a
+  journey from its own block or template: `Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", "blueprint-key")`.
 
 ### Security
 

@@ -285,7 +285,12 @@ a worklist that spans blueprints), so a host can scope access per service. It ru
 render and form post, so cache any lookup it makes.
 
 Then drop the `wayfinderServiceRequestStage` block onto any Block Grid page and set its
-`blueprintKey`.
+`blueprintKey`. To render a journey from your own block or template instead, use the same view the
+block does:
+
+```cshtml
+@await Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", "your-blueprint-key")
+```
 
 ## What a host still owns
 
