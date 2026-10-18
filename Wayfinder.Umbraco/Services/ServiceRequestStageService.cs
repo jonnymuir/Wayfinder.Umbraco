@@ -27,9 +27,24 @@ public class ServiceRequestStageService(
     IServiceRequestFileStorage fileStorage,
     IUploadTokenService uploadTokenService,
     IAntiforgery antiforgery,
-    ILogger<ServiceRequestStageService> logger)
+    ILogger<ServiceRequestStageService> logger,
+    IEnumerable<IStageSubmissionGuard>? guards = null)
 {
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
+
+    // Guards run in registration order, and the first rejection stops the submission.
+    private async Task<string?> FirstGuardRejectionAsync(StageSubmissionGuardContext context, IFormCollection form)
+    {
+        foreach (var guard in guards ?? [])
+        {
+            if (await guard.CheckAsync(context, form) is { } rejection)
+            {
+                return rejection;
+            }
+        }
+
+        return null;
+    }
     private const string FieldPrefix = "field:";
 
     /// <summary>
@@ -208,6 +223,13 @@ public class ServiceRequestStageService(
         var submittedFields = form.Keys
             .Where(k => k.StartsWith(FieldPrefix, StringComparison.Ordinal))
             .ToDictionary(k => k[FieldPrefix.Length..], k => form[k].ToString());
+
+        if (await FirstGuardRejectionAsync(new StageSubmissionGuardContext(ctx, blueprintKey, instanceId), form) is { } rejection)
+        {
+            logger.LogWarning("Stage advance: rejected by a submission guard");
+            return ServiceRequestStageAdvanceResult.Redirect(
+                returnUrl, [new ServiceRequestProblem { FieldKey = "", Message = rejection, Code = "SUBMISSION_REJECTED" }], submittedFields);
+        }
 
         // Files never appear in form.Keys — a file-upload field's "value" for required-checking
         // purposes is simply whether a file was posted for it.

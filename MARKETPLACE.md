@@ -310,6 +310,7 @@ Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wi
   | `IServiceInputsResolver` | Supply `source: "service"` calculation fields from your own systems. A field you don't supply keeps its stored value. |
   | `IRequestConcurrencyPolicy` | Decide whether someone can start another request for a blueprint, for example one open claim per person. |
   | `IAuditLogStore` | Keep the audit trail somewhere else. Your store replaces the database one, and its retention is then yours. |
+  | `IStageSubmissionGuard` | Check every stage submission before anything changes: bot protection (a CAPTCHA, a honeypot), rate limiting. Its fields are added to every stage form, and a rejection returns the person to the stage with your message. Register as many as you need. |
 
 ## Security responsibilities
 
@@ -320,7 +321,7 @@ own unless it says otherwise.
 |---|---|---|
 | Backoffice authoring API (`ServiceBlueprintAuthoringController`) | Umbraco Management API, `/umbraco/management/api/v1/wayfinder/...` | The `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin` policy, registered by the package and checked against `WayfinderServiceDesignOptions.AdminGroupAliases`. |
 | Live-update polling (`ServiceRequestPollController`) | `/api/wayfinder/workflow/poll` | The `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` policy. The package's default is `RequireAuthenticatedUser()`; a host can replace it (see above). |
-| Stage form posts (`WayfinderStageSurfaceController`) | Umbraco surface controller | Antiforgery validation, a per-instance nonce, and the engine's ownership check. Uploaded files arrive with this form post. |
+| Stage form posts (`WayfinderStageSurfaceController`) | Umbraco surface controller | Antiforgery validation, a per-instance nonce, and the engine's ownership check. Uploaded files arrive with this form post. Anonymous journeys accept posts from anyone, so register an `IStageSubmissionGuard` for bot protection; it runs only once the nonce is verified. |
 | Uploaded-file downloads and bulk-data-review data (`WayfinderStageDataController`) | `/umbraco/wayfinder-stage/{blueprintKey}/{instanceId}/...` | The engine's ownership check (`IsOwnedInstance`) against the caller's host-resolved identity, on every action. It carries `[AllowAnonymous]` deliberately, so an anonymous citizen journey still works; the ownership check is the boundary. |
 | MCP authoring endpoint (only if you turn it on) | Wherever you map it | Deny-by-default in `Wayfinder.Engine.Mcp`; narrow it to `BlueprintsAdmin` as shown in [Turning on MCP authoring](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#turning-on-mcp-authoring-in-your-own-site). |
 

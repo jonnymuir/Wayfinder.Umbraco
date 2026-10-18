@@ -9,6 +9,20 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- `IStageSubmissionGuard`, for bot protection or any other check a stage submission must pass. Each
+  registered guard's fields are added to every stage form, and its check runs on every submission once
+  the nonce is verified and before any field, file or engine work. A rejection changes nothing and
+  returns the person to the stage with the guard's message. With none registered, nothing changes.
+
+### Security
+
+- The stage form's hidden fields are attribute-encoded. `ReturnUrl` is the page's own path, which the
+  person requesting it controls, and was written into the form unencoded: a page with the stage block
+  reachable at a path containing a quote would have allowed script injection. No such route was found,
+  but the values are now encoded regardless.
+
 ### Fixed
 
 - Keeps an anonymous visitor's request once it has been handed over to another queue. Before, the

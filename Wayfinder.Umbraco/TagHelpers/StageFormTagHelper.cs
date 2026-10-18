@@ -1,13 +1,15 @@
+using System.Net;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Wayfinder.Umbraco.Controllers;
+using Wayfinder.Umbraco.Services;
 
 namespace Wayfinder.Umbraco.TagHelpers;
 
 [HtmlTargetElement("wayfinder-stage-form")]
-public class StageFormTagHelper(IAntiforgery antiforgery) : TagHelper
+public class StageFormTagHelper(IAntiforgery antiforgery, IEnumerable<IStageSubmissionGuard> guards) : TagHelper
 {
     [HtmlAttributeNotBound]
     [ViewContext]
@@ -47,19 +49,32 @@ public class StageFormTagHelper(IAntiforgery antiforgery) : TagHelper
         output.Attributes.SetAttribute("enctype", "multipart/form-data");
 
         var tokens = antiforgery.GetAndStoreTokens(ViewContext.HttpContext);
-        var antiforgeryHtml = $@"<input type=""hidden"" name=""__RequestVerificationToken"" value=""{tokens.RequestToken}"" />";
+        // Every value is attribute-encoded: ReturnUrl is the page's own path, which the person
+        // requesting it controls, so an unencoded quote in it would break out of the attribute.
+        var antiforgeryHtml = $@"<input type=""hidden"" name=""__RequestVerificationToken"" value=""{Encode(tokens.RequestToken)}"" />";
 
         var hiddenFields = $@"
 {antiforgeryHtml}
-    <input type=""hidden"" name=""InstanceId"" value=""{InstanceId}"" />
+    <input type=""hidden"" name=""InstanceId"" value=""{Encode(InstanceId)}"" />
     <input type=""hidden"" name=""StateVersion"" value=""{StateVersion}"" />
-    <input type=""hidden"" name=""BlueprintKey"" value=""{BlueprintKey}"" />
-    <input type=""hidden"" name=""ReturnUrl"" value=""{ReturnUrl}"" />
-    <input type=""hidden"" name=""Nonce"" value=""{Nonce}"" />";
+    <input type=""hidden"" name=""BlueprintKey"" value=""{Encode(BlueprintKey)}"" />
+    <input type=""hidden"" name=""ReturnUrl"" value=""{Encode(ReturnUrl)}"" />
+    <input type=""hidden"" name=""Nonce"" value=""{Encode(Nonce)}"" />";
 
         output.PreContent.SetHtmlContent(hiddenFields);
 
         var childContent = await output.GetChildContentAsync();
         output.Content.SetHtmlContent(childContent);
+
+        var guardContext = new StageSubmissionGuardContext(ViewContext.HttpContext, BlueprintKey, InstanceId);
+        foreach (var guard in guards)
+        {
+            if (guard.FormFields(guardContext) is { } fields)
+            {
+                output.PostContent.AppendHtml(fields);
+            }
+        }
     }
+
+    private static string Encode(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 }
