@@ -32,6 +32,31 @@ public class ServiceRequestStageService(
 {
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
 
+    /// <summary>
+    /// The fields the nonce was issued for, consuming it; <see langword="null"/> (logged) for a missing,
+    /// expired or invalid nonce, or one bound to a different instance or user. Consumed the moment a
+    /// whole-page submission uses it, which bounds replay of this exact submission to before this point
+    /// rather than to the nonce's own lifetime (an async file upload's own resolve never reaches here).
+    /// </summary>
+    private async Task<IReadOnlyList<FieldRenderPayload>?> ConsumeNonceAsync(string nonce, string instanceId, string userId)
+    {
+        if (string.IsNullOrEmpty(nonce))
+        {
+            logger.LogWarning("Stage advance: missing nonce — possible form tampering");
+            return null;
+        }
+
+        var authoritativeFields = await nonceService.ResolveAsync(nonce, instanceId, userId);
+        if (authoritativeFields == null)
+        {
+            logger.LogWarning("Stage advance: nonce expired, invalid, or bound to a different instance/user — redirecting to GET");
+            return null;
+        }
+
+        await nonceService.InvalidateAsync(nonce);
+        return authoritativeFields;
+    }
+
     // Guards run in registration order, and the first rejection stops the submission.
     private async Task<string?> FirstGuardRejectionAsync(StageSubmissionGuardContext context, IFormCollection form)
     {
@@ -201,23 +226,11 @@ public class ServiceRequestStageService(
         var instanceId = form["InstanceId"].ToString();
         var nonce = form["Nonce"].ToString();
 
-        if (string.IsNullOrEmpty(nonce))
-        {
-            logger.LogWarning("Stage advance: missing nonce — possible form tampering");
-            return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
-        }
-
-        var authoritativeFields = await nonceService.ResolveAsync(nonce, instanceId, userId);
+        var authoritativeFields = await ConsumeNonceAsync(nonce, instanceId, userId);
         if (authoritativeFields == null)
         {
-            logger.LogWarning("Stage advance: nonce expired, invalid, or bound to a different instance/user — redirecting to GET");
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
         }
-
-        // Consumed the moment a whole-page submission actually uses it — bounds replay of this
-        // exact submission to "before this point", rather than "until the nonce's own TTL
-        // expires" (an async file-upload's own resolve never reaches here, so it's unaffected).
-        await nonceService.InvalidateAsync(nonce);
 
         // Fields post under GovUk.FieldName's "field:{fieldKey}" convention (Wayfinder.Rendering.GovUk's own rendering contract).
         var submittedFields = form.Keys
