@@ -270,6 +270,11 @@ Install the package and call `AddWayfinderUmbraco()`:
 - **An audit trail**, DB-backed (`wayfinderAuditEvent`): every transition, pickup and putback,
   with who did it and when, read back through `IAuditLogStore`. Events are removed once they
   are older than `Wayfinder:AuditRetention` (365 days by default; `00:00:00` keeps them forever).
+- **Request storage**, DB-backed (`wayfinderServiceRequest`). An anonymous visitor's request expires
+  thirty minutes after they last touched it while it is still a draft in their own queue. Once it
+  has been handed over to another queue (a submission landing in a team's worklist), or belongs to
+  a signed-in member, it is kept until something removes it, so your retention policy needs to
+  cover it.
 - **The supporting infrastructure**: nonce handling, file upload, field validation, and live
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
