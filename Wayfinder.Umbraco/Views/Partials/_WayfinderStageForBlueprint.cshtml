@@ -1,0 +1,40 @@
+@using System.Text.Json
+@using Wayfinder.Umbraco.Models
+@using Wayfinder.Umbraco.Services
+@using Wayfinder.Models.ServiceDesign
+@model string
+@inject ServiceRequestStageService StageService
+@*
+    The citizen-facing stage for one blueprint, anywhere a view can render a partial: the
+    wayfinderServiceRequestStage block uses it, and a host can render it from its own block or
+    template with @await Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", "blueprint-key").
+    The model is the blueprint key.
+*@
+@{
+    var blueprintKey = Model;
+    IReadOnlyList<ServiceRequestProblem>? problems = null;
+    IReadOnlyDictionary<string, string>? formValues = null;
+    if (TempData.TryGetValue("ServiceRequestProblems", out var rawProblems) && rawProblems is string problemsJson)
+    {
+        try { problems = JsonSerializer.Deserialize<List<ServiceRequestProblem>>(problemsJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+    if (TempData.TryGetValue("ServiceRequestFormValues", out var rawFormValues) && rawFormValues is string formValuesJson)
+    {
+        try { formValues = JsonSerializer.Deserialize<Dictionary<string, string>>(formValuesJson); }
+        catch { /* ignore malformed TempData */ }
+    }
+
+    var instanceId = Context.Request.Query["instanceId"].ToString();
+    var action = Context.Request.Query["action"].ToString();
+
+    var result = await StageService.RenderCurrentAsync(
+        Context, blueprintKey,
+        string.IsNullOrEmpty(instanceId) ? null : instanceId,
+        string.IsNullOrEmpty(action) ? null : action,
+        problems, formValues);
+
+    var returnUrl = Context.Request.PathBase + Context.Request.Path;
+    var vm = ServiceRequestPageViewModel.FromRenderResult(result, returnUrl);
+}
+@await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", vm)

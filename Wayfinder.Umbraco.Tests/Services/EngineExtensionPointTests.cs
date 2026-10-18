@@ -103,6 +103,8 @@ public class EngineExtensionPointTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddHttpContextAccessor();
+        // Umbraco itself registers this on every site.
+        services.AddSingleton(Moq.Mock.Of<global::Umbraco.Cms.Core.Events.IEventAggregator>());
         services.AddSingleton<IServiceBlueprintStore>(new SingleDefinitionServiceBlueprintStore(definition));
         services.AddSingleton<IServiceRequestStore>(new InMemoryServiceRequestStore());
         services.AddSingleton<IBulkDatasetStore>(new InMemoryBulkDatasetStore(new InMemoryServiceRequestFileStorage()));

@@ -1,3 +1,4 @@
+using Umbraco.Cms.Core.Events;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Wayfinder.Models.ServiceDesign;
@@ -29,6 +30,7 @@ public sealed class UmbracoProcessManagerEngine(
     IHttpContextAccessor httpContextAccessor,
     IEnumerable<ISupportSystemClient> supportSystemClients,
     IEnumerable<IRequestConcurrencyPolicy> requestConcurrencyPolicies,
+    IEventAggregator eventAggregator,
     IBulkDatasetStore? bulkDatasetStore = null,
     IServiceInputsResolver? serviceInputsResolver = null)
     : ProcessManagerEngine(
@@ -40,7 +42,7 @@ public sealed class UmbracoProcessManagerEngine(
         supportSystemClients,
         bulkDatasetStore,
         requestConcurrencyPolicies,
-        auditLogStore)
+        new NotifyingAuditLogStore(auditLogStore, eventAggregator, logger))
 {
     /// <summary>
     /// A new instance is authenticated when the request creating it belongs to a signed-in
