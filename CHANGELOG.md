@@ -9,6 +9,15 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Fixed
+
+- Keeps an anonymous visitor's request once it has been handed over to another queue. Before, the
+  database store gave every anonymous request a thirty-minute sliding expiry, so a submission waiting
+  in a team's worklist (a contact message, say) was deleted within the hour unless someone opened it.
+  Now only a draft still in the visitor's own queue expires with their session. Handed-over requests,
+  and the personal details in them, are kept like a signed-in member's, so check your retention
+  policy covers them. Requires Wayfinder 0.21.0.
+
 ## [4.0.0] — 2026-10-16
 
 ### Breaking changes

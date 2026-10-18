@@ -8,11 +8,14 @@ namespace Wayfinder.Umbraco.Services;
 
 /// <summary>
 /// <see cref="IServiceRequestStore"/> backed by the wayfinderServiceRequest table — durable
-/// across an app-pool recycle. An anonymous visitor's row carries a sliding <c>ExpiresUtc</c>
-/// so it still dies with their session; an authenticated member's row
-/// (<see cref="ServiceRequest.IsAuthenticated"/>) is stamped with <see cref="NeverExpires"/>
-/// instead, so signing in and coming back next week finds it exactly where it was left — see
-/// "My Requests" (<c>ServiceRequestHubController</c>).
+/// across an app-pool recycle. An anonymous visitor's draft carries a sliding <c>ExpiresUtc</c>
+/// so it still dies with their session. Two kinds of row are stamped with
+/// <see cref="NeverExpires"/> instead: an authenticated member's
+/// (<see cref="ServiceRequest.IsAuthenticated"/>), so signing in and coming back next week finds
+/// it exactly where it was left (see "My Requests", <c>ServiceRequestHubController</c>), and any
+/// request that has been handed over to another queue (<see cref="ServiceRequest.HandedOverAt"/>),
+/// so an anonymous visitor's submission waiting in a team's worklist is never deleted with their
+/// session.
 /// </summary>
 public sealed class UmbracoServiceRequestStore(
     IUmbracoDatabaseFactory databaseFactory,
@@ -52,10 +55,10 @@ public sealed class UmbracoServiceRequestStore(
             return false;
         }
 
-        // Refresh the sliding window on read — an active anonymous visitor keeps their instance
-        // alive. Skipped for an authenticated instance: it's already at NeverExpires, and
-        // re-issuing the same value on every read would just be a wasted write.
-        if (!state.IsAuthenticated)
+        // Refresh the sliding window on read — an active anonymous visitor keeps their draft
+        // alive. Skipped for a kept instance: it's already at NeverExpires, and re-issuing the
+        // same value on every read would just be a wasted write.
+        if (!IsKept(state))
         {
             db.Execute(
                 "UPDATE wayfinderServiceRequest SET ExpiresUtc = @0 WHERE InstanceId = @1",
@@ -69,7 +72,7 @@ public sealed class UmbracoServiceRequestStore(
     public void Save(ServiceRequest instance)
     {
         using var db = databaseFactory.CreateDatabase();
-        var expiresUtc = instance.IsAuthenticated ? NeverExpires : DateTime.UtcNow.Add(_slidingExpiration);
+        var expiresUtc = IsKept(instance) ? NeverExpires : DateTime.UtcNow.Add(_slidingExpiration);
         var json = JsonSerializer.Serialize(instance, JsonOptions);
 
         var rowsAffected = db.Execute(
@@ -123,4 +126,8 @@ public sealed class UmbracoServiceRequestStore(
             .Select(state => state!)
             .ToArray();
     }
+
+    // Only an anonymous visitor's draft, still in their own queue, expires with their session.
+    private static bool IsKept(ServiceRequest instance) =>
+        instance.IsAuthenticated || instance.HandedOverAt is not null;
 }
