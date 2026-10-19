@@ -9,6 +9,10 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [5.0.0] — 2026-10-19
+
+Depends on Wayfinder 0.23.0 and Wayfinder.Rendering.GovUk 0.11.0.
+
 ### Added
 
 - `AddWayfinderVisitors`: anonymous visitors with a way back. A visitor is a random secret in an
