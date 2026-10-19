@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using FluentAssertions;
 
@@ -118,14 +119,32 @@ public sealed class AuthorizationBehaviourTests(ReferenceAppFactory factory)
     // ---- ServiceRequestPollController: [Authorize(Policy = ServiceRequestPolling)] ----
 
     [Fact]
-    public async Task Poll_endpoint_rejects_an_anonymous_caller()
+    public async Task Poll_endpoint_admits_an_anonymous_visitor_then_the_engine_scopes_it()
     {
+        // The reference host has anonymous visitors (AddWayfinderVisitors), whose own wait screens
+        // poll too. A visitor is still only ever told about a request their own id may see: someone
+        // else's, or an unknown one, is a clean 404 — never its state, never a 5xx.
         using var client = Anonymous();
         var res = await client.GetAsync(
             "/api/wayfinder/workflow/poll?blueprintKey=reference-demo&instanceId=x&knownStateVersion=0");
-        res.StatusCode.Should().BeOneOf(
-            new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Redirect },
-            "ServiceRequestPolling requires an authenticated user in the reference host");
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Poll_endpoint_tells_an_anonymous_visitor_nothing_about_a_citizens_request()
+    {
+        var citizen = new Wayfinder.Models.ServiceDesign.ActorProfile
+        {
+            VisibleQueues = ["citizen"], StartableQueues = ["citizen"], ActionableQueues = ["citizen"], RestrictToInstanceOwner = true,
+        };
+        var theirs = factory.Services.GetRequiredService<Wayfinder.Engine.Abstractions.IProcessManager>()
+            .GetCurrent("reference-demo", "reference", CitizenEmail, citizen);
+
+        using var client = Anonymous();
+        var res = await client.GetAsync(
+            $"/api/wayfinder/workflow/poll?blueprintKey=reference-demo&instanceId={theirs.InstanceId}&knownStateVersion=0");
+
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

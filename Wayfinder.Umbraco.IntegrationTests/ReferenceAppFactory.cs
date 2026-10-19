@@ -38,6 +38,9 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
     private readonly string _tempRoot = Path.Combine(
         Path.GetTempPath(), "wu-authcontract-" + Guid.NewGuid().ToString("N"));
 
+    /// <summary>Where the host writes each email it sends, as an .eml file.</summary>
+    public string MailFolder => Path.Combine(_tempRoot, "mail");
+
     private readonly SqlServerDatabase? _sqlServer =
         Environment.GetEnvironmentVariable(SqlServerVariable) is { Length: > 0 } server ? new SqlServerDatabase(server) : null;
 
@@ -112,6 +115,9 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
                 ["Umbraco:CMS:Unattended:InstallUnattended"] = "true",
                 ["Umbraco:CMS:Unattended:UpgradeUnattended"] = "true",
                 ["Umbraco:CMS:Unattended:PackageMigrationsUnattended"] = "true",
+
+                // Emails the host sends land here, not in the source tree.
+                ["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] = MailFolder,
             });
         });
     }

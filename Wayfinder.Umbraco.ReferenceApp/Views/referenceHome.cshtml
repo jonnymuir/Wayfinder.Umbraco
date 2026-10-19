@@ -28,7 +28,7 @@
     {
         using var citizenWriter = new StringWriter();
         (await Html.GetBlockGridHtmlAsync(citizenGrid!)).WriteTo(citizenWriter, HtmlEncoder.Default);
-        sections += "<h1 class=\"govuk-heading-l\">Apply</h1>" + citizenWriter;
+        sections += $"<h1 class=\"govuk-heading-l\">{HtmlEncoder.Default.Encode(Model.Name ?? "Apply")}</h1>" + citizenWriter;
     }
 
     if (hasCaseworkerBlock)

@@ -88,7 +88,13 @@ public static class WayfinderUmbracoServiceCollectionExtensions
 
         services.AddOptions<WayfinderServiceDesignOptions>()
             .BindConfiguration("Wayfinder")
-            .Configure(configure);
+            .Configure(configure)
+            .Validate(
+                options => TimeZoneInfo.TryFindSystemTimeZoneById(options.DisplayTimeZone, out _),
+                "Wayfinder:DisplayTimeZone must be a time zone id this server knows, such as \"Europe/London\".")
+            .ValidateOnStart();
+
+        services.TryAddSingleton<WayfinderDisplayTime>();
 
         services.TryAddSingleton<IStageNonceService, StageNonceService>();
 

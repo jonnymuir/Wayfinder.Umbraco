@@ -1,0 +1,6 @@
+@inherits Microsoft.AspNetCore.Mvc.Razor.RazorPage<Wayfinder.Umbraco.Emails.WayfinderEmailModel>
+@* Who wrote, and where to answer. What they wrote stays on the site, out of anyone's inbox. *@
+<html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#0b0c0c">
+<p>@(Model.Field("name") ?? "A visitor") has sent a message through the contact page.</p>
+<p><a href="@(Model.PublicBaseUrl)/caseworker-queue/">Read and reply</a></p>
+</body></html>

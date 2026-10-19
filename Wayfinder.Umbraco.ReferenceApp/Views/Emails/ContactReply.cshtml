@@ -1,0 +1,17 @@
+@inherits Microsoft.AspNetCore.Mvc.Razor.RazorPage<Wayfinder.Umbraco.Emails.WayfinderEmailModel>
+@{
+    var reply = Model.LatestMessage("conversation") is { QueueKey: "team" } latest ? latest.Text : null;
+    var closed = Model.Action == "close";
+}
+<html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#0b0c0c">
+<p>Dear @(Model.Field("name") ?? "visitor"),</p>
+@if (reply is not null)
+{
+    <p>Here is our reply:</p>
+    <blockquote style="border-left:4px solid #1d70b8;padding-left:15px;margin:15px 0;white-space:pre-wrap">@reply</blockquote>
+}
+<p>@(closed ? "We've closed this conversation. You can still read it, or send us a new message:" : "To reply, use the link below. It takes you straight back to your conversation with us.")</p>
+<p><a href="@Model.PrivateLinkUrl">@(closed ? "Open your conversation" : "Reply to us")</a></p>
+<p><strong>Please don't reply to this email.</strong> Replies to it aren't read; use the link above instead.</p>
+<p style="font-size:0.9em;color:#505a5f">The link is just for you and works for @Model.PrivateLinkLifetime.Days days. Please don't forward this email.</p>
+</body></html>

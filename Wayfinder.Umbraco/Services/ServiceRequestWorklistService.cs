@@ -18,8 +18,17 @@ namespace Wayfinder.Umbraco.Services;
 /// </summary>
 public class ServiceRequestWorklistService(
     IProcessManager processManager,
-    IOptions<WayfinderServiceDesignOptions> optionsAccessor)
+    IOptions<WayfinderServiceDesignOptions> optionsAccessor,
+    IServiceRequestStore requests)
 {
+    /// <summary>Each item on a worklist page with its request's field values, for a host showing them as columns.</summary>
+    public IReadOnlyList<Models.WorklistRow> Rows(QueueWorkListEnvelope envelope) =>
+        envelope.Items
+            .Select(item => new Models.WorklistRow(
+                item,
+                requests.TryGet(item.InstanceId, out var request) ? request.FieldValues : new Dictionary<string, object?>()))
+            .ToList();
+
     /// <summary>
     /// Lists the work items the calling caseworker's <c>ActorProfile</c> can see across whatever
     /// queues it has visibility into — the caseworker worklist's own paged/filtered/sorted query,

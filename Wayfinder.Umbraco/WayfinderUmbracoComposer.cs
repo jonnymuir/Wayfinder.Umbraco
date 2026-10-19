@@ -80,13 +80,25 @@ public class WayfinderUmbracoComposer : IComposer
         // for an unregistered policy name). Only takes effect if no host has already registered
         // this exact policy name — a host wanting different behaviour (e.g. a specific scheme)
         // still calls AddPolicy with the same name and simply wins, whichever composer order runs.
-        builder.Services.Configure<AuthorizationOptions>(options =>
+        // Resolved when options are first read, so it sees AddWayfinderVisitors whichever composer
+        // or Program.cs line called it.
+        builder.Services.AddOptions<AuthorizationOptions>().Configure<IServiceProvider>((options, services) =>
         {
-            if (options.GetPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling) is null)
+            if (options.GetPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling) is not null)
             {
-                options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling,
-                    policy => policy.RequireAuthenticatedUser());
+                return;
             }
+
+            // With anonymous visitors (AddWayfinderVisitors) a visitor's own wait screen polls too, and
+            // is no less scoped than a signed-in person's: the poll resolves the caller's own id and
+            // the engine only ever answers about a request that id may see.
+            if (services.GetRequiredService<IServiceProviderIsService>().IsService(typeof(Visitors.WayfinderVisitors)))
+            {
+                options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling, policy => policy.RequireAssertion(_ => true));
+                return;
+            }
+
+            options.AddPolicy(WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling, policy => policy.RequireAuthenticatedUser());
         });
     }
 }

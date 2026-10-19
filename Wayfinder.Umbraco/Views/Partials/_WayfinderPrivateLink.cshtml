@@ -1,0 +1,27 @@
+@model Wayfinder.Umbraco.Visitors.PrivateLinkPrompt
+@*
+    Asked on a request's page after someone follows a private link from an email: nothing about who
+    this browser is changes until they answer. A host restyles it with its own
+    ~/Views/Partials/_WayfinderPrivateLink.cshtml; keep the form, its antiforgery token and the two
+    decision values.
+*@
+@{
+    // The answer must be given on this site, never in a frame another site puts around it.
+    if (!Context.Response.HasStarted)
+    {
+        Context.Response.Headers["X-Frame-Options"] = "DENY";
+        Context.Response.Headers.CacheControl = "no-store";
+    }
+}
+<div data-wayfinder-private-link>
+    <h2 class="govuk-heading-m">Continue in this browser?</h2>
+    <p class="govuk-body">You followed a private link from an email about @Model.BlueprintDisplayName. Continue to see it here, and carry on from this browser.</p>
+    <p class="govuk-body">If you didn't expect this link, choose "Not now".</p>
+    <form method="post" action="@Model.PostUrl">
+        @Html.AntiForgeryToken()
+        <div class="govuk-button-group">
+            <button type="submit" name="decision" value="continue" class="govuk-button" data-module="govuk-button">Continue</button>
+            <button type="submit" name="decision" value="dismiss" class="govuk-button govuk-button--secondary" data-module="govuk-button">Not now</button>
+        </div>
+    </form>
+</div>

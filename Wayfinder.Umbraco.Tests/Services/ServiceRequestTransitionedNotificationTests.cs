@@ -98,7 +98,7 @@ public sealed class ServiceRequestTransitionedNotificationTests
     }
 
     [Fact]
-    public void ACaseworkersMoveIntoAQueueTheyCannotSee_StillPublishes_ThoughTheirResponseReadsAsDenied()
+    public void ACaseworkersMoveIntoAQueueTheyCannotSee_Publishes_AndTheirAnswerIsMovedOn()
     {
         var (engine, published) = Build();
         var instanceId = Sent(engine);
@@ -108,7 +108,7 @@ public sealed class ServiceRequestTransitionedNotificationTests
         var response = engine.Advance(instanceId, TenantId, "nick", Team, "reply", pickedUp.StateVersion,
             new Dictionary<string, object?> { ["answer"] = "Hi" });
 
-        response.Problems.Select(p => p.Code).Should().Contain("ACCESS_DENIED", "the request is now in a queue Nick cannot see");
+        response.ResponseState.Should().Be("moved_on", "the request is now in a queue Nick cannot see");
         published.Select(n => (n.Transition.ToStageKey, n.Transition.Action)).Should().Contain(("write", "reply"));
     }
 

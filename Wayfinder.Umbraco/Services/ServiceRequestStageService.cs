@@ -28,7 +28,9 @@ public class ServiceRequestStageService(
     IUploadTokenService uploadTokenService,
     IAntiforgery antiforgery,
     ILogger<ServiceRequestStageService> logger,
-    IEnumerable<IStageSubmissionGuard>? guards = null)
+    IEnumerable<IStageSubmissionGuard>? guards = null,
+    WayfinderDisplayTime? displayTime = null,
+    Visitors.WayfinderVisitors? visitors = null)
 {
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -85,19 +87,18 @@ public class ServiceRequestStageService(
     /// <param name="blueprintKey">Which service blueprint to render.</param>
     /// <param name="instanceId">A specific instance to resume, or <see langword="null"/> to resolve the caller's current/latest one.</param>
     /// <param name="action">An explicit transition to take on load (rare — most stages render via a plain GET).</param>
-    /// <param name="problems">Validation problems carried over from a failed POST (PRG pattern), if any.</param>
-    /// <param name="formValues">Submitted values to repopulate the form with, alongside <paramref name="problems"/>.</param>
+    /// <param name="flash">What a failed submission left for the next render (PRG pattern): shown only if it
+    /// belongs to the request this render resolves to, so it can never appear on someone else's form.</param>
     public async Task<ServiceRequestStageRenderResult> RenderCurrentAsync(
         HttpContext ctx,
         string blueprintKey,
         string? instanceId,
         string? action,
-        IReadOnlyList<ServiceRequestProblem>? problems = null,
-        IReadOnlyDictionary<string, string>? formValues = null)
+        StageFlash? flash = null)
     {
         try
         {
-            return await RenderCurrentCoreAsync(ctx, blueprintKey, instanceId, action, problems, formValues);
+            return await RenderCurrentCoreAsync(ctx, blueprintKey, instanceId, action, flash);
         }
         catch (Exception ex) when (ex is not (OperationCanceledException or StackOverflowException or OutOfMemoryException))
         {
@@ -122,8 +123,7 @@ public class ServiceRequestStageService(
                     Code = "UNHANDLED_EXCEPTION",
                 }],
             };
-            return new ServiceRequestStageRenderResult(
-                errorEnvelope, blueprintKey, Nonce: "", problems ?? [], formValues ?? new Dictionary<string, string>());
+            return new ServiceRequestStageRenderResult(errorEnvelope, blueprintKey, Nonce: "", [], new Dictionary<string, string>());
         }
     }
 
@@ -132,13 +132,15 @@ public class ServiceRequestStageService(
         string blueprintKey,
         string? instanceId,
         string? action,
-        IReadOnlyList<ServiceRequestProblem>? problems,
-        IReadOnlyDictionary<string, string>? formValues)
+        StageFlash? flash)
     {
         var options = optionsAccessor.Value;
         var tenantId = options.ResolveTenantId!(ctx);
         var userId = options.ResolveUserId(ctx);
         var accessProfile = await options.ResolveAccessProfile!(ctx, blueprintKey);
+
+        // What someone started as a visitor becomes theirs once they are signed in.
+        visitors?.ClaimForSignedInUser(ctx, tenantId, accessProfile);
 
         // action=start-new is untrusted query-string input from a citizen-facing surface (the
         // "Start again" link) — never forwarded to GetCurrent's own raw, unconditional handling of
@@ -152,9 +154,11 @@ public class ServiceRequestStageService(
                 string.IsNullOrEmpty(instanceId) ? null : instanceId,
                 string.IsNullOrEmpty(action) ? null : action);
 
+        var (problems, formValues) = flash?.For(envelope.InstanceId) ?? ([], new Dictionary<string, string>());
+
         if (envelope.ResponseState is "error" or "instance_picker")
         {
-            return new ServiceRequestStageRenderResult(envelope, blueprintKey, Nonce: "", problems ?? [], formValues ?? new Dictionary<string, string>());
+            return new ServiceRequestStageRenderResult(envelope, blueprintKey, Nonce: "", problems, formValues);
         }
 
         // Whether this render carries a bulk-data-review component with a real dataset — the only
@@ -173,6 +177,7 @@ public class ServiceRequestStageService(
         // but no row cards to act on.
         var (filesPrefix, bulkDatasetsPrefix) = Controllers.WayfinderStageDataController.BuildUrlPrefixes(blueprintKey, envelope.InstanceId);
         envelope = envelope.WithFileDownloadUrls(filesPrefix);
+        envelope = (displayTime ?? new WayfinderDisplayTime(optionsAccessor)).InDisplayTime(envelope);
 
         // Mint the token — and write its cookie onto this response — only when it's actually
         // needed (guard above). GetAndStoreTokens has a Set-Cookie side effect, so it must not
@@ -198,7 +203,7 @@ public class ServiceRequestStageService(
 
         var nonce = await nonceService.CreateAsync(envelope.InstanceId, userId, nonceFields);
 
-        return new ServiceRequestStageRenderResult(envelope, blueprintKey, nonce, problems ?? [], formValues ?? new Dictionary<string, string>());
+        return new ServiceRequestStageRenderResult(envelope, blueprintKey, nonce, problems, formValues);
     }
 
     /// <summary>
@@ -229,7 +234,7 @@ public class ServiceRequestStageService(
         var authoritativeFields = await ConsumeNonceAsync(nonce, instanceId, userId);
         if (authoritativeFields == null)
         {
-            return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
+            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId);
         }
 
         // Fields post under GovUk.FieldName's "field:{fieldKey}" convention (Wayfinder.Rendering.GovUk's own rendering contract).
@@ -241,7 +246,7 @@ public class ServiceRequestStageService(
         {
             logger.LogWarning("Stage advance: rejected by a submission guard");
             return ServiceRequestStageAdvanceResult.Redirect(
-                returnUrl, [new ServiceRequestProblem { FieldKey = "", Message = rejection, Code = "SUBMISSION_REJECTED" }], submittedFields);
+                returnUrl, instanceId, [new ServiceRequestProblem { FieldKey = "", Message = rejection, Code = "SUBMISSION_REJECTED" }], submittedFields);
         }
 
         // Files never appear in form.Keys — a file-upload field's "value" for required-checking
@@ -314,7 +319,7 @@ public class ServiceRequestStageService(
             var problems = errors
                 .Select(e => new ServiceRequestProblem { FieldKey = e.Key, Message = e.Value, Code = "validation_error" })
                 .ToList();
-            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, problems, submittedFields);
+            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId, problems, submittedFields);
         }
 
         var action = form["Action"].ToString();
@@ -323,7 +328,7 @@ public class ServiceRequestStageService(
         if (string.IsNullOrEmpty(instanceId) || !form.ContainsKey("Action"))
         {
             logger.LogWarning("Stage advance: missing InstanceId or Action");
-            return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
+            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId);
         }
 
         // Generic field coercion (booleans, numbers/decimals, GDS date sub-inputs, plain text) is
@@ -353,10 +358,10 @@ public class ServiceRequestStageService(
 
         if (envelope.Problems.Count > 0)
         {
-            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, envelope.Problems, submittedFields);
+            return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId, envelope.Problems, submittedFields);
         }
 
-        return ServiceRequestStageAdvanceResult.Redirect(returnUrl);
+        return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId) with { MovedOn = envelope.ResponseState == "moved_on" };
     }
 }
 
@@ -376,12 +381,20 @@ public record ServiceRequestStageRenderResult(
 /// </summary>
 public record ServiceRequestStageAdvanceResult(
     string ReturnUrl,
+    string InstanceId,
     IReadOnlyList<ServiceRequestProblem> Problems,
     IReadOnlyDictionary<string, string> FormValues)
 {
+    /// <summary>What to carry to the next render when the submission failed, tied to its request; null when it didn't.</summary>
+    public StageFlash? Flash => Problems.Count > 0 ? new StageFlash(InstanceId, Problems, FormValues) : null;
+
+    /// <summary>True when the move was saved and took the request out of everything the actor can see: their part is done.</summary>
+    public bool MovedOn { get; init; }
+
     public static ServiceRequestStageAdvanceResult Redirect(
         string? returnUrl,
+        string instanceId,
         IReadOnlyList<ServiceRequestProblem>? problems = null,
         IReadOnlyDictionary<string, string>? formValues = null) =>
-        new(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl, problems ?? [], formValues ?? new Dictionary<string, string>());
+        new(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl, instanceId, problems ?? [], formValues ?? new Dictionary<string, string>());
 }

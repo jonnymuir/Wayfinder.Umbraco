@@ -9,6 +9,45 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- `AddWayfinderVisitors`: anonymous visitors with a way back. A visitor is a random secret in an
+  HttpOnly cookie, and their requests record a one-way hash of it, never the secret. A private link in
+  an email (`/wayfinder/link`, 30 days) brings them back on any device: following it asks "Continue in
+  this browser?" first, and only that answer adds the browser, with a secret of its own. Signing in
+  moves what a visitor started onto their account; a team member never takes over a visitor's
+  requests. New tables `wayfinderVisitorDevice` and `wayfinderPrivateLink`.
+- `AddWayfinderEmails`: Razor-template emails sent as requests move on, through Umbraco's email
+  sender, in the background. A conversation is quoted as it was at the move, and queued jobs hold ids
+  only. `IWayfinderEmailQueue` lets a host queue them durably (Hangfire, say).
+- `AddWayfinderRecaptcha`: a Google reCAPTCHA v3 `IStageSubmissionGuard` that fails closed.
+- `LatestRequestPolicy`: opening a blueprint's page picks up the person's latest request whatever its
+  state, for conversations such as a contact page.
+- `Wayfinder:DisplayTimeZone` and `WayfinderDisplayTime`: conversation times and hub dates in your
+  visitors' time zone.
+- The worklist block renders through `_WayfinderWorklist.cshtml` and `_WayfinderWorklistItem.cshtml`,
+  which a host can replace, with each item's request field values in the model.
+- After a caseworker's move hands a request on, the worklist says it's done, not that the item is no
+  longer in their queue.
+- The reference app has a contact-us example open to anonymous visitors, with emails written to
+  `umbraco/Data/Mail`.
+
+### Fixed
+
+- A failed submission's problems and typed values are shown only on the form of the request they came
+  from. They rode in TempData with no owner, so a caseworker's reply (an "access denied" and the reply
+  text) turned up on the next stage form the same browser opened, such as a visitor's conversation.
+- A caseworker's reply that hands a request back is no longer treated as a failed submission
+  (Wayfinder 0.23.0's `moved_on`).
+
+### Changed
+
+- **Breaking:** `ServiceRequestStageService.RenderCurrentAsync` takes a `StageFlash` in place of
+  `problems` and `formValues`, and `ServiceRequestStageAdvanceResult` carries the request's
+  `InstanceId`. A host rendering stages itself passes `StageFlash.Take(TempData)`, and writes a failed
+  submission's `result.Flash?.Keep(TempData)`.
+- The reference app identifies anonymous citizens as visitors instead of one shared `"anonymous"` id.
+
 ## [4.1.0] — 2026-10-18
 
 ### Added

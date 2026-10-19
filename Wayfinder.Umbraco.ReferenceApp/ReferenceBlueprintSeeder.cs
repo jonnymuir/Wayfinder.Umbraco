@@ -34,10 +34,13 @@ public class ReferenceBlueprintSeeder(
     /// <summary>The NJF coaching-register blueprint whose registrar review stage calls the <c>njf-coaching-standards</c> support system.</summary>
     public const string CoachingRegisterDefinitionKey = "njf-coaching-register";
 
+    public const string ContactDefinitionKey = "contact-us";
+
     private static readonly (string Key, string File)[] Blueprints =
     [
         (DefinitionKey, "reference-demo.json"),
         (CoachingRegisterDefinitionKey, "njf-coaching-register.json"),
+        (ContactDefinitionKey, "contact-us.json"),
     ];
 
     private static readonly JsonSerializerOptions ReadOptions = new()

@@ -1,0 +1,7 @@
+@model Wayfinder.Umbraco.Models.WorklistItemViewModel
+@*
+    One work item open from the worklist: the way back, then its stage. A host replaces this with its
+    own ~/Views/Partials/_WayfinderWorklistItem.cshtml to change the surrounding page.
+*@
+<p class="govuk-body"><a href="@Model.PageUrl" class="govuk-link">&larr; Back to worklist</a></p>
+@await Html.PartialAsync("~/Views/Partials/_WayfinderStageRender.cshtml", Model.Stage)
