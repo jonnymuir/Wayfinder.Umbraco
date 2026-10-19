@@ -181,6 +181,7 @@ public static class ReferenceAppPageShell
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/">Home</a></li>
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/apply">Apply</a></li>
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/caseworker-queue">Caseworker queue</a></li>
+                          <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/contact-us">Contact us</a></li>
                           {nav}
                           <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/umbraco">Backoffice</a></li>
                         </ul>

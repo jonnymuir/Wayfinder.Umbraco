@@ -44,11 +44,28 @@ public sealed class ServiceRequestSweepService(
                 }
 
                 SweepAuditEvents(scope.ServiceProvider);
+                SweepVisitorDevices(scope.ServiceProvider);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Service request sweep failed; will retry next interval.");
             }
+        }
+    }
+
+    // A visitor's browser that hasn't been used for longer than its cookie lasts can never come back.
+    private void SweepVisitorDevices(IServiceProvider services)
+    {
+        if (services.GetService<Visitors.IVisitorDeviceStore>() is not { } devices
+            || services.GetService<IOptions<Visitors.WayfinderVisitorOptions>>() is not { } visitorOptions)
+        {
+            return;
+        }
+
+        var removed = devices.RemoveUnusedSince(DateTime.UtcNow - visitorOptions.Value.CookieLifetime);
+        if (removed > 0)
+        {
+            logger.LogInformation("Visitor sweep removed {Count} browser(s) unused for longer than their cookie lasts.", removed);
         }
     }
 

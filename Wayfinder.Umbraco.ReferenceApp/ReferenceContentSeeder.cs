@@ -77,6 +77,10 @@ public class ReferenceContentSeeder(
         EnsureContent(homeType, "Apply to coach", ReferenceBlueprintSeeder.CoachingRegisterDefinitionKey, citizenArea: true, caseworkerArea: false);
         EnsureContent(homeType, "Coaching register queue", ReferenceBlueprintSeeder.CoachingRegisterDefinitionKey, citizenArea: false, caseworkerArea: true);
 
+        // Contact us: anyone can write without signing in (AddWayfinderVisitors in Program.cs), and
+        // the team answers from the same caseworker queue page as every other service.
+        EnsureContent(homeType, "Contact us", ReferenceBlueprintSeeder.ContactDefinitionKey, citizenArea: true, caseworkerArea: false);
+
         logger.LogInformation("REFERENCE CONTENT SEEDER: complete");
     }
 

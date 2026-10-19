@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Core.Cache;
@@ -56,14 +55,13 @@ public class WayfinderStageSurfaceController(
     {
         var result = await stageService.AdvanceAsync(HttpContext, Request.Form);
 
-        // PRG: problems/resubmitted values ride in TempData for the block's own GET-side
-        // partial to pick back up on the next render — same mechanism ServiceRequestStageService
-        // callers have always used, just written here rather than by the service itself, since
-        // TempData is a controller/framework concern, not stage-rendering logic.
-        if (result.Problems.Count > 0)
+        // PRG: a failed submission's problems and values ride in TempData, tied to their request,
+        // for the next render of that request to show. TempData is a controller concern, so it is
+        // written here rather than by the service.
+        result.Flash?.Keep(TempData);
+        if (result.MovedOn)
         {
-            TempData["ServiceRequestProblems"] = JsonSerializer.Serialize(result.Problems);
-            TempData["ServiceRequestFormValues"] = JsonSerializer.Serialize(result.FormValues);
+            StageFlash.KeepMovedOn(TempData, result.InstanceId);
         }
 
         return Redirect(Url.IsLocalUrl(result.ReturnUrl) ? result.ReturnUrl : "/");

@@ -1,0 +1,29 @@
+@model Wayfinder.Umbraco.Models.WorklistViewModel
+@*
+    The worklist's list, in GOV.UK markup. A host shows its queue its own way by putting its own
+    ~/Views/Partials/_WayfinderWorklist.cshtml in the site, which replaces this one; the model has
+    each item with its request's field values, and the item and pickup URLs.
+*@
+@if (Model.Notice == Wayfinder.Umbraco.Models.WorklistNotice.Done)
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="wayfinder-worklist-notification-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="wayfinder-worklist-notification-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">Done. That request has moved on to its next step.</p>
+        </div>
+    </div>
+}
+else if (Model.Notice == Wayfinder.Umbraco.Models.WorklistNotice.NoLongerInQueue)
+{
+    <div class="govuk-notification-banner" role="region" aria-labelledby="wayfinder-worklist-notification-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="wayfinder-worklist-notification-title">Important</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">That item is no longer in your queue — it's likely already been actioned, or picked up by someone else.</p>
+        </div>
+    </div>
+}
+@Html.Raw(Model.DefaultBody)

@@ -34,10 +34,29 @@ builder.Configuration["NJF_STANDARDS_SIGNING_KEY"] ??=
 builder.Services.AddWayfinderUmbraco(options =>
 {
     options.ResolveTenantId = _ => "reference";
-    options.ResolveUserId = ctx =>
-        ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     options.ResolveAccessProfile = ReferenceAppAuth.ResolveAccessProfile;
+    options.DisplayTimeZone = "Europe/London";
 });
+
+// Anyone can use a citizen journey without signing in: an anonymous visitor is a browser cookie, a
+// private link in a reply email brings them back on another device, and signing in as a demo
+// citizen takes over what they started. Signed-in personas are identified by the demo scheme.
+builder.Services.AddWayfinderVisitors(visitors =>
+{
+    visitors.SignedInUserId = ctx => ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    visitors.StaffLandingPath = "/caseworker-queue/";
+    visitors.ExpiredLinkPath = "/contact-us/";
+});
+
+// Contact us picks up the visitor's latest conversation, whatever state it is in.
+builder.Services.AddSingleton<Wayfinder.Engine.Abstractions.IRequestConcurrencyPolicy>(
+    new LatestRequestPolicy(ReferenceBlueprintSeeder.ContactDefinitionKey));
+
+// No mail server in the reference app: Umbraco writes each email to a folder instead.
+var mailFolder = Path.Combine(builder.Environment.ContentRootPath, "umbraco", "Data", "Mail");
+builder.Configuration["Umbraco:CMS:Global:Smtp:From"] ??= "noreply@reference.example";
+builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] ??= mailFolder;
+Directory.CreateDirectory(builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"]!);
 
 // AddWayfinderUmbraco() above already registers ServiceBlueprintAuthoringService (the same
 // transport-agnostic service the backoffice REST authoring controller uses) — this just adds
@@ -63,6 +82,30 @@ builder.CreateUmbracoBuilder()
     // Development) and, below, the discovery documents + 401 challenge hint the flow needs.
     // The manual client-credentials flow (README) still works for headless/CI agents.
     .AddWayfinderUmbracoMcpAuthentication()
+    .AddWayfinderEmails(emails =>
+    {
+        emails.From = "The reference team <noreply@reference.example>";
+        emails.PublicBaseUrl = builder.Configuration["ReferenceApp:PublicBaseUrl"] ?? "https://localhost:44399";
+        emails.Emails.Add(new()
+        {
+            Name = "contact-reply",
+            BlueprintKey = ReferenceBlueprintSeeder.ContactDefinitionKey,
+            Actions = ["reply", "close"],
+            Subject = "We've replied to your message",
+            Template = "~/Views/Emails/ContactReply.cshtml",
+            ToField = "email",
+            PrivateLinkPagePath = "/contact-us/",
+        });
+        emails.Emails.Add(new()
+        {
+            Name = "contact-team-notice",
+            BlueprintKey = ReferenceBlueprintSeeder.ContactDefinitionKey,
+            Actions = ["send"],
+            Subject = "New message on the contact page",
+            Template = "~/Views/Emails/ContactTeamNotice.cshtml",
+            ToAddresses = ["team@reference.example"],
+        });
+    })
     .Build();
 
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();

@@ -278,6 +278,15 @@ Install the package and call `AddWayfinderUmbraco()`:
 - **The supporting infrastructure**: nonce handling, file upload, field validation, and live
   workflow-state polling, so a waiting or join-gateway screen updates in place instead of needing a
   manual refresh.
+- **Times in your visitors' time zone.** Set `Wayfinder:DisplayTimeZone` (an IANA id such as
+  `Europe/London`) and conversation messages and dates show in it, GMT or BST as the date falls.
+  Everything is still stored in UTC; host views can inject `WayfinderDisplayTime` for their own.
+- **A worklist you can restyle.** The worklist block's list and its open-item page render through
+  `~/Views/Partials/_WayfinderWorklist.cshtml` and `_WayfinderWorklistItem.cshtml`. Put your own
+  copy in your site to show the queue your way; the model carries each item with its request's
+  field values, and the item and pickup URLs. To put the worklist on a page of your own (a
+  controller view behind your own authorization, say), render
+  `@await Html.PartialAsync("~/Views/Partials/_WayfinderWorklistForPage.cshtml", 20)` (the page size).
 
 ![The stage block rendering the first step of a GOV.UK-styled journey](assets/screenshots/applicant-journey.png)
 
@@ -322,6 +331,73 @@ block does:
 @await Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", "your-blueprint-key")
 ```
 
+## A contact page, without anyone signing in
+
+A contact page is a conversation: the visitor writes, the team replies, either can carry on. The
+reference app's [`contact-us.json`](Wayfinder.Umbraco.ReferenceApp/service-blueprints/contact-us.json)
+is a complete blueprint for one (a `conversation` component, and a split and join so the visitor
+waits while the team replies). Four optional pieces make it work for visitors who never sign in:
+
+```csharp
+builder.Services.AddWayfinderUmbraco(options =>
+{
+    options.ResolveAccessProfile = YourQueues.AccessProfileAsync;   // the team, or a visitor
+    options.DisplayTimeZone = "Europe/London";
+});
+
+// Anonymous visitors: a browser cookie, with a private link in each email to come back on any device.
+builder.Services.AddWayfinderVisitors(visitors =>
+{
+    visitors.StaffLandingPath = "/messages/";      // where a team member who opens a link is sent
+    visitors.ExpiredLinkPath = "/contact-us/";
+});
+
+// Opening the page picks up the visitor's latest conversation, whatever state it's in.
+builder.Services.AddSingleton<IRequestConcurrencyPolicy>(new LatestRequestPolicy("contact-us"));
+
+// Emails as conversations move on, through Umbraco's own SMTP settings, in the background.
+builder.AddWayfinderEmails(emails =>
+{
+    emails.From = "Your site <noreply@example.com>";
+    emails.PublicBaseUrl = "https://example.com";
+    emails.Emails.Add(new() { Name = "reply", BlueprintKey = "contact-us", Actions = ["reply", "close"],
+        Subject = "We've replied to your message", Template = "~/Views/Emails/ContactReply.cshtml",
+        ToField = "email", PrivateLinkPagePath = "/contact-us/" });
+    emails.Emails.Add(new() { Name = "team-notice", BlueprintKey = "contact-us", Actions = ["send"],
+        Subject = "New message on the contact page", Template = "~/Views/Emails/ContactTeamNotice.cshtml",
+        ToAddresses = ["team@example.com"] });
+});
+
+// Bot protection with Google reCAPTCHA v3; it fails closed.
+builder.Services.AddWayfinderRecaptcha(recaptcha =>
+{
+    recaptcha.SiteKey = config["ReCaptcha:SiteKey"]!;
+    recaptcha.SecretKey = config["ReCaptcha:SecretKey"]!;
+});
+```
+
+The team answers from an ordinary content page with the worklist block on it, protected the way
+your site protects any members' page (Umbraco's Public Access, say). How it behaves:
+
+- **A visitor** is a random 256-bit secret in an HttpOnly, Secure cookie. Their requests record a
+  one-way hash of it as their owner, never the secret, so nothing shown or stored (a worklist, the
+  audit log, a backup) is a way to act as them.
+- **A private link** in an email works for 30 days (`Wayfinder:Visitors:PrivateLinkLifetime`).
+  Following one changes nothing by itself: the page asks "Continue in this browser?", and only that
+  answer, posted from your own page, adds the browser to the visitor, with a secret of its own. A
+  link someone else sends you can't quietly make your browser theirs. Only a hash of each link is
+  stored.
+- **Signing in** moves what a visitor started onto their account, the next time a stage renders
+  for them. A team member (an access profile not limited to their own requests) never takes
+  over a visitor's requests, whether by signing in or by opening a link.
+- **Emails** are Razor views with a `WayfinderEmailModel`; a conversation is quoted as it was when
+  the move happened. Queued jobs carry ids only, never a name, address or message. They send on
+  Umbraco's background queue; register your own `IWayfinderEmailQueue` (a Hangfire job calling
+  `WayfinderEmailSender.SendAsync`) for retries that survive a restart.
+
+Members are identified by Umbraco's members' scheme (`Identity.Application`) as `member:{id}`; a
+site with its own sign-in sets `WayfinderVisitorOptions.SignedInUserId`.
+
 ## What a host still owns
 
 Wayfinder for Umbraco has no multi-tenancy or auth opinion of its own. A host wires:
@@ -356,7 +432,8 @@ own unless it says otherwise.
 | Surface | Route | Protected by |
 |---|---|---|
 | Backoffice authoring API (`ServiceBlueprintAuthoringController`) | Umbraco Management API, `/umbraco/management/api/v1/wayfinder/...` | The `WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin` policy, registered by the package and checked against `WayfinderServiceDesignOptions.AdminGroupAliases`. |
-| Live-update polling (`ServiceRequestPollController`) | `/api/wayfinder/workflow/poll` | The `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` policy. The package's default is `RequireAuthenticatedUser()`; a host can replace it (see above). |
+| Live-update polling (`ServiceRequestPollController`) | `/api/wayfinder/workflow/poll` | The `WayfinderUmbracoAuthorizationPolicies.ServiceRequestPolling` policy. The package's default is `RequireAuthenticatedUser()`, or, with `AddWayfinderVisitors`, open to visitors too; either way the engine answers only about a request the caller's own id may see. A host can replace it (see above). |
+| Private links (`WayfinderPrivateLinkController`, only with `AddWayfinderVisitors`) | `/wayfinder/link` | `[AllowAnonymous]` deliberately: the 256-bit token is the proof, and only its hash is stored. Following a link (GET) changes no identity; the answer (POST) is antiforgery-checked. Responses are `no-store`, `no-referrer` and never framed. A request owned by a signed-in person opens only for them, and a team member is sent to `StaffLandingPath` unchanged. |
 | Stage form posts (`WayfinderStageSurfaceController`) | Umbraco surface controller | Antiforgery validation, a per-instance nonce, and the engine's ownership check. Uploaded files arrive with this form post. Anonymous journeys accept posts from anyone, so register an `IStageSubmissionGuard` for bot protection; it runs only once the nonce is verified. |
 | Uploaded-file downloads and bulk-data-review data (`WayfinderStageDataController`) | `/umbraco/wayfinder-stage/{blueprintKey}/{instanceId}/...` | The engine's ownership check (`IsOwnedInstance`) against the caller's host-resolved identity, on every action. It carries `[AllowAnonymous]` deliberately, so an anonymous citizen journey still works; the ownership check is the boundary. |
 | MCP authoring endpoint (only if you turn it on) | Wherever you map it | Deny-by-default in `Wayfinder.Engine.Mcp`; narrow it to `BlueprintsAdmin` as shown in [Turning on MCP authoring](#turning-on-mcp-authoring-in-your-own-site). |

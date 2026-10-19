@@ -84,6 +84,9 @@ public class WayfinderServiceDesignOptions
     /// this host resolves the acting user id differently.</summary>
     public Func<HttpContext, string> ResolveUserId { get; set; } = DefaultResolveUserId;
 
+    /// <summary>True while <see cref="ResolveUserId"/> is still the package's own default.</summary>
+    internal bool ResolvesUserIdByDefault => ResolveUserId.Method.Name == nameof(DefaultResolveUserId) && ResolveUserId.Target is null;
+
     private static string DefaultResolveUserId(HttpContext ctx) =>
         ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
         ?? throw new InvalidOperationException("Authenticated request has no NameIdentifier claim.");
@@ -124,4 +127,12 @@ public class WayfinderServiceDesignOptions
     /// <c>"/auth/login"</c>, the convention this package's own reference hosts use.
     /// </summary>
     public string LoginPath { get; set; } = "/auth/login";
+
+    /// <summary>
+    /// The time zone people read times in, as an IANA id such as <c>"Europe/London"</c>: conversation
+    /// messages and other times on a stage are shown in it (GMT or BST, in that example), while
+    /// everything is still stored in UTC. Defaults to <c>"UTC"</c>. An unknown id stops the site
+    /// starting, rather than quietly showing the wrong times (<c>Wayfinder:DisplayTimeZone</c>).
+    /// </summary>
+    public string DisplayTimeZone { get; set; } = "UTC";
 }

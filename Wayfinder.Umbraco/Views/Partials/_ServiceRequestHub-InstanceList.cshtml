@@ -1,5 +1,6 @@
 @using Wayfinder.Umbraco.Models
 @model IReadOnlyList<ServiceRequestViewModel>
+@inject Wayfinder.Umbraco.Services.WayfinderDisplayTime DisplayTime
 
 <ul class="wayfinder-instance-list" role="list">
     @foreach (var instance in Model)
@@ -13,13 +14,13 @@
                     <span class="wayfinder-instance-card__state-badge">@instance.Summary.CurrentStateDisplayName</span>
                 </p>
                 <p class="wayfinder-instance-card__meta">
-                    Started <time datetime="@instance.Summary.CreatedAt.ToString("yyyy-MM-dd")">
-                        @instance.Summary.CreatedAt.ToString("d MMM yyyy")
+                    Started <time datetime="@DisplayTime.Format(instance.Summary.CreatedAt, "yyyy-MM-dd")">
+                        @DisplayTime.Format(instance.Summary.CreatedAt, "d MMM yyyy")
                     </time>
                     @if (instance.Summary.LastUpdatedAt != instance.Summary.CreatedAt)
                     {
-                        <span> &middot; Updated <time datetime="@instance.Summary.LastUpdatedAt.ToString("yyyy-MM-dd")">
-                            @instance.Summary.LastUpdatedAt.ToString("d MMM yyyy")
+                        <span> &middot; Updated <time datetime="@DisplayTime.Format(instance.Summary.LastUpdatedAt, "yyyy-MM-dd")">
+                            @DisplayTime.Format(instance.Summary.LastUpdatedAt, "d MMM yyyy")
                         </time></span>
                     }
                 </p>

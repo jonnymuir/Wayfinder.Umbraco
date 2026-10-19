@@ -67,6 +67,13 @@ public class AuthorizationContractTests
             "CallerOwnsInstance helper) before touching any store — that check is the package's real " +
             "access boundary here, exactly as it is for ServiceRequestStageService. See the controller's " +
             "own class remarks.",
+
+        [(typeof(WayfinderPrivateLinkController), "*")] =
+            "A private link from an email is followed by someone usually not signed in: the token, a " +
+            "256-bit random value whose hash is all that is stored, is what proves the request is theirs. " +
+            "Following it (GET) changes no identity; only the answer on the site's own page (POST, " +
+            "antiforgery-checked) adds the browser to the visitor. Team members and requests owned by a " +
+            "signed-in person are refused a takeover. Asserted by PrivateLinkTests.",
     };
 
     private static IEnumerable<Type> AllControllers() =>
