@@ -115,6 +115,12 @@ public sealed partial class WayfinderVisitors(
         context.Items.Remove(ResolvedKey);
     }
 
+    /// <summary>
+    /// The owner id a browser's own secret gives (<c>visitor:</c> and a one-way hash of the secret). For a
+    /// host moving visitors it identified by their secret before onto this package's ids.
+    /// </summary>
+    public static string UserIdForSecret(string secret) => VisitorPrefix + DerivedId(secret);
+
     public static bool IsVisitorUserId(string? userId) =>
         userId is not null && userId.StartsWith(VisitorPrefix, StringComparison.Ordinal) && userId.Length > VisitorPrefix.Length;
 

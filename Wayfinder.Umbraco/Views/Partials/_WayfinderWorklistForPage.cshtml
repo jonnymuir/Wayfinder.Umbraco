@@ -1,0 +1,98 @@
+@using Wayfinder.Engine.Worklist
+@using Wayfinder.Umbraco.Controllers
+@using Wayfinder.Umbraco.Models
+@using Wayfinder.Umbraco.Services
+@model int
+@inject ServiceRequestStageService StageService
+@inject ServiceRequestWorklistService WorklistService
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@*
+    The caseworker worklist, anywhere a view can render a partial: the wayfinderServiceRequestWorklist
+    block uses it, and a host can render it from its own template or controller view with
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderWorklistForPage.cshtml", 20). The model is
+    the page size. It shows what the caller's access profile can see; gate who reaches the page as
+    you would any other.
+*@
+@{
+    var pageUrl = Context.Request.PathBase + Context.Request.Path;
+    var instanceId = Context.Request.Query["instanceId"].ToString();
+    var noLongerInQueue = false;
+    var notice = WorklistNotice.None;
+
+    if (!string.IsNullOrEmpty(instanceId))
+    {
+        // Reviewing one item — same stage-rendering pipeline the stage block itself uses.
+        // ReturnUrl must carry this item's own ?instanceId=/&blueprintKey= query string, not the
+        // bare listing path pageUrl already is (Context.Request.Path drops it) — otherwise every
+        // Advance() from here (a correction's resubmit, an accept, ...) PRGs the caseworker back
+        // to the listing instead of back to the item they were actually working on. Found live:
+        // a real Playwright walkthrough resubmitting a corrected bulk-data-review file landed back
+        // on the queue instead of the item's own wait screen.
+        var blueprintKey = Context.Request.Query["blueprintKey"].ToString();
+        var itemUrl = $"{pageUrl}{Context.Request.QueryString}";
+        var result = await StageService.RenderCurrentAsync(Context, blueprintKey, instanceId, action: null, StageFlash.Take(TempData));
+
+        // The one PRG outcome that isn't a "wait, resume here" case: a *final* Advance (approve/
+        // reject, or anything else that moves the item out of every queue this actor can act on)
+        // leaves ReturnUrl pointing at an instance this actor can no longer access at all — every
+        // ACCESS_DENIED the engine raises here means exactly that for a link the worklist itself
+        // generated (see ProcessManagerEngine's own ACCESS_DENIED call sites: this actor never had
+        // an unrelated reason to be shown someone else's instanceId). Falling through to the
+        // listing below, with a banner explaining why, beats a dead-end "There is a problem" box
+        // for what is actually a normal, expected outcome of finishing the item. Found live: Casey
+        // approving a request in the reference app landed on exactly this dead end.
+        noLongerInQueue = result.Envelope.ResponseState == "error"
+            && result.Envelope.Problems.Any(p => p.Code == "ACCESS_DENIED");
+        if (noLongerInQueue)
+        {
+            notice = StageFlash.TakeMovedOn(TempData, instanceId) ? WorklistNotice.Done : WorklistNotice.NoLongerInQueue;
+        }
+
+        if (!noLongerInQueue)
+        {
+            var item = new WorklistItemViewModel(pageUrl, ServiceRequestPageViewModel.FromRenderResult(result, itemUrl));
+            @await Html.PartialAsync("~/Views/Partials/_WayfinderWorklistItem.cshtml", item)
+            return;
+        }
+    }
+
+    // The page size the caller asked for is the default; a paginated nav link (built by
+    // WorklistRenderer.RenderWorklistBody, which bakes the current size into every page link)
+    // overrides it via the query string, exactly as ParseWorklistQuery's own pageSize ?? default
+    // fallback expects.
+    var configuredPageSize = Model > 0 ? Model : 20;
+
+    // StringValues' implicit array conversion is annotated string?[] (each element nullable);
+    // ParseWorklistQuery wants string[]? — the per-element Select(s => s!) forgives that
+    // annotation, safe because ASP.NET's query parser never actually puts a null string into
+    // the collection.
+    var (statuses, selectedStatuses, sort, pageIndex, pageSize) = WorklistRenderer.ParseWorklistQuery(
+        status: Context.Request.Query["status"].Count > 0 ? Context.Request.Query["status"].Select(s => s!).ToArray() : null,
+        sort: Context.Request.Query["sort"],
+        page: int.TryParse(Context.Request.Query["page"], out var parsedPage) ? parsedPage : null,
+        pageSize: int.TryParse(Context.Request.Query["pageSize"], out var parsedPageSize) ? parsedPageSize : null,
+        statusFilterApplied: Context.Request.Query["statusFilterApplied"].Count > 0 ? Context.Request.Query["statusFilterApplied"].ToString() : null,
+        defaultPageSize: configuredPageSize);
+
+    var searchText = Context.Request.Query["q"].ToString();
+    var envelope = await WorklistService.GetWorklistAsync(
+        Context, statuses, sort, string.IsNullOrEmpty(searchText) ? null : searchText, pageIndex, pageSize);
+
+    var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+
+    var body = WorklistRenderer.RenderWorklistBody(
+        listUrl: pageUrl,
+        itemUrlPrefix: WayfinderWorklistSurfaceController.ItemUrlPrefix,
+        pageTitle: null, // this Umbraco content page already renders its own heading
+        envelope: envelope,
+        selectedStatuses: selectedStatuses,
+        parsedSort: sort,
+        q: string.IsNullOrEmpty(searchText) ? null : searchText,
+        pageIndex: pageIndex,
+        size: pageSize,
+        antiforgeryToken: antiforgeryToken,
+        emptyStateMessage: "No service requests match the current filters");
+}
+@await Html.PartialAsync(
+    "~/Views/Partials/_WayfinderWorklist.cshtml",
+    new WorklistViewModel(pageUrl, envelope, WorklistService.Rows(envelope), antiforgeryToken ?? "", notice, body))

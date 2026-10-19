@@ -254,7 +254,9 @@ Install the package and call `AddWayfinderUmbraco()`:
 - **A worklist you can restyle.** The worklist block's list and its open-item page render through
   `~/Views/Partials/_WayfinderWorklist.cshtml` and `_WayfinderWorklistItem.cshtml`. Put your own
   copy in your site to show the queue your way; the model carries each item with its request's
-  field values, and the item and pickup URLs.
+  field values, and the item and pickup URLs. To put the worklist on a page of your own (a
+  controller view behind your own authorization, say), render
+  `@await Html.PartialAsync("~/Views/Partials/_WayfinderWorklistForPage.cshtml", 20)` (the page size).
 
 ![The stage block rendering the first step of a GOV.UK-styled journey](https://raw.githubusercontent.com/jonnymuir/Wayfinder.Umbraco/main/assets/screenshots/applicant-journey.png)
 

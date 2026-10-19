@@ -190,4 +190,13 @@ public sealed class VisitorIdentityTests
     {
         Visit.Visitors(new InMemoryDevices()).AddThisBrowser(Visit.WithCookies(), "member:7").Should().BeFalse();
     }
+
+    [Fact]
+    public void ASecretsOwnerId_IsTheIdThatBrowserIsGiven()
+    {
+        var context = Visit.WithCookies();
+        var userId = Visit.Visitors(new InMemoryDevices()).ResolveUserId(context);
+
+        WayfinderVisitors.UserIdForSecret(Visit.SetCookie(context, Cookie)!).Should().Be(userId);
+    }
 }

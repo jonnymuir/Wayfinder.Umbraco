@@ -26,7 +26,8 @@ Releases before 3.0.0 are listed on
 - `Wayfinder:DisplayTimeZone` and `WayfinderDisplayTime`: conversation times and hub dates in your
   visitors' time zone.
 - The worklist block renders through `_WayfinderWorklist.cshtml` and `_WayfinderWorklistItem.cshtml`,
-  which a host can replace, with each item's request field values in the model.
+  which a host can replace, with each item's request field values in the model, and the whole
+  worklist through `_WayfinderWorklistForPage.cshtml`, which a host can render from its own view.
 - After a caseworker's move hands a request on, the worklist says it's done, not that the item is no
   longer in their queue.
 - The reference app has a contact-us example open to anonymous visitors, with emails written to
