@@ -100,9 +100,9 @@ public sealed class VisitorBehaviourTests(ReferenceAppFactory factory)
     {
         using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync("/contact-us/");
+        var (response, html) = await SeededPages.GetWhenReady(client, "/contact-us/");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the Contact us page should render once seeded; last response: {0}", html[..Math.Min(html.Length, 2000)]);
         var cookie = response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("Wayfinder.Visitor=", StringComparison.Ordinal));
         cookie.Should().Contain("httponly").And.Contain("secure").And.Contain("samesite=lax");
     }
