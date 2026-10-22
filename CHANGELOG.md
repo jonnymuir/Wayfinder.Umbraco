@@ -9,6 +9,10 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [5.1.0] — 2026-10-23
+
+Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.0 and Wayfinder.Rendering.GovUk 0.11.0.
+
 ### Added
 
 - Design notes in the Blueprints editor: pin feedback to a stage, gateway or route, see a marker on
@@ -25,7 +29,6 @@ Releases before 3.0.0 are listed on
 - The Blueprints editor follows changes saved elsewhere: when an agent saves over MCP while a
   designer has the blueprint open with nothing unsaved, the canvas moves to the new version and
   marks what changed (from Wayfinder.Editor 0.10.0).
-- Depends on Wayfinder 0.24.0 and Wayfinder.Editor 0.10.0.
 
 ## [5.0.0] — 2026-10-19
 
