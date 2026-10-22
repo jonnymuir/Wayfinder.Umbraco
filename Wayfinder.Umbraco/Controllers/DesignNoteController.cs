@@ -15,6 +15,10 @@ namespace Wayfinder.Umbraco.Controllers;
 /// against either. Same <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> policy as
 /// <see cref="ServiceBlueprintAuthoringController"/>: whoever may edit a blueprint may read and write
 /// its notes. A note is attributed to the signed-in backoffice user, never to a name in the request.
+/// The POST actions carry <see cref="IgnoreAntiforgeryTokenAttribute"/> for the same reason as
+/// <see cref="ServiceRequestAdminController"/>'s abort: Management API calls are authenticated by a
+/// bearer token the client attaches explicitly, never an ambient cookie a cross-site request could
+/// ride on, so an anti-forgery token defends against nothing here.
 /// </summary>
 [Authorize(Policy = WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin)]
 [VersionedApiBackOfficeRoute("wayfinder")]
@@ -28,18 +32,22 @@ public class DesignNoteController(DesignNoteService notes, IBackOfficeSecurityAc
         await notes.ListAsync(definitionKey, ct: ct) is { } list ? Ok(list) : NotFound();
 
     [HttpPost("service-blueprints/{definitionKey}/notes")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Add(string definitionKey, [FromBody] AddDesignNoteRequest request, CancellationToken ct) =>
         ToResult(await notes.AddAsync(definitionKey, request.Anchor, request.Text, Author(), ct));
 
     [HttpPost("service-blueprints/{definitionKey}/notes/{noteId}/replies")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Reply(string definitionKey, string noteId, [FromBody] DesignNoteTextRequest request, CancellationToken ct) =>
         ToResult(await notes.ReplyAsync(definitionKey, noteId, request.Text, Author(), ct));
 
     [HttpPost("service-blueprints/{definitionKey}/notes/{noteId}/resolve")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Resolve(string definitionKey, string noteId, [FromBody] ResolveDesignNoteRequest request, CancellationToken ct) =>
         ToResult(await notes.ResolveAsync(definitionKey, noteId, request.Summary, Author(), request.Version, ct));
 
     [HttpPost("service-blueprints/{definitionKey}/notes/{noteId}/reopen")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Reopen(string definitionKey, string noteId, [FromBody] ReopenDesignNoteRequest request, CancellationToken ct) =>
         ToResult(await notes.ReopenAsync(definitionKey, noteId, Author(), request.Reason, ct));
 
