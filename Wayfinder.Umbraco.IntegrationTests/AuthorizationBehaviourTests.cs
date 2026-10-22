@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 
 namespace Wayfinder.Umbraco.IntegrationTests;
@@ -114,6 +115,29 @@ public sealed class AuthorizationBehaviourTests(ReferenceAppFactory factory)
         res.StatusCode.Should().BeOneOf(
             new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.Redirect },
             "the demo front-end cookie is not the backoffice scheme and does not satisfy BlueprintsAdmin");
+    }
+
+    // ---- DesignNoteController: [Authorize(Policy = BlueprintsAdmin)] ----
+
+    [Fact]
+    public async Task Design_notes_api_rejects_an_anonymous_caller()
+    {
+        using var client = Anonymous();
+        var read = await client.GetAsync("/umbraco/management/api/v1/wayfinder/service-blueprints/any/notes");
+        var write = await client.PostAsJsonAsync(
+            "/umbraco/management/api/v1/wayfinder/service-blueprints/any/notes", new { anchor = new { kind = "Blueprint" }, text = "Hello" });
+        read.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Redirect);
+        write.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Redirect);
+    }
+
+    [Fact]
+    public async Task Design_notes_api_rejects_a_front_end_member_cookie()
+    {
+        using var client = await SignedInAs(CitizenEmail);
+        var res = await client.GetAsync("/umbraco/management/api/v1/wayfinder/service-blueprints/any/notes");
+        res.StatusCode.Should().BeOneOf(
+            new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.Redirect },
+            "the demo front-end cookie does not satisfy BlueprintsAdmin, so it cannot read or write design notes");
     }
 
     // ---- ServiceRequestPollController: [Authorize(Policy = ServiceRequestPolling)] ----

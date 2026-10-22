@@ -85,11 +85,36 @@ function readStructuredDetails(
   });
 }
 
+type DesignNote = Record<string, unknown> & { id: string };
+type DesignNoteAnchor = { kind: string; key?: string; fieldKey?: string };
+
 export class UmbracoWayfinderServiceBlueprintSource {
   private readonly getToken: () => Promise<string | undefined>;
+  private notesSource?: Promise<any>;
 
   constructor(getToken: () => Promise<string | undefined>) {
     this.getToken = getToken;
+  }
+
+  /**
+   * Design notes, through DesignNoteController's routes under the same base URL, with a fresh
+   * bearer token on every request. The editor's HttpDesignNoteSource comes from the runtime-loaded
+   * bundle, so each call waits for it.
+   */
+  readonly designNotes = {
+    list: async (key: string): Promise<DesignNote[]> => (await this.notes()).list(key),
+    add: async (key: string, anchor: DesignNoteAnchor, text: string): Promise<DesignNote> => (await this.notes()).add(key, anchor, text),
+    reply: async (key: string, noteId: string, text: string): Promise<DesignNote> => (await this.notes()).reply(key, noteId, text),
+    resolve: async (key: string, noteId: string, summary: string): Promise<DesignNote> => (await this.notes()).resolve(key, noteId, summary),
+    reopen: async (key: string, noteId: string, reason?: string): Promise<DesignNote> => (await this.notes()).reopen(key, noteId, reason),
+    remove: async (key: string, noteId: string): Promise<void> => (await this.notes()).remove(key, noteId),
+  };
+
+  private notes(): Promise<any> {
+    this.notesSource ??= loadWayfinderElements().then(
+      ({ HttpDesignNoteSource }) => new HttpDesignNoteSource({ blueprintsUrl: API_BASE, headers: () => this.authHeaders() })
+    );
+    return this.notesSource;
   }
 
   private async authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {

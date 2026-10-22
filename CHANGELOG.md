@@ -9,6 +9,24 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- Design notes in the Blueprints editor: pin feedback to a stage, gateway or route, see a marker on
+  the canvas, and reply, resolve or reopen in the new Notes tab. An AI design partner connected over
+  MCP works through them with Wayfinder's `list_design_notes`, `add_design_note`,
+  `resolve_design_note` and `reply_to_design_note` tools. Notes are kept in a new
+  `wayfinderDesignNote` table (`UmbracoDesignNoteStore`), not in the blueprint and not in uSync, and
+  are deleted with their blueprint. The management API gains
+  `service-blueprints/{definitionKey}/notes` routes under the `BlueprintsAdmin` policy, and a note
+  made there is attributed to the signed-in backoffice user.
+
+### Changed
+
+- The Blueprints editor follows changes saved elsewhere: when an agent saves over MCP while a
+  designer has the blueprint open with nothing unsaved, the canvas moves to the new version and
+  marks what changed (from Wayfinder.Editor 0.10.0).
+- Depends on Wayfinder 0.24.0 and Wayfinder.Editor 0.10.0.
+
 ## [5.0.0] — 2026-10-19
 
 Depends on Wayfinder 0.23.0 and Wayfinder.Rendering.GovUk 0.11.0.
