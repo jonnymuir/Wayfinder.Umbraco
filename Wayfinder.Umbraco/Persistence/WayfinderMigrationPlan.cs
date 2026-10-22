@@ -22,6 +22,7 @@ public class WayfinderMigrationPlan : PackageMigrationPlan
             .To<CreateServiceRequestWorklistBlock>("add-service-request-worklist-block")
             .To<WidenJsonColumns>("widen-json-columns")
             .To<CreateAuditEventTable>("add-audit-events")
-            .To<CreateVisitorTables>("add-visitors");
+            .To<CreateVisitorTables>("add-visitors")
+            .To<CreateDesignNoteTable>("add-design-notes");
     }
 }

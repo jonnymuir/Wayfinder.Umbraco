@@ -79,6 +79,9 @@ public static class WayfinderUmbracoServiceCollectionExtensions
         services.TryAddSingleton<IServiceBlueprintSourceStore>(sp => sp.GetRequiredService<UmbracoServiceBlueprintStore>());
         services.TryAddSingleton<IBlueprintQueueDirectory>(sp => sp.GetRequiredService<UmbracoServiceBlueprintStore>());
 
+        // Design notes, kept beside the blueprints (not in uSync). Registered before
+        // AddServiceBlueprintAuthoring, whose in-memory default is a TryAdd.
+        services.TryAddSingleton<IDesignNoteStore, UmbracoDesignNoteStore>();
         services.AddServiceBlueprintAuthoring();
 
         // Distributed cache backing the nonce/upload-token services below — works out of the
