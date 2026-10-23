@@ -143,6 +143,17 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
     await page.screenshot({ path: path.join(outDir, 'blueprints-list.png') });
   });
 
+  test('connect a design partner', async () => {
+    await page.goto('/umbraco/section/settings');
+    await page.waitForTimeout(1_500);
+    await page.getByText('Blueprints', { exact: true }).click();
+    await page.getByRole('button', { name: 'Connect a design partner…' }).click();
+    await page.getByRole('button', { name: 'Copy add command' }).waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(outDir, 'connect-design-partner.png') });
+    await page.getByRole('button', { name: 'Close' }).click();
+  });
+
   test('visual editor graph', async () => {
     await openBlueprintInEditor(page);
     await page.getByRole('button', { name: 'Fit to screen' }).click();

@@ -127,9 +127,21 @@ app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);     // 5. the discove
   required: a minimal API mapped outside Umbraco's Management API doesn't inherit the backoffice
   schemes, so without it the endpoint challenges your site's default (front-end) scheme.
 - Step 3 must run before `BootUmbracoAsync`, so it wraps the whole pipeline and sees the 401.
-- In Development, the client's loopback callback (`http://localhost:33418/callback`) is
-  registered for you. Anywhere else, list your MCP client's real callback URLs under
-  `Wayfinder:Mcp:RedirectUris` in `appsettings.json`.
+- In Development, the loopback callbacks Claude Code (`http://localhost:33418/callback`) and VS
+  Code (`http://127.0.0.1:33418/`) use are registered for you. Anywhere else, list your MCP
+  client's real callback URLs under `Wayfinder:Mcp:RedirectUris` in `appsettings.json`. Claude
+  Desktop and claude.ai use `https://claude.ai/api/mcp/auth_callback`.
+
+### Connecting a design partner
+
+Once MCP authoring is on, **Connect a design partner** on the Blueprints screen gives each designer
+the setup for Claude Code, Claude Desktop, VS Code or any other MCP client, with this site's server
+URL, client ID and callback port filled in. Each step has a copy button, the Claude Code and VS
+Code config files download in one click, and two starter prompts get a conversation going: one to
+design a new service, one to work through the design notes on a blueprint. If a client's sign-in
+callback isn't registered on this site, the panel says so and shows the setting to add.
+
+![Settings, Blueprints, Connect a design partner: the Claude Code setup for this site](assets/screenshots/connect-design-partner.png)
 
 The [reference app README](Wayfinder.Umbraco.ReferenceApp/README.md#mcp-service-blueprint-authoring)
 shows how to connect Claude Code, including the headless client-credentials option.

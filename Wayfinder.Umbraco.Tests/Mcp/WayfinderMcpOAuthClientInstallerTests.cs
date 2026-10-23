@@ -50,8 +50,10 @@ public class WayfinderMcpOAuthClientInstallerTests
         {
             "http://localhost:33418/callback",
             "http://127.0.0.1:33418/callback",
+            "http://127.0.0.1:33418/",
             "http://localhost:40000/callback",
             "http://127.0.0.1:40000/callback",
+            "http://127.0.0.1:40000/",
         });
     }
 

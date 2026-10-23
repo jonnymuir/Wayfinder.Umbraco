@@ -8,7 +8,8 @@ import type { UmbControllerHost } from '@umbraco-cms/backoffice/controller-api';
 import type { UmbClassInterface } from '@umbraco-cms/backoffice/class-api';
 import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 
-export const SERVICE_BLUEPRINT_API_BASE = '/umbraco/management/api/v1/wayfinder/service-blueprints';
+export const WAYFINDER_API_BASE = '/umbraco/management/api/v1/wayfinder';
+export const SERVICE_BLUEPRINT_API_BASE = `${WAYFINDER_API_BASE}/service-blueprints`;
 
 async function authHeaders(host: UmbControllerHost, extra: Record<string, string> = {}): Promise<Record<string, string>> {
   // Data source constructors are typed to the minimal UmbControllerHost per Umbraco's own
@@ -23,8 +24,12 @@ async function authHeaders(host: UmbControllerHost, extra: Record<string, string
   };
 }
 
-export async function serviceBlueprintFetch(host: UmbControllerHost, path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${SERVICE_BLUEPRINT_API_BASE}${path}`, {
+export function serviceBlueprintFetch(host: UmbControllerHost, path: string, init: RequestInit = {}): Promise<Response> {
+  return wayfinderFetch(host, `/service-blueprints${path}`, init);
+}
+
+export async function wayfinderFetch(host: UmbControllerHost, path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${WAYFINDER_API_BASE}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',

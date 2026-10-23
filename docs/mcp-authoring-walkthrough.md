@@ -49,7 +49,8 @@ backoffice's own login uses. Its permissions are the permissions of the person w
    `Wayfinder123!`). Leave the tab open. Acts 3 and 4 reuse this session.
 
 2. **Register the server**, from a directory outside this repo (so you are working only through
-   the MCP tools):
+   the MCP tools). **Settings → Advanced → Blueprints → Connect a design partner** shows the same
+   commands with this site's details filled in, ready to copy:
 
    ```bash
    cd "$(mktemp -d)"
