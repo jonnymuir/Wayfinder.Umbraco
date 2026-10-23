@@ -35,7 +35,10 @@ public static class WayfinderMcpDiscoveryEndpoints
             Results.Json(WayfinderMcpOAuthMetadata.BuildProtectedResourceMetadata(
                 SiteRoot(request), mcpResourcePath, options));
 
-        endpoints.MapGet("/.well-known/oauth-protected-resource", ProtectedResourceMetadata).AllowAnonymous();
+        // The metadata also tells the backoffice's "Connect a design partner" panel where the MCP
+        // endpoint is, since the host chooses its path.
+        var resource = new WayfinderMcpResource(mcpResourcePath);
+        endpoints.MapGet("/.well-known/oauth-protected-resource", ProtectedResourceMetadata).AllowAnonymous().WithMetadata(resource);
         endpoints.MapGet($"/.well-known/oauth-protected-resource{mcpResourcePath}", ProtectedResourceMetadata).AllowAnonymous();
 
         // RFC 8414: Authorization Server Metadata for the backoffice OpenIddict server, whose
@@ -51,3 +54,6 @@ public static class WayfinderMcpDiscoveryEndpoints
 
     private static string SiteRoot(HttpRequest request) => $"{request.Scheme}://{request.Host.Value}";
 }
+
+/// <summary>Endpoint metadata naming the root-relative path the MCP endpoint is mapped at.</summary>
+public sealed record WayfinderMcpResource(string Path);

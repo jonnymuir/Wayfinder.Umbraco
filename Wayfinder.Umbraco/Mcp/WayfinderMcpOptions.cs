@@ -53,12 +53,13 @@ public sealed class WayfinderMcpOptions
     public string[] PostLogoutRedirectUris { get; set; } = [];
 
     /// <summary>
-    /// Loopback ports for which <c>http://localhost:{port}/callback</c> and
-    /// <c>http://127.0.0.1:{port}/callback</c> are added as permitted redirect URIs — but only
-    /// when the app is running in the Development environment (a loopback HTTP redirect is never
-    /// registered for a non-Development host). Claude Code picks a random callback port unless
-    /// told otherwise, so a connecting developer passes <c>--callback-port 33418</c> to match the
-    /// default here.
+    /// Loopback ports for which <c>http://localhost:{port}/callback</c>,
+    /// <c>http://127.0.0.1:{port}/callback</c> and <c>http://127.0.0.1:{port}/</c> are added as
+    /// permitted redirect URIs, but only when the app is running in the Development environment (a
+    /// loopback HTTP redirect is never registered for a non-Development host). Claude Code picks a
+    /// random callback port unless told otherwise, so a connecting developer passes
+    /// <c>--callback-port 33418</c> to match the default here. VS Code always listens on
+    /// <c>http://127.0.0.1:33418/</c>.
     /// </summary>
     public int[] LocalCallbackPorts { get; set; } = [33418];
 

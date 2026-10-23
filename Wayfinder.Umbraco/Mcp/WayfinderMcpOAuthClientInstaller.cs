@@ -82,7 +82,7 @@ public sealed class WayfinderMcpOAuthClientInstaller(
             },
         };
 
-        foreach (var uri in EnumerateRedirectUris(options, environment))
+        foreach (var uri in WayfinderMcpRedirectUris.For(options, environment))
         {
             descriptor.RedirectUris.Add(uri);
         }
@@ -93,26 +93,5 @@ public sealed class WayfinderMcpOAuthClientInstaller(
         }
 
         return descriptor;
-    }
-
-    private static IEnumerable<Uri> EnumerateRedirectUris(WayfinderMcpOptions options, IHostEnvironment environment)
-    {
-        foreach (var uri in options.RedirectUris)
-        {
-            yield return new Uri(uri, UriKind.Absolute);
-        }
-
-        // A loopback HTTP callback is only ever registered for a Development host — never for a
-        // real deployment, where it would be a standing open redirect target on plain HTTP.
-        if (!environment.IsDevelopment())
-        {
-            yield break;
-        }
-
-        foreach (var port in options.LocalCallbackPorts)
-        {
-            yield return new Uri($"http://localhost:{port}/callback", UriKind.Absolute);
-            yield return new Uri($"http://127.0.0.1:{port}/callback", UriKind.Absolute);
-        }
     }
 }

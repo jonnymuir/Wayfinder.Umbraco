@@ -9,6 +9,21 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- **Connect a design partner** on the Blueprints screen: setup for Claude Code, Claude Desktop, VS
+  Code and any other MCP client, with this site's MCP server URL, OAuth client ID and callback port
+  filled in, copy buttons, downloadable `.mcp.json` and `.vscode/mcp.json` files, and starter
+  prompts for designing a new service and for working through a blueprint's design notes. It reads
+  a new `GET /umbraco/management/api/v1/wayfinder/design-partner` route (`BlueprintsAdmin`), which
+  also says which sign-in callbacks each client still needs on this site.
+
+### Changed
+
+- In Development, the MCP OAuth client also accepts `http://127.0.0.1:{port}/` for each
+  `Wayfinder:Mcp:LocalCallbackPorts` entry, the callback VS Code signs in through, so VS Code
+  connects to a local site with no configuration.
+
 ## [5.1.0] — 2026-10-23
 
 Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.0 and Wayfinder.Rendering.GovUk 0.11.0.

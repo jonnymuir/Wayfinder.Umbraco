@@ -140,6 +140,20 @@ public sealed class AuthorizationBehaviourTests(ReferenceAppFactory factory)
             "the demo front-end cookie does not satisfy BlueprintsAdmin, so it cannot read or write design notes");
     }
 
+    [Fact]
+    public async Task Design_partner_connection_details_need_a_blueprints_admin()
+    {
+        using var anonymous = Anonymous();
+        (await anonymous.GetAsync("/umbraco/management/api/v1/wayfinder/design-partner"))
+            .StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Redirect);
+
+        using var member = await SignedInAs(CitizenEmail);
+        (await member.GetAsync("/umbraco/management/api/v1/wayfinder/design-partner"))
+            .StatusCode.Should().BeOneOf(
+                new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.Redirect },
+                "the demo front-end cookie does not satisfy BlueprintsAdmin");
+    }
+
     // ---- ServiceRequestPollController: [Authorize(Policy = ServiceRequestPolling)] ----
 
     [Fact]

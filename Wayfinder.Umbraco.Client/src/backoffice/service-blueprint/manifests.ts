@@ -10,6 +10,7 @@ import { manifests as entityActionManifests } from './entity-actions/manifests.j
 import { manifests as workspaceManifests } from './workspace/manifests.js';
 import { manifests as rootManifests } from './root/manifests.js';
 import { manifests as createModalManifests } from './create-modal/manifests.js';
+import { manifests as connectManifests } from './connect/manifests.js';
 
 export const manifests = [
   ...itemManifests,
@@ -19,4 +20,5 @@ export const manifests = [
   ...workspaceManifests,
   ...rootManifests,
   ...createModalManifests,
+  ...connectManifests,
 ];
