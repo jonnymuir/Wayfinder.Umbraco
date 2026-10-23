@@ -1,9 +1,9 @@
 # The agentic design loop
 
-**Status:** proposal. Nothing here is built yet. Most of the work lands in
+**Status:** Parts 1 and 3 are built (Wayfinder 0.24.0, Wayfinder.Umbraco 5.1.0). Part 2 is not
+planned, see below. Parts 4 and 5 are proposals. Most of the work lands in
 [`jonnymuir/Wayfinder`](https://github.com/jonnymuir/Wayfinder) (editor, MCP tools, contracts);
-this repo supplies storage, preview and the backoffice surfaces. Each part says which repo it
-touches.
+this repo supplies storage and the backoffice surfaces. Each part says which repo it touches.
 
 ## The problem
 
@@ -17,7 +17,7 @@ conversation itself works well. The round trip around it does not:
    after every save, with no sign of what changed.
 2. **Saves are live.** `save_service_blueprint` and the editor both write the one stored row,
    and the engine picks it up at once. An agent iterating on a running service changes it for real
-   applicants with every save, and there is no history to go back to.
+   applicants with every save. Part 2 answers this with environments, not drafts.
 3. **Seeing the journey takes a publish.** To walk the service, the designer edits the Blueprint
    key on a page's block and publishes the page. To see the caseworker side, they sign out and
    back in as someone else.
@@ -31,13 +31,13 @@ conversation itself works well. The round trip around it does not:
 ## The loop we want
 
 > Describe it. Watch it appear. Walk it. Point at what's wrong. "Work through my notes." Repeat.
-> Publish when it's right.
+> Promote it when it's right.
 
 The designer chats with the agent in one window and keeps the canvas open in another. Each save
-appears on the canvas with the changes highlighted. A preview link walks the draft journey as any
-person in the service. Anything that's wrong gets a note pinned to the exact stage, from the
-canvas or from the preview. The agent reads the notes, fixes them, and marks each one resolved
-with what it did. Nothing reaches real applicants until the designer publishes.
+appears on the canvas with the changes highlighted. The designer walks the journey on the same
+site. Anything that's wrong gets a note pinned to the exact stage. The agent reads the notes,
+fixes them, and marks each one resolved with what it did. All of this happens on a development
+site, so nothing reaches real applicants until the blueprint is promoted to live.
 
 Every part works with any MCP client. Wayfinder is used with Claude Code, Claude Desktop, VS Code
 and GitHub Copilot, and others, so nothing here depends on one of them.
@@ -61,58 +61,27 @@ and GitHub Copilot, and others, so nothing here depends on one of them.
 
 The diff is computed in the client between the two snapshots, by stage key, route (from, to and
 condition) and field key, so it needs no server change. A pure, unit-tested `diffBlueprints`
-function also serves Part 2's history view and Part 3's "resolved in version 7" links.
+function also serves Part 3's "resolved in version 7" links.
 
-## Part 2: drafts, preview and history
+## Part 2: change control through environments
 
-**Repos:** Wayfinder (contracts, MCP tools, editor), Wayfinder.Umbraco (storage, preview route,
-backoffice). This is a breaking change for Wayfinder.Umbraco, because saving stops being live.
+**Not planned.** An earlier version of this plan gave each blueprint a draft, a publish step, a
+version history and a sandboxed preview. Wayfinder leaves change control to environments instead,
+the same way Umbraco content and code move:
 
-### Drafts
+- A designer and their agent work on a local or development site, where saves going live at once
+  is what they want.
+- A blueprint moves to staging and then live through uSync, which already carries blueprints.
+- Walking the journey on the development site is the preview.
 
-Each blueprint has a **published** version, which the engine runs, and at most one **draft**.
-
-- The editor and `save_service_blueprint` save to the draft. Optimistic concurrency works as it
-  does today, against the draft's version.
-- `read_service_blueprint` returns the draft when there is one, and says so. A `published: true`
-  argument reads the live one.
-- **Publish** in the backoffice makes the draft live and clears it. Publishing is the designer's
-  act: no MCP tool publishes by default (see open questions).
-- **Discard draft** throws it away.
-- A new blueprint is only a draft until its first publish, so it can't be put on a page before
-  then.
-
-### History
-
-Every publish is kept as a version, and so is every draft save, capped at the last 50 draft
-saves for each blueprint. The canvas gets a History panel: pick a version to see it with Part 1's
-diff against the current draft, then **Restore as draft**. "Go back to before the agent's last
-change" is one click, and restoring never touches the live service.
-
-Storage: a `wayfinderServiceBlueprintVersion` table (definition key, version, JSON, kind of
-publish or draft, author, saved at), beside the existing row, which becomes the published
-pointer. uSync carries only the published version.
-
-### Preview
-
-`/wayfinder/preview/{key}` runs the draft as a journey, for backoffice users with `BlueprintsAdmin`.
-
-- The preview runs in a sandbox: its requests are marked as previews, never appear in real
-  worklists, and are deleted after 24 hours.
-- Side effects are suppressed. Emails go to a preview outbox shown in the preview toolbar, and
-  support system calls use the stub the blueprint declares, or are shown as "would call X with
-  Y".
-- A **preview toolbar** lets the designer act as any queue the blueprint names: the applicant,
-  then the caseworker who picks the request up, then back. There's no sign-out, because preview
-  people exist only in the sandbox.
-- `save_service_blueprint` returns the preview URL with the save result, so the agent can hand it
-  over ("Open the preview to try the ineligible path"). `simulate_service_blueprint` can return
-  a URL that opens the preview at the end of the path it simulated.
+Saves stay live, and the store keeps one version of each blueprint. Tooling and guidance for
+promoting blueprints between environments, and for merging changes made in more than one, will be
+designed once there is a live environment to learn from.
 
 ## Part 3: design notes
 
 **Repos:** Wayfinder (model, `IDesignNoteStore` contract, MCP tools, canvas UI), Wayfinder.Umbraco
-(table, preview Feedback button).
+(table).
 
 This is what turns feedback from prose into pointing.
 
@@ -130,15 +99,12 @@ This is what turns feedback from prose into pointing.
 | Created, resolved | Timestamps. |
 
 Notes live beside the blueprint, not inside its JSON. They are about the design, not part of it,
-and they must not change the blueprint's version or travel with it into a published service.
+and they must not change the blueprint's version or travel with it to another environment.
 
 ### Making notes
 
 - **On the canvas:** select a stage, route or field and choose **Add note**. A marker with a count
   appears on the stage.
-- **In the preview:** a **Feedback** button on every preview page opens a note already anchored to
-  the stage on screen, with the field in focus if there is one. "This question is confusing" is
-  written while looking at the question.
 - **From the agent:** the agent can pin a question to a stage instead of asking in the chat, for
   example "Should an expired licence be refused here, or sent to a caseworker?". The designer
   answers on the canvas, where the context is.
@@ -151,10 +117,10 @@ New MCP tools:
 |---|---|
 | `list_design_notes` | Open notes for a blueprint (or all, by status), each with its anchor resolved to the stage's name and the current JSON path, so the agent knows exactly where it points. |
 | `add_design_note` | The agent pins a question or a flag to an anchor. |
-| `resolve_design_note` | Marks a note resolved, with a one-sentence summary and the draft version that resolved it. |
+| `resolve_design_note` | Marks a note resolved, with a one-sentence summary and the version that resolved it. |
 | `reply_to_design_note` | A threaded reply, for when the agent needs to ask before it can resolve. |
 
-"Work through my notes" becomes: list the open notes, change the draft, save, resolve each one
+"Work through my notes" becomes: list the open notes, change the blueprint, save, resolve each one
 with what it did. The canvas, following along through Part 1, shows each marker turn resolved,
 and each resolution links to the diff for its version. The authoring guide resource gains a short
 section that teaches this cycle, so any agent picks it up without being told.
@@ -212,26 +178,20 @@ problem but not the last. Part 5 gets the same "it's in the UI" result without e
 
 ## Order of work
 
-1. **Part 1**, the canvas follows the agent. Small, Wayfinder only, and every later part leans on
-   its diff.
-2. **Part 3**, design notes. The biggest change to how the loop feels, and it works with saves as
-   they are today.
-3. **Part 2**, drafts, preview and history. The largest piece, and breaking for Wayfinder.Umbraco,
-   so it gets its own major version.
-4. **Part 4**, the connect panel. Small, any time.
-5. **Part 5**, the spike, after Part 3, so the in-backoffice agent has notes to work through.
+1. **Part 1**, the canvas follows the agent. Built.
+2. **Part 3**, design notes. Built.
+3. **Part 4**, the connect panel. Small, any time.
+4. **Part 5**, the spike, so the in-backoffice agent has notes to work through.
 
 ## Open questions
 
-1. **Should an agent ever publish?** Proposed: no tool by default. A host could opt in to a
-   `publish_service_blueprint` tool for teams that want the agent to ship.
-2. **What happens to requests in flight when a blueprint is published?** A service request doesn't
-   record which blueprint version it started on, so today every save changes the rules for
-   requests already under way. Drafts turn that into one deliberate moment, the publish, but
-   don't answer it. Whether a request finishes on the version it started on is a question for the
-   engine, and worth its own design.
-3. **Do notes travel with uSync?** Proposed: no. They are working material for one environment.
-4. **Who can see notes?** Proposed: anyone with `BlueprintsAdmin`, which is who can edit the
-   blueprint.
-5. **Preview data retention:** 24 hours, or until the draft is published or discarded, whichever
-   comes first?
+1. **What happens to requests in flight when a blueprint changes?** A service request doesn't
+   record which blueprint version it started on, so every save, and every promotion to live,
+   changes the rules for requests already under way. Whether a request finishes on the version it
+   started on is a question for the engine, and worth its own design.
+2. **Promoting and merging between environments.** How a blueprint moves from development to
+   staging to live, and what happens when two environments change the same one, is for a later
+   design (see Part 2).
+
+Settled while building Part 3: notes don't travel with uSync, because they are working material
+for one environment, and anyone with `BlueprintsAdmin` can see and add them.
