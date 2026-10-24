@@ -494,7 +494,7 @@ authoring surface. Backoffice and demo logins are documented there.
 | **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 5.1.0 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 5.2.0 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|

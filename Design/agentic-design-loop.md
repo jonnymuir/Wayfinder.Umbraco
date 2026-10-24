@@ -1,7 +1,7 @@
 # The agentic design loop
 
-**Status:** Parts 1 and 3 are built (Wayfinder 0.24.0, Wayfinder.Umbraco 5.1.0). Part 2 is not
-planned, see below. Parts 4 and 5 are proposals. Most of the work lands in
+**Status:** Parts 1 and 3 are built (Wayfinder 0.24.0, Wayfinder.Umbraco 5.1.0), and Part 4 is
+built (Wayfinder.Umbraco 5.2.0). Part 2 is not planned, see below. Part 5 is a proposal. Most of the work lands in
 [`jonnymuir/Wayfinder`](https://github.com/jonnymuir/Wayfinder) (editor, MCP tools, contracts);
 this repo supplies storage and the backoffice surfaces. Each part says which repo it touches.
 
@@ -180,7 +180,7 @@ problem but not the last. Part 5 gets the same "it's in the UI" result without e
 
 1. **Part 1**, the canvas follows the agent. Built.
 2. **Part 3**, design notes. Built.
-3. **Part 4**, the connect panel. Small, any time.
+3. **Part 4**, the connect panel. Built.
 4. **Part 5**, the spike, so the in-backoffice agent has notes to work through.
 
 ## Open questions

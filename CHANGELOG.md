@@ -9,6 +9,10 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [5.2.0] — 2026-10-24
+
+Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.0 and Wayfinder.Rendering.GovUk 0.11.0.
+
 ### Added
 
 - **Connect a design partner** on the Blueprints screen: setup for Claude Code, Claude Desktop, VS
