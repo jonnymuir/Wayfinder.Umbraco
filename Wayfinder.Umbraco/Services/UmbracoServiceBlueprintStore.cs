@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Umbraco.Cms.Infrastructure.Persistence;
 using Wayfinder.Umbraco.Persistence;
 using Wayfinder.Engine.Abstractions;
@@ -17,8 +15,8 @@ namespace Wayfinder.Umbraco.Services;
 /// Reads are served from an in-memory snapshot of the table: hosts resolve a caller's queues
 /// from the saved blueprints on every citizen/caseworker request (see
 /// <see cref="Configuration.WayfinderServiceDesignOptions.ResolveAccessProfile"/>), which used to
-/// cost one query plus one query and JSON parse per blueprint, every time. The snapshot holds
-/// the blueprints' JSON text and a queue-key index of plain strings, never parsed blueprints, so
+/// cost one query plus one query and YAML parse per blueprint, every time. The snapshot holds
+/// the blueprints' YAML text and a queue-key index of plain strings, never parsed blueprints, so
 /// each <see cref="LoadAsync"/> hands back its own copy and nothing a caller does to it can reach
 /// another request. Saves and deletes
 /// through this store drop the snapshot at once; a write that bypasses it (a uSync import, another
@@ -38,12 +36,12 @@ public sealed class UmbracoServiceBlueprintStore(
     // Bumped by every write so a read that started before it can't re-cache the old rows.
     private long generation;
 
-    // Only the JSON text and strings are shared. The queue index is Lazy so one blueprint that
+    // Only the YAML text and strings are shared. The queue index is Lazy so one blueprint that
     // fails to parse breaks the index, never ListAsync or another blueprint's LoadAsync.
     private sealed record Snapshot(
         DateTimeOffset LoadedAt,
         IReadOnlyList<ServiceBlueprintSourceSummary> Summaries,
-        IReadOnlyDictionary<string, (string Json, int Version)> Rows,
+        IReadOnlyDictionary<string, (string Yaml, int Version)> Rows,
         Lazy<ILookup<string, string>> QueueKeysByActor);
 
     private Snapshot GetSnapshot()
@@ -61,7 +59,7 @@ public sealed class UmbracoServiceBlueprintStore(
 
         using var db = databaseFactory.CreateDatabase();
         var rows = db.Fetch<ServiceBlueprintSchema>("SELECT * FROM wayfinderServiceBlueprint ORDER BY DefinitionKey");
-        var byKey = rows.ToDictionary(row => row.DefinitionKey, row => (row.Json, row.Version));
+        var byKey = rows.ToDictionary(row => row.DefinitionKey, row => (row.Yaml, row.Version));
         var loaded = new Snapshot(
             clock.GetUtcNow(),
             rows.Select(row => new ServiceBlueprintSourceSummary(row.DefinitionKey, row.DisplayName)).ToArray(),
@@ -79,15 +77,13 @@ public sealed class UmbracoServiceBlueprintStore(
         return loaded;
     }
 
-    private static ServiceBlueprint? Parse(string json, int version) =>
-        JsonSerializer.Deserialize<ServiceBlueprint>(json, ReadOptions) is { } blueprint
-            ? blueprint with { Version = version }
-            : null;
+    private static ServiceBlueprint Parse(string yaml, int version) =>
+        ServiceBlueprintYaml.Deserialize(yaml) with { Version = version };
 
-    private static ILookup<string, string> BuildQueueIndex(IEnumerable<(string Json, int Version)> rows) =>
-        rows.Select(row => Parse(row.Json, row.Version))
-            .Where(blueprint => blueprint?.Queues is not null)
-            .SelectMany(blueprint => blueprint!.Queues!)
+    private static ILookup<string, string> BuildQueueIndex(IEnumerable<(string Yaml, int Version)> rows) =>
+        rows.Select(row => Parse(row.Yaml, row.Version))
+            .Where(blueprint => blueprint.Queues is not null)
+            .SelectMany(blueprint => blueprint.Queues!)
             .Where(queue => queue.Actor is not null)
             .Select(queue => (Actor: queue.Actor!, queue.Key))
             .Distinct()
@@ -102,21 +98,6 @@ public sealed class UmbracoServiceBlueprintStore(
         }
     }
 
-    private static readonly JsonSerializerOptions ReadOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        // Component is a [JsonPolymorphic] type; not every blueprint's components have
-        // "type" written first, so this must be relaxed — matches FilesystemServiceBlueprintSourceStore.
-        AllowOutOfOrderMetadataProperties = true
-    };
-
-    private static readonly JsonSerializerOptions WriteOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = true
-    };
-
     public Task<IReadOnlyList<ServiceBlueprintSourceSummary>> ListAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -127,7 +108,7 @@ public sealed class UmbracoServiceBlueprintStore(
     {
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(
-            GetSnapshot().Rows.TryGetValue(definitionKey, out var row) ? Parse(row.Json, row.Version) : null);
+            GetSnapshot().Rows.TryGetValue(definitionKey, out var row) ? Parse(row.Yaml, row.Version) : null);
     }
 
     public Task<IReadOnlyList<string>> QueueKeysForActorAsync(string actor, CancellationToken ct = default)
@@ -158,7 +139,7 @@ public sealed class UmbracoServiceBlueprintStore(
             {
                 DefinitionKey = blueprint.DefinitionKey,
                 DisplayName = blueprint.DisplayName,
-                Json = JsonSerializer.Serialize(blueprint with { Version = 1 }, WriteOptions),
+                Yaml = ServiceBlueprintYaml.Serialize(blueprint with { Version = 1 }),
                 Version = 1,
                 UpdatedUtc = DateTime.UtcNow
             };
@@ -180,10 +161,10 @@ public sealed class UmbracoServiceBlueprintStore(
 
         // Atomic compare-and-swap: only the writer that still sees `expectedVersion` wins the race.
         var rowsAffected = db.Execute(
-            "UPDATE wayfinderServiceBlueprint SET DisplayName = @0, Json = @1, Version = @2, UpdatedUtc = @3 " +
+            "UPDATE wayfinderServiceBlueprint SET DisplayName = @0, Yaml = @1, Version = @2, UpdatedUtc = @3 " +
             "WHERE DefinitionKey = @4 AND Version = @5",
             blueprint.DisplayName,
-            JsonSerializer.Serialize(toSave, WriteOptions),
+            ServiceBlueprintYaml.Serialize(toSave),
             newVersion,
             DateTime.UtcNow,
             blueprint.DefinitionKey,

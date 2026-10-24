@@ -1,6 +1,5 @@
 using Moq;
 using System.Text;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -34,27 +33,26 @@ public sealed class WayfinderStageDataControllerTests
     private const string OwnerUserId = "citizen-owner";
     private const string OtherUserId = "citizen-other";
 
-    private const string BlueprintJson = """
-        {
-          "definitionKey": "stage-data-test",
-          "displayName": "Stage data test",
-          "version": 1,
-          "initialStage": "start",
-          "requestPolicy": "multiple",
-          "queues": [ { "key": "citizen", "displayName": "Citizen", "actor": "citizen" } ],
-          "stages": [
-            {
-              "stageKey": "start",
-              "displayName": "Start",
-              "queueKey": "citizen",
-              "components": [ { "type": "panel", "heading": "Start" } ],
-              "routes": []
-            }
-          ]
-        }
+    private const string BlueprintYaml = """
+        definitionKey: stage-data-test
+        displayName: Stage data test
+        version: 1
+        initialStage: start
+        requestPolicy: multiple
+        queues:
+          - key: citizen
+            displayName: Citizen
+            actor: citizen
+        stages:
+          - stageKey: start
+            displayName: Start
+            queueKey: citizen
+            components:
+              - type: panel
+                heading: Start
+            routes: []
         """;
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private sealed class SingleHttpContextAccessor(HttpContext context) : IHttpContextAccessor
     {
@@ -86,7 +84,7 @@ public sealed class WayfinderStageDataControllerTests
     private static async Task<(UmbracoProcessManagerEngine Engine, InMemoryBulkDatasetStore BulkDatasetStore,
         InMemoryServiceRequestFileStorage FileStorage, string InstanceId, string DatasetId)> SeedOwnedInstanceWithDataset()
     {
-        var definition = JsonSerializer.Deserialize<ServiceBlueprint>(BlueprintJson, JsonOptions)!;
+        var definition = ServiceBlueprintYaml.Deserialize(BlueprintYaml);
         var fileStorage = new InMemoryServiceRequestFileStorage();
         var bulkDatasetStore = new InMemoryBulkDatasetStore(fileStorage);
         var engine = new UmbracoProcessManagerEngine(

@@ -1,9 +1,9 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Infrastructure.Persistence;
 using Wayfinder.Umbraco.Persistence;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Serialization;
 
 namespace Wayfinder.Umbraco.Services;
 
@@ -17,12 +17,6 @@ namespace Wayfinder.Umbraco.Services;
 public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory databaseFactory)
     : IServiceBlueprintStore
 {
-    private static readonly JsonSerializerOptions ReadOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        AllowOutOfOrderMetadataProperties = true
-    };
-
     public IReadOnlyDictionary<string, ServiceBlueprint> LoadDefinitions(ILogger logger)
     {
         using var db = databaseFactory.CreateDatabase();
@@ -33,13 +27,9 @@ public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory dat
         {
             try
             {
-                var blueprint = JsonSerializer.Deserialize<ServiceBlueprint>(row.Json, ReadOptions);
-                if (blueprint is not null)
-                {
-                    definitions[row.DefinitionKey] = blueprint with { Version = row.Version };
-                }
+                definitions[row.DefinitionKey] = ServiceBlueprintYaml.Deserialize(row.Yaml) with { Version = row.Version };
             }
-            catch (JsonException ex)
+            catch (ServiceBlueprintYamlException ex)
             {
                 logger.LogError(ex, "Failed to deserialize CMS Service Blueprint '{Key}' at boot; skipping.", row.DefinitionKey);
             }

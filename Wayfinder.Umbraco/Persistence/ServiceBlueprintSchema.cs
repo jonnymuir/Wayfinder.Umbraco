@@ -30,9 +30,9 @@ public class ServiceBlueprintSchema
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the full serialized <c>ServiceBlueprint</c> JSON.</summary>
-    [Column("Json")]
+    [Column("Yaml")]
     [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
-    public string Json { get; set; } = string.Empty;
+    public string Yaml { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optimistic-concurrency version — the source of truth for save CAS checks.</summary>
     [Column("Version")]

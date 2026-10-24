@@ -41,7 +41,7 @@
        actually agree (see ConfiguredSupportSystemBlueprintTests). -->
   <ItemGroup>
     <None Include="../Wayfinder.Umbraco.ReferenceApp/appsettings.json" Link="Fixtures/referenceapp.appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../Wayfinder.Umbraco.ReferenceApp/service-blueprints/njf-coaching-register.json" Link="Fixtures/njf-coaching-register.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Wayfinder.Umbraco.ReferenceApp/service-blueprints/njf-coaching-register.yaml" Link="Fixtures/njf-coaching-register.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

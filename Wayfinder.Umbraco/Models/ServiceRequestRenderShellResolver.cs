@@ -36,7 +36,7 @@ public static class ServiceRequestRenderShellResolver
         // A panel signals a genuinely terminal/confirmation screen only when there's nothing
         // left to do here — no interactive inputs AND no real routes to trigger. The core
         // Wayfinder blueprint convention also uses "panel" purely for a heading treatment on
-        // stages that still have real actions (see the reference njf-contributions.json's own
+        // stages that still have real actions (see the reference njf-contributions.yaml's own
         // review/confirm-warnings stages) — the core Wayfinder.Rendering.GovUk pipeline renders
         // those fine (it has no notion of shells at all), but this package's own shell split
         // was flattening any such stage to _Stage-Completion's inert <a href="/"> links instead

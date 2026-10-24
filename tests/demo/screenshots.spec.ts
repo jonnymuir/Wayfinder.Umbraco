@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse, stringify } from 'yaml';
 
 // Produces the still images the repo README and docs embed. Repeatable in ~30s against a running
 // Wayfinder.Umbraco.ReferenceApp — it seeds the "transfer a juggling licence" blueprint directly
@@ -21,9 +22,7 @@ const admin = { email: 'admin@example.test', password: 'Wayfinder123!' };
 // Matches ReferenceMcpDemoAgentSeeder — seeded on every reference-app startup, idempotently.
 const agent = { clientId: 'wayfinder-demo-agent', clientSecret: 'DemoAgentLocal!12345' };
 
-const fixture = JSON.parse(
-  readFileSync(path.join(__dirname, 'support', 'rehearsal-fake-blueprint.json'), 'utf8')
-);
+const fixture = parse(readFileSync(path.join(__dirname, 'support', 'rehearsal-fake-blueprint.yaml'), 'utf8'));
 const blueprintKey: string = fixture.definitionKey;
 const displayName: string = fixture.displayName;
 
@@ -89,12 +88,12 @@ test.describe.serial('Wayfinder.Umbraco README screenshots', () => {
       .get(`/umbraco/management/api/v1/wayfinder/service-blueprints/${blueprintKey}`, { headers: auth })
       .catch(() => null);
     if (existing?.ok()) {
-      const body = await existing.json();
+      const body = parse(await existing.text());
       fixture.version = typeof body.version === 'number' ? body.version : fixture.version;
     }
     const put = await api.put(
       `/umbraco/management/api/v1/wayfinder/service-blueprints/${blueprintKey}`,
-      { headers: auth, data: fixture }
+      { headers: { ...auth, 'Content-Type': 'application/yaml' }, data: stringify(fixture) }
     );
     if (!put.ok()) throw new Error(`seeding the blueprint failed (${put.status()}): ${await put.text()}`);
 

@@ -23,6 +23,7 @@ public class WayfinderMigrationPlan : PackageMigrationPlan
             .To<WidenJsonColumns>("widen-json-columns")
             .To<CreateAuditEventTable>("add-audit-events")
             .To<CreateVisitorTables>("add-visitors")
-            .To<CreateDesignNoteTable>("add-design-notes");
+            .To<CreateDesignNoteTable>("add-design-notes")
+            .To<StoreBlueprintsAsYaml>("blueprints-as-yaml");
     }
 }
