@@ -9,6 +9,16 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [5.2.1] — 2026-10-24
+
+Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.1 and Wayfinder.Rendering.GovUk 0.11.0.
+
+### Fixed
+
+- In the Blueprints editor, the box for adding a design note to the selected stage, gateway or route
+  is pinned under the Properties panel. It was below the panel's visible area and could not be
+  reached.
+
 ## [5.2.0] — 2026-10-24
 
 Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.0 and Wayfinder.Rendering.GovUk 0.11.0.
