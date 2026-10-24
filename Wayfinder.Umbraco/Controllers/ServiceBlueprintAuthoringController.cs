@@ -19,7 +19,10 @@ namespace Wayfinder.Umbraco.Controllers;
 /// A controller, not a mapped minimal-API group, because this is a package (Razor Class
 /// Library) with no access to the host application's <c>IEndpointRouteBuilder</c> — Umbraco
 /// discovers MVC controllers via assembly scanning instead. A whole blueprint travels as YAML
-/// (<c>application/yaml</c>) both ways; lists, catalogs and outcomes are JSON.
+/// (<c>application/yaml</c>) both ways; lists, catalogs and outcomes are JSON. The writes carry
+/// <see cref="IgnoreAntiforgeryTokenAttribute"/> for the same reason as
+/// <see cref="DesignNoteController"/>'s: Management API calls are authenticated by a bearer token the
+/// client attaches explicitly, never an ambient cookie a cross-site request could ride on.
 /// </summary>
 /// <remarks>
 /// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> requires membership of a
@@ -83,6 +86,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
 
     /// <summary>Runs <see cref="ServiceBlueprintAuthoringService.Validate"/> against a blueprint that hasn't been saved yet — the editor's live-validation-as-you-type call.</summary>
     [HttpPost("service-blueprints/validate")]
+    [IgnoreAntiforgeryToken]
     [Consumes(YamlContentType)]
     public async Task<IActionResult> ValidateServiceBlueprint(CancellationToken ct) =>
         ServiceBlueprintYaml.TryDeserialize(await ReadBodyAsync(ct), out var blueprint, out var diagnostic)
@@ -117,6 +121,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     /// <see cref="ServiceBlueprintAuthoringService.SaveAsync"/>.
     /// </summary>
     [HttpPut("service-blueprints/{definitionKey}")]
+    [IgnoreAntiforgeryToken]
     [Consumes(YamlContentType)]
     public async Task<IActionResult> SaveServiceBlueprint(string definitionKey, CancellationToken ct)
     {
@@ -146,6 +151,7 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
 
     /// <summary>Dry-runs a scripted sequence of steps against a blueprint without persisting any instance — the editor's "try it" panel.</summary>
     [HttpPost("service-blueprints/simulate")]
+    [IgnoreAntiforgeryToken]
     public IActionResult SimulateServiceBlueprint([FromBody] ServiceBlueprintSimulationRequest request) =>
         ServiceBlueprintYaml.TryDeserialize(request.Blueprint, out var blueprint, out var diagnostic)
             ? Ok(ServiceBlueprintSimulationRunner.Run(blueprint, request.Steps))
