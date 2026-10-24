@@ -9,6 +9,16 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [5.2.2] — 2026-10-24
+
+Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.2 and Wayfinder.Rendering.GovUk 0.11.0.
+
+### Changed
+
+- In the Blueprints editor, the notes under the Properties panel fold away. They start closed, the
+  heading says how many notes are open on what is selected, and once opened they stay open as the
+  selection changes.
+
 ## [5.2.1] — 2026-10-24
 
 Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.1 and Wayfinder.Rendering.GovUk 0.11.0.
