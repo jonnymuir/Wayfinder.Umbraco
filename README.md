@@ -494,14 +494,14 @@ authoring surface. Backoffice and demo logins are documented there.
 | **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 5.2.1 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 5.2.2 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|
 | `Wayfinder` | 0.24.0 | The domain model and calculation engine. |
 | `Wayfinder.Engine` | 0.24.0 | The state-machine engine. |
 | `Wayfinder.Rendering.GovUk` | 0.11.0 | GOV.UK Design System rendering and the component catalog. |
-| `Wayfinder.Editor` | 0.10.1 | The visual editor behind **Settings → Advanced → Blueprints**. |
+| `Wayfinder.Editor` | 0.10.2 | The visual editor behind **Settings → Advanced → Blueprints**. |
 | `Wayfinder.Engine.Worklist` | 0.4.0 | The caseworker worklist rendering. |
 
 Two more are optional and added by the host: `Wayfinder.Engine.Mcp` for
