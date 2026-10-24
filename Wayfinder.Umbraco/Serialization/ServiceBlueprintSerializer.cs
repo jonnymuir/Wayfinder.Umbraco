@@ -69,7 +69,7 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
 
     public override Task SaveItemAsync(ServiceBlueprintSchema item)
     {
-        // Parse before writing anything — DeserializeCoreAsync already validated this exact YAML,
+        // Parse before writing anything: DeserializeCoreAsync already validated this exact YAML,
         // but re-parsing here first (rather than after db.Insert/Update, as before) means a
         // corrupt item can never leave a half-written row: a bad file now fails cleanly with
         // nothing persisted, instead of throwing after the insert already committed.
