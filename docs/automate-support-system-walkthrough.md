@@ -53,7 +53,7 @@ is unset the app generates an ephemeral one at startup so the signed webhook sti
   (`coachingStandardsOutcome`, `coachingStandardsNote`), three outcomes (`accredited`,
   `provisional`, `referred`), webhook completion. `WayfinderUmbracoComposer` calls
   `AddConfiguredSupportSystems`, so this registers on boot.
-- **`service-blueprints/njf-coaching-register.json`** is the blueprint. Its `standards-validation`
+- **`service-blueprints/njf-coaching-register.yaml`** is the blueprint. Its `standards-validation`
   stage carries the `support-system-call` action; the calling gateway's routes are
   `accredited` / `provisional` / `referred`.
 - **Umbraco Automate** registers through its own composer (a bare package reference plus

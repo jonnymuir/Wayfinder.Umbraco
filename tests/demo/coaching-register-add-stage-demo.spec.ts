@@ -12,6 +12,7 @@ import {
   waitForPromptText, waitForPromptTextGone, captureTerminal
 } from 'wayfinder-demo-recording-kit';
 import { compressDeadTime } from 'wayfinder-demo-recording-kit/compress-dead-time';
+import { parse } from 'yaml';
 
 // One shared Page across every act (see narrated-single-take-demo-recording skill). Playwright
 // records one video per Page, so as long as nothing ever opens a second page, later acts are just
@@ -434,7 +435,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
         { headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true }
       ).catch(() => null);
       if (!resp?.ok()) return null;
-      return resp.json();
+      return parse(await resp.text());
     }
 
     const initialToken = await mintAgentToken();
@@ -494,7 +495,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
       'recap',
       'That new stage is sitting right there in the graph, between the accredited outcome and ' +
         'confirmation. Nobody touched a line of code, and nothing in the brief named a stage, a ' +
-        'component type, or where in the JSON it goes. That vocabulary is the agent\'s, from ' +
+        'component type, or where in the YAML it goes. That vocabulary is the agent\'s, from ' +
         'reading the live definition, not mine.'
     );
   });

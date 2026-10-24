@@ -14,7 +14,7 @@ namespace Wayfinder.Umbraco.Tests.Serialization;
 
 /// <summary>
 /// SECURITY REGRESSION: uSync import used to skip <see cref="ServiceBlueprintAuthoringService.Validate"/>
-/// entirely and, on a malformed stored JSON payload, throw out of <c>SaveItemAsync</c> after the
+/// entirely and, on a malformed stored payload, throw out of <c>SaveItemAsync</c> after the
 /// row had already been written. <see cref="ServiceBlueprintSerializer.DeserializeCoreAsync"/> now
 /// parses and validates before touching the store at all.
 ///
@@ -39,24 +39,24 @@ public sealed class ServiceBlueprintSerializerTests
             DeserializeCoreAsync(node, options);
     }
 
-    private const string ValidBlueprintJson = """
-        {
-          "definitionKey": "import-test",
-          "displayName": "Import test",
-          "version": 1,
-          "initialStage": "start",
-          "requestPolicy": "multiple",
-          "queues": [ { "key": "citizen", "displayName": "Citizen", "actor": "citizen" } ],
-          "stages": [
-            {
-              "stageKey": "start",
-              "displayName": "Start",
-              "queueKey": "citizen",
-              "components": [ { "type": "panel", "heading": "Start" } ],
-              "routes": []
-            }
-          ]
-        }
+    private const string ValidBlueprintYaml = """
+        definitionKey: import-test
+        displayName: Import test
+        version: 1
+        initialStage: start
+        requestPolicy: multiple
+        queues:
+          - key: citizen
+            displayName: Citizen
+            actor: citizen
+        stages:
+          - stageKey: start
+            displayName: Start
+            queueKey: citizen
+            components:
+              - type: panel
+                heading: Start
+            routes: []
         """;
 
     private static TestableSerializer BuildSerializer() => new(
@@ -70,32 +70,47 @@ public sealed class ServiceBlueprintSerializerTests
     /// node shape (root element, Key/Alias attributes) matches exactly what a real export
     /// produces, rather than a hand-built approximation of uSync's internal node format.</summary>
     private static async Task<System.Xml.Linq.XElement> BuildNodeWithDefinitionAsync(
-        TestableSerializer serializer, string definitionJson)
+        TestableSerializer serializer, string definitionYaml)
     {
         var schema = new ServiceBlueprintSchema
         {
             DefinitionKey = "import-test",
             DisplayName = "Import test",
             Version = 1,
-            Json = ValidBlueprintJson,
+            Yaml = ValidBlueprintYaml,
         };
         var serialized = await serializer.SerializeAsync(schema, new SyncSerializerOptions());
         serialized.Success.Should().BeTrue("the fixture export itself must succeed for these tests to mean anything");
 
         var node = serialized.Item!;
-        node.Element("Definition")!.ReplaceWith(new System.Xml.Linq.XElement("Definition", new System.Xml.Linq.XCData(definitionJson)));
+        node.Element("Definition")!.ReplaceWith(new System.Xml.Linq.XElement("Definition", new System.Xml.Linq.XCData(definitionYaml)));
         return node;
     }
 
     [Fact]
-    public async Task DeserializeAsync_FailsCleanly_ForMalformedJson_InsteadOfThrowingAfterAWrite()
+    public async Task DeserializeAsync_FailsCleanly_ForMalformedYaml_InsteadOfThrowingAfterAWrite()
     {
         var serializer = BuildSerializer();
-        var node = await BuildNodeWithDefinitionAsync(serializer, "{ this is not valid json");
+        var node = await BuildNodeWithDefinitionAsync(serializer, "definitionKey: import-test\nstages: [unclosed\n");
 
         var result = await serializer.DeserializeForTestAsync(node, new SyncSerializerOptions());
 
-        result.Success.Should().BeFalse("malformed stored JSON must fail the sync attempt, not throw");
+        result.Success.Should().BeFalse("malformed stored YAML must fail the sync attempt, not throw");
+        result.Change.Should().Be(ChangeType.Fail);
+    }
+
+    // SECURITY REGRESSION: a uSync file is another way in for a blueprint. Anchors and aliases let a
+    // few lines expand exponentially when the blueprint is next written out, so an import using
+    // them fails before anything reaches the store.
+    [Fact]
+    public async Task DeserializeAsync_FailsTheSyncAttempt_ForYamlUsingAnchorsAndAliases()
+    {
+        var serializer = BuildSerializer();
+        var node = await BuildNodeWithDefinitionAsync(serializer, "definitionKey: &key import-test\ndisplayName: *key\n");
+
+        var result = await serializer.DeserializeForTestAsync(node, new SyncSerializerOptions());
+
+        result.Success.Should().BeFalse();
         result.Change.Should().Be(ChangeType.Fail);
     }
 
@@ -105,35 +120,38 @@ public sealed class ServiceBlueprintSerializerTests
         // Stage routes must always target a gateway, never another stage directly
         // (ValidateGatewayRouting) — "start" here routes straight to "end", which isn't declared
         // as a gateway, exactly the shape a real backoffice save would reject.
-        const string invalidBlueprintJson = """
-            {
-              "definitionKey": "import-test",
-              "displayName": "Import test",
-              "version": 1,
-              "initialStage": "start",
-              "requestPolicy": "multiple",
-              "queues": [ { "key": "citizen", "displayName": "Citizen", "actor": "citizen" } ],
-              "stages": [
-                {
-                  "stageKey": "start",
-                  "displayName": "Start",
-                  "queueKey": "citizen",
-                  "components": [ { "type": "panel", "heading": "Start" } ],
-                  "routes": [ { "id": "start--submit--end", "target": "end", "trigger": "submit" } ]
-                },
-                {
-                  "stageKey": "end",
-                  "displayName": "End",
-                  "queueKey": "citizen",
-                  "components": [ { "type": "panel", "heading": "End" } ],
-                  "routes": []
-                }
-              ]
-            }
+        const string invalidBlueprintYaml = """
+            definitionKey: import-test
+            displayName: Import test
+            version: 1
+            initialStage: start
+            requestPolicy: multiple
+            queues:
+              - key: citizen
+                displayName: Citizen
+                actor: citizen
+            stages:
+              - stageKey: start
+                displayName: Start
+                queueKey: citizen
+                components:
+                  - type: panel
+                    heading: Start
+                routes:
+                  - id: start--submit--end
+                    target: end
+                    trigger: submit
+              - stageKey: end
+                displayName: End
+                queueKey: citizen
+                components:
+                  - type: panel
+                    heading: End
+                routes: []
             """;
 
         var serializer = BuildSerializer();
-        var node = await BuildNodeWithDefinitionAsync(serializer, invalidBlueprintJson);
+        var node = await BuildNodeWithDefinitionAsync(serializer, invalidBlueprintYaml);
 
         var result = await serializer.DeserializeForTestAsync(node, new SyncSerializerOptions());
 

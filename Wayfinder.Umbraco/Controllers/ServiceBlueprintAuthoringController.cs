@@ -18,7 +18,8 @@ namespace Wayfinder.Umbraco.Controllers;
 /// visual editor's own HTTP source both use elsewhere.
 /// A controller, not a mapped minimal-API group, because this is a package (Razor Class
 /// Library) with no access to the host application's <c>IEndpointRouteBuilder</c> — Umbraco
-/// discovers MVC controllers via assembly scanning instead.
+/// discovers MVC controllers via assembly scanning instead. A whole blueprint travels as YAML
+/// (<c>application/yaml</c>) both ways; lists, catalogs and outcomes are JSON.
 /// </summary>
 /// <remarks>
 /// <see cref="WayfinderUmbracoAuthorizationPolicies.BlueprintsAdmin"/> requires membership of a
@@ -64,12 +65,12 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     public async Task<IActionResult> ListServiceBlueprints(CancellationToken ct) =>
         Ok(await authoringService.ListAsync(ct));
 
-    /// <summary>The full definition for one blueprint, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
+    /// <summary>The full definition for one blueprint as YAML, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
     [HttpGet("service-blueprints/{definitionKey}")]
     public async Task<IActionResult> ReadServiceBlueprint(string definitionKey, CancellationToken ct)
     {
         var blueprint = await authoringService.ReadAsync(definitionKey, ct);
-        return blueprint is null ? NotFound() : Ok(blueprint);
+        return blueprint is null ? NotFound() : Content(ServiceBlueprintYaml.Serialize(blueprint), YamlContentType);
     }
 
     /// <summary>Just the current version number — the editor's cheap "has this changed under me?" poll, without re-fetching the whole definition.</summary>
@@ -82,8 +83,11 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
 
     /// <summary>Runs <see cref="ServiceBlueprintAuthoringService.Validate"/> against a blueprint that hasn't been saved yet — the editor's live-validation-as-you-type call.</summary>
     [HttpPost("service-blueprints/validate")]
-    public IActionResult ValidateServiceBlueprint([FromBody] ServiceBlueprint blueprint) =>
-        Ok(authoringService.Validate(blueprint));
+    [Consumes(YamlContentType)]
+    public async Task<IActionResult> ValidateServiceBlueprint(CancellationToken ct) =>
+        ServiceBlueprintYaml.TryDeserialize(await ReadBodyAsync(ct), out var blueprint, out var diagnostic)
+            ? Ok(authoringService.Validate(blueprint))
+            : Ok(new ServiceBlueprintValidationOutcome(false, [diagnostic]));
 
     /// <summary>
     /// Every registered component type's descriptor — the schema behind the editor's
@@ -113,9 +117,14 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     /// <see cref="ServiceBlueprintAuthoringService.SaveAsync"/>.
     /// </summary>
     [HttpPut("service-blueprints/{definitionKey}")]
-    public async Task<IActionResult> SaveServiceBlueprint(
-        string definitionKey, [FromBody] ServiceBlueprint blueprint, CancellationToken ct)
+    [Consumes(YamlContentType)]
+    public async Task<IActionResult> SaveServiceBlueprint(string definitionKey, CancellationToken ct)
     {
+        if (!ServiceBlueprintYaml.TryDeserialize(await ReadBodyAsync(ct), out var blueprint, out var diagnostic))
+        {
+            return BadRequest(ServiceBlueprintSaveOutcome.Invalid([diagnostic]));
+        }
+
         if (!string.Equals(blueprint.DefinitionKey, definitionKey, StringComparison.Ordinal))
         {
             return BadRequest(new ServiceBlueprintValidationOutcome(
@@ -138,7 +147,9 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
     /// <summary>Dry-runs a scripted sequence of steps against a blueprint without persisting any instance — the editor's "try it" panel.</summary>
     [HttpPost("service-blueprints/simulate")]
     public IActionResult SimulateServiceBlueprint([FromBody] ServiceBlueprintSimulationRequest request) =>
-        Ok(ServiceBlueprintSimulationRunner.Run(request.Blueprint, request.Steps));
+        ServiceBlueprintYaml.TryDeserialize(request.Blueprint, out var blueprint, out var diagnostic)
+            ? Ok(ServiceBlueprintSimulationRunner.Run(blueprint, request.Steps))
+            : BadRequest(new ServiceBlueprintValidationOutcome(false, [diagnostic]));
 
     /// <summary>Permanently removes a blueprint, or 404 if <paramref name="definitionKey"/> doesn't exist.</summary>
     [HttpDelete("service-blueprints/{definitionKey}")]
@@ -147,9 +158,18 @@ public class ServiceBlueprintAuthoringController(ServiceBlueprintAuthoringServic
         var deleted = await authoringService.DeleteAsync(definitionKey, ct);
         return deleted ? Ok() : NotFound();
     }
+
+    private const string YamlContentType = "application/yaml";
+
+    private async Task<string> ReadBodyAsync(CancellationToken ct)
+    {
+        using var reader = new StreamReader(Request.Body);
+        return await reader.ReadToEndAsync(ct);
+    }
 }
 
 /// <summary>Request body for <see cref="ServiceBlueprintAuthoringController.SimulateServiceBlueprint"/>.</summary>
+/// <param name="Blueprint">The blueprint to simulate, as YAML.</param>
 public sealed record ServiceBlueprintSimulationRequest(
-    ServiceBlueprint Blueprint,
+    string Blueprint,
     IReadOnlyList<ProcessManagerSimulationStep> Steps);

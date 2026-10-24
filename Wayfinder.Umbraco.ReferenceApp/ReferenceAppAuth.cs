@@ -29,7 +29,7 @@ public static class ReferenceAppAuth
     // share a name in this reference app's own simple two-persona model, nothing more.
     public const string CaseworkerRole = "caseworker";
 
-    // The team that owns njf-coaching-register.json's "registrar" queue (assignmentPolicy
+    // The team that owns njf-coaching-register.yaml's "registrar" queue (assignmentPolicy
     // "team-tray"). Both caseworker personas are members, so either can pick up a new coaching
     // application; once picked up it stays with that person through the whole send-to-standards
     // -and-wait round trip (team-tray ownership lives in ServiceRequest.QueueAssignments, which

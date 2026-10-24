@@ -79,9 +79,15 @@ public sealed class UmbracoDesignNoteStore(IUmbracoDatabaseFactory databaseFacto
         return Task.CompletedTask;
     }
 
-    private static string Write(DesignNote note) => JsonSerializer.Serialize(note, ServiceBlueprintJson.WriteOptions);
+    // A design note lives beside a blueprint, not inside it, and is stored as JSON.
+    private static readonly JsonSerializerOptions NoteJson = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static string Write(DesignNote note) => JsonSerializer.Serialize(note, NoteJson);
 
     private static DesignNote Read(DesignNoteSchema row) =>
-        (JsonSerializer.Deserialize<DesignNote>(row.Json, ServiceBlueprintJson.ReadOptions)
+        (JsonSerializer.Deserialize<DesignNote>(row.Json, NoteJson)
             ?? throw new JsonException($"Design note '{row.NoteId}' could not be read.")) with { Revision = row.Revision };
 }

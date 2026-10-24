@@ -9,6 +9,21 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- A service blueprint is YAML everywhere this package stores or carries one: the
+  `wayfinderServiceBlueprint` table's `Yaml` column (was `Json`), uSync export files, and the
+  backoffice authoring API, where a whole blueprint is an `application/yaml` body in both
+  directions (read, validate, save) and the simulate request carries it as a YAML string. Lists,
+  catalogs and outcomes are still JSON. The `blueprints-as-yaml` package migration renames the
+  column and rewrites each stored blueprint as YAML; one that can't be read is logged and left as
+  it was, to fix or reseed. Seed files for a host are `*.yaml`. Needs Wayfinder 0.25.0 and
+  Wayfinder.Editor 0.11.0.
+- To upgrade, update the package and start the site so the migration runs. A host that seeds
+  blueprints from files converts them to YAML (JSON is valid YAML, so
+  `ServiceBlueprintYaml.Deserialize` reads one and `ServiceBlueprintYaml.Serialize` writes it) and
+  reads them with `ServiceBlueprintYaml`.
+
 ## [5.2.2] — 2026-10-24
 
 Depends on Wayfinder 0.24.0, Wayfinder.Editor 0.10.2 and Wayfinder.Rendering.GovUk 0.11.0.

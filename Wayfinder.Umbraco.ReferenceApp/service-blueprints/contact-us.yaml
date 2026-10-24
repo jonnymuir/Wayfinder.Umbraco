@@ -1,0 +1,131 @@
+definitionKey: contact-us
+displayName: Contact us
+version: 1
+description: "A conversation between a visitor and the team: the visitor writes, the team replies, and either can carry on until the team closes it. Visitors needn't sign in; a private link in each reply email brings them back on any device."
+initialStage: message
+requestPolicy: multiple
+allowManualRestart: true
+queues:
+  - key: visitor
+    displayName: Visitor
+    actor: citizen
+  - key: team
+    displayName: The team
+    actor: caseworker
+stages:
+  - stageKey: message
+    displayName: Send us a message
+    queueKey: visitor
+    components:
+      - type: text
+        fieldKey: name
+        label: Your name
+        required: true
+        maxLength: 200
+      - type: email
+        fieldKey: email
+        label: Your email
+        required: true
+      - type: conversation
+        fieldKey: conversation
+        label: Your message
+        required: true
+    routes:
+      - id: message--send--to-team
+        target: to-team
+        trigger: send
+        label: Send
+        style: primary
+  - stageKey: reply
+    displayName: Reply to a message
+    queueKey: team
+    components:
+      - type: summary-list
+        title: From
+        children:
+          - type: text
+            fieldKey: name
+            label: Name
+          - type: email
+            fieldKey: email
+            label: Email
+      - type: conversation
+        fieldKey: conversation
+        label: Your reply
+        hint: We'll email it to them with a private link back to this conversation.
+    routes:
+      - id: reply--reply--awaiting-reply
+        target: awaiting-reply
+        trigger: reply
+        label: Send reply
+        style: primary
+      - id: reply--close--awaiting-reply
+        target: awaiting-reply
+        trigger: close
+        label: Send and close the conversation
+        style: secondary
+  - stageKey: follow-up
+    displayName: Your conversation with us
+    queueKey: visitor
+    components:
+      - type: conversation
+        fieldKey: conversation
+        label: Reply to us
+        required: true
+    routes:
+      - id: follow-up--send--to-team
+        target: to-team
+        trigger: send
+        label: Send
+        style: primary
+      - id: follow-up--done--to-closed
+        target: to-closed
+        trigger: done
+        label: That answers my question
+        style: secondary
+  - stageKey: closed
+    displayName: Conversation closed
+    stageType: Confirmation
+    queueKey: visitor
+    components:
+      - type: panel
+        heading: This conversation is closed
+      - type: body
+        content: Thank you for getting in touch. If there's anything else, send us a new message.
+gateways:
+  - key: to-team
+    displayName: Send to the team
+    gatewayType: Split
+    queueKey: visitor
+    routes:
+      - id: to-team--send--reply
+        target: reply
+        trigger: send
+      - id: to-team--send--awaiting-reply
+        target: awaiting-reply
+        trigger: send
+  - key: awaiting-reply
+    displayName: Thank you, we have your message
+    gatewayType: Join
+    queueKey: visitor
+    waitingContent: We'll email you when we reply, and you can come back to this page to carry on the conversation.
+    waitingExpectedSeconds: 86400
+    waitingPollIntervalMs: 60000
+    routes:
+      - id: awaiting-reply--reply--follow-up
+        target: follow-up
+        trigger: reply
+      - id: awaiting-reply--close--closed
+        target: closed
+        trigger: close
+    requiredIncomingQueues:
+      - visitor
+      - team
+  - key: to-closed
+    displayName: Close the conversation
+    gatewayType: Split
+    queueKey: visitor
+    routes:
+      - id: to-closed--done--closed
+        target: closed
+        trigger: done

@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Infrastructure.Persistence;
@@ -9,6 +8,7 @@ using uSync.Core.Models;
 using uSync.Core.Serialization;
 using Wayfinder.Umbraco.Persistence;
 using Wayfinder.Models.ServiceDesign;
+using Wayfinder.Serialization;
 using Wayfinder.Engine.Abstractions;
 using Wayfinder.Engine.Services;
 
@@ -22,7 +22,7 @@ namespace Wayfinder.Umbraco.Serialization;
 /// effect immediately rather than requiring a restart.
 ///
 /// SEC (2026-09-05 audit): import used to skip both the REST authoring path's
-/// <see cref="ServiceBlueprintAuthoringService.Validate"/> call and, if the imported JSON failed
+/// <see cref="ServiceBlueprintAuthoringService.Validate"/> call and, if the imported definition failed
 /// to parse, threw out of <c>SaveItemAsync</c> after the row had already been inserted/updated.
 /// <see cref="DeserializeCoreAsync"/> now parses and validates before ever returning a
 /// <see cref="ChangeType.Import"/> attempt, so a structurally invalid or malformed definition
@@ -31,12 +31,6 @@ namespace Wayfinder.Umbraco.Serialization;
 [SyncSerializer("7a2e4f18-9c3b-4d67-a1e5-8f6b2c9d4a71", "Wayfinder Service Blueprint Serializer", "wayfinderServiceBlueprint")]
 public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSchema>, ISyncSerializer<ServiceBlueprintSchema>
 {
-    private static readonly JsonSerializerOptions ReadOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        AllowOutOfOrderMetadataProperties = true
-    };
-
     private readonly ILogger _logger;
     private readonly IUmbracoDatabaseFactory _databaseFactory;
     private readonly IProcessManager _engine;
@@ -75,19 +69,19 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
 
     public override Task SaveItemAsync(ServiceBlueprintSchema item)
     {
-        // Parse before writing anything — DeserializeCoreAsync already validated this exact JSON,
+        // Parse before writing anything: DeserializeCoreAsync already validated this exact YAML,
         // but re-parsing here first (rather than after db.Insert/Update, as before) means a
         // corrupt item can never leave a half-written row: a bad file now fails cleanly with
         // nothing persisted, instead of throwing after the insert already committed.
         ServiceBlueprint? blueprint;
         try
         {
-            blueprint = JsonSerializer.Deserialize<ServiceBlueprint>(item.Json, ReadOptions);
+            blueprint = ServiceBlueprintYaml.Deserialize(item.Yaml);
         }
-        catch (JsonException ex)
+        catch (ServiceBlueprintYamlException ex)
         {
             _logger.LogWarning(ex,
-                "Skipping save for service blueprint '{DefinitionKey}': stored JSON failed to parse.",
+                "Skipping save for service blueprint '{DefinitionKey}': stored YAML failed to parse.",
                 item.DefinitionKey);
             return Task.CompletedTask;
         }
@@ -125,7 +119,7 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
                 new XElement("DefinitionKey", item.DefinitionKey),
                 new XElement("DisplayName", item.DisplayName),
                 new XElement("Version", item.Version)),
-            new XElement("Definition", new XCData(item.Json)));
+            new XElement("Definition", new XCData(item.Yaml)));
 
         return Task.FromResult(SyncAttempt<XElement>.Succeed(alias, node, ChangeType.Export, new List<uSyncChange>()));
     }
@@ -139,28 +133,22 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
             return SyncAttempt<ServiceBlueprintSchema>.Fail(node.GetAlias(), default, ChangeType.Fail,
                 "DefinitionKey is empty — check the exported file", null);
 
-        var json = node.Element("Definition")?.Value ?? string.Empty;
+        var yaml = node.Element("Definition")?.Value ?? string.Empty;
 
         // Parse and validate before ever touching the store (FindItemAsync below) — an import is
         // a second door onto the same authoritative store the REST/backoffice authoring path
         // guards with exactly this gate (ServiceBlueprintAuthoringService.SaveAsync), and must not
         // be allowed to skip it. Doing this first also means a malformed or invalid file never
         // reaches the database at all, rather than throwing after a row is already written.
-        ServiceBlueprint? blueprint;
+        ServiceBlueprint blueprint;
         try
         {
-            blueprint = JsonSerializer.Deserialize<ServiceBlueprint>(json, ReadOptions);
+            blueprint = ServiceBlueprintYaml.Deserialize(yaml);
         }
-        catch (JsonException ex)
+        catch (ServiceBlueprintYamlException ex)
         {
             return SyncAttempt<ServiceBlueprintSchema>.Fail(node.GetAlias(), default, ChangeType.Fail,
-                $"Definition is not valid JSON: {ex.Message}", ex);
-        }
-
-        if (blueprint is null)
-        {
-            return SyncAttempt<ServiceBlueprintSchema>.Fail(node.GetAlias(), default, ChangeType.Fail,
-                "Definition deserialized to null.", null);
+                $"Definition is not a valid service blueprint: {ex.Message}", ex);
         }
 
         var validation = _authoringService.Validate(blueprint);
@@ -178,7 +166,7 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
         schema.DefinitionKey = definitionKey;
         schema.DisplayName = info?.Element("DisplayName")?.Value ?? string.Empty;
         schema.Version = int.TryParse(info?.Element("Version")?.Value, out var version) ? version : 1;
-        schema.Json = json;
+        schema.Yaml = yaml;
         schema.UpdatedUtc = DateTime.UtcNow;
 
         return SyncAttempt<ServiceBlueprintSchema>.Succeed(ItemAlias(schema), schema, ChangeType.Import, new List<uSyncChange>());

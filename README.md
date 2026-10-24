@@ -243,8 +243,9 @@ database) alongside `Wayfinder.Umbraco`; it registers itself through its own com
 
 Install the package and call `AddWayfinderUmbraco()`:
 
-- **A service blueprint store**, DB-backed (`wayfinderServiceBlueprint`) and uSync-portable, with
-  its own package migration so the table and the two building blocks are created on install.
+- **A service blueprint store**, DB-backed (`wayfinderServiceBlueprint`, each blueprint stored as
+  YAML) and uSync-portable, with its own package migration so the table and the two building blocks
+  are created on install.
 - **Two Block Grid blocks**, composable onto any content page like any other block.
   `wayfinderServiceRequestStage` is the citizen-facing journey: GOV.UK components, file upload,
   GetCurrent and Advance. `wayfinderServiceRequestWorklist` is the caseworker queue: pickup and
@@ -269,13 +270,26 @@ Install the package and call `AddWayfinderUmbraco()`:
   code. `user.name` comes from the `name` claim and `user.email` from the `email` claim, and both
   are empty for an anonymous visitor. A saved answer always wins over the default:
 
-  ```json
-  "calculations": { "fields": { "user": { "source": "service", "shape": {
-      "name": { "valueKind": "string" }, "email": { "valueKind": "string" } } } } },
-  "components": [
-    { "type": "text",  "fieldKey": "applicantName",  "label": "Full name",     "defaultFrom": "user.name" },
-    { "type": "email", "fieldKey": "applicantEmail", "label": "Email address", "defaultFrom": "user.email" }
-  ]
+  ```yaml
+  calculations:
+    fields:
+      user:
+        source: service
+        shape:
+          name:
+            valueKind: string
+          email:
+            valueKind: string
+  # ...and on a stage:
+  components:
+    - type: text
+      fieldKey: applicantName
+      label: Full name
+      defaultFrom: user.name
+    - type: email
+      fieldKey: applicantEmail
+      label: Email address
+      defaultFrom: user.email
   ```
 
   A registered `IServiceInputsResolver` that supplies its own `user` value takes precedence.
@@ -346,7 +360,7 @@ block does:
 ## A contact page, without anyone signing in
 
 A contact page is a conversation: the visitor writes, the team replies, either can carry on. The
-reference app's [`contact-us.json`](Wayfinder.Umbraco.ReferenceApp/service-blueprints/contact-us.json)
+reference app's [`contact-us.yaml`](Wayfinder.Umbraco.ReferenceApp/service-blueprints/contact-us.yaml)
 is a complete blueprint for one (a `conversation` component, and a split and join so the visitor
 waits while the team replies). Four optional pieces make it work for visitors who never sign in:
 

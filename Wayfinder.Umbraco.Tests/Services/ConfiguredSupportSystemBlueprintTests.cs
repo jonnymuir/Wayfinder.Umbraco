@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,9 +43,8 @@ public sealed class ConfiguredSupportSystemBlueprintTests : IClassFixture<Config
 
     private static ServiceBlueprint CoachingRegisterBlueprint()
     {
-        var json = File.ReadAllText(Path.Combine(FixturesDir, "njf-coaching-register.json"));
-        return JsonSerializer.Deserialize<ServiceBlueprint>(
-            json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, AllowOutOfOrderMetadataProperties = true })!;
+        var json = File.ReadAllText(Path.Combine(FixturesDir, "njf-coaching-register.yaml"));
+        return ServiceBlueprintYaml.Deserialize(json);
     }
 
     [Fact]

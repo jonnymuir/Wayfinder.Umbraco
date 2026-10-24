@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -23,42 +22,49 @@ public class EngineExtensionPointTests
     private const string UserId = "user";
     private const string BlueprintKey = "extension-points";
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private const string BlueprintJson = """
-        {
-          "definitionKey": "extension-points",
-          "displayName": "Extension points",
-          "version": 1,
-          "initialStage": "start",
-          "requestPolicy": "single",
-          "calculations": {
-            "fields": {
-              "rate": { "source": "service" },
-              "doubled": { "expr": "rate * 2" }
-            }
-          },
-          "queues": [ { "key": "citizen", "displayName": "Applicant", "actor": "citizen" } ],
-          "stages": [
-            {
-              "stageKey": "start",
-              "displayName": "Start",
-              "queueKey": "citizen",
-              "components": [ { "type": "panel", "heading": "Start" } ],
-              "routes": [ { "id": "start--submit--to-done", "target": "to-done", "trigger": "submit" } ]
-            },
-            { "stageKey": "done", "displayName": "Done", "queueKey": "citizen", "components": [ { "type": "panel", "heading": "Done" } ] }
-          ],
-          "gateways": [
-            {
-              "key": "to-done",
-              "displayName": "Submit",
-              "gatewayType": "Split",
-              "queueKey": "citizen",
-              "routes": [ { "id": "to-done--continue--done", "target": "done", "trigger": "continue" } ]
-            }
-          ]
-        }
+    private const string BlueprintYaml = """
+        definitionKey: extension-points
+        displayName: Extension points
+        version: 1
+        initialStage: start
+        requestPolicy: single
+        queues:
+          - key: citizen
+            displayName: Applicant
+            actor: citizen
+        stages:
+          - stageKey: start
+            displayName: Start
+            queueKey: citizen
+            components:
+              - type: panel
+                heading: Start
+            routes:
+              - id: start--submit--to-done
+                target: to-done
+                trigger: submit
+          - stageKey: done
+            displayName: Done
+            queueKey: citizen
+            components:
+              - type: panel
+                heading: Done
+        gateways:
+          - key: to-done
+            displayName: Submit
+            gatewayType: Split
+            queueKey: citizen
+            routes:
+              - id: to-done--continue--done
+                target: done
+                trigger: continue
+        calculations:
+          fields:
+            rate:
+              source: service
+            doubled:
+              expr: rate * 2
         """;
 
     [Fact]
@@ -99,7 +105,7 @@ public class EngineExtensionPointTests
     // (AddWayfinderUmbraco's TryAdd keeps whatever is already registered), then resolves the engine.
     private static UmbracoProcessManagerEngine EngineWith(Action<IServiceCollection> hostRegistrations)
     {
-        var definition = JsonSerializer.Deserialize<ServiceBlueprint>(BlueprintJson, JsonOptions)!;
+        var definition = ServiceBlueprintYaml.Deserialize(BlueprintYaml);
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddHttpContextAccessor();
