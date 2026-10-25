@@ -98,7 +98,7 @@ This is what turns feedback from prose into pointing.
 | Resolution | What was done, in a sentence, and the version it was done in. |
 | Created, resolved | Timestamps. |
 
-Notes live beside the blueprint, not inside its JSON. They are about the design, not part of it,
+Notes live beside the blueprint, not inside its YAML. They are about the design, not part of it,
 and they must not change the blueprint's version or travel with it to another environment.
 
 ### Making notes
@@ -115,7 +115,7 @@ New MCP tools:
 
 | Tool | What it does |
 |---|---|
-| `list_design_notes` | Open notes for a blueprint (or all, by status), each with its anchor resolved to the stage's name and the current JSON path, so the agent knows exactly where it points. |
+| `list_design_notes` | Open notes for a blueprint (or all, by status), each with its anchor resolved to the stage's name and the current path in the blueprint, so the agent knows exactly where it points. |
 | `add_design_note` | The agent pins a question or a flag to an anchor. |
 | `resolve_design_note` | Marks a note resolved, with a one-sentence summary and the version that resolved it. |
 | `reply_to_design_note` | A threaded reply, for when the agent needs to ask before it can resolve. |

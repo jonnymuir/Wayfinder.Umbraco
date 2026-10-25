@@ -16,7 +16,12 @@ public class WidenJsonColumns(IMigrationContext context) : AsyncMigrationBase(co
     {
         if (SqlSyntax.ProviderName == SqlServerProviderName)
         {
-            Database.Execute("ALTER TABLE wayfinderServiceBlueprint ALTER COLUMN Json NVARCHAR(MAX) NOT NULL");
+            // A fresh install creates the blueprint table with its Yaml column, already NVARCHAR(MAX).
+            if (ColumnExists("wayfinderServiceBlueprint", "Json"))
+            {
+                Database.Execute("ALTER TABLE wayfinderServiceBlueprint ALTER COLUMN Json NVARCHAR(MAX) NOT NULL");
+            }
+
             Database.Execute("ALTER TABLE wayfinderServiceRequest ALTER COLUMN StateJson NVARCHAR(MAX) NOT NULL");
         }
 

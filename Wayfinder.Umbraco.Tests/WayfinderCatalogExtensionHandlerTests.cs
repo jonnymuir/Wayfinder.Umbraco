@@ -7,10 +7,9 @@ namespace Wayfinder.Umbraco.Tests;
 
 /// <summary>
 /// DX REGRESSION: extending Wayfinder.Umbraco's component/support-system catalog used to mean a
-/// static <c>ComponentTypeRegistry.Register&lt;T&gt;</c> call, a paired
-/// <c>GovUkComponentRenderer.RegisterComponent</c>/<c>RegisterField</c> call, and (for the REST/MCP
-/// authoring surface) a third <c>AddServiceBlueprintAuthoringApi()</c> call — three separate,
-/// order-sensitive registrations with no compile-time or startup-time check a host did all three.
+/// static <c>ComponentTypeRegistry.Register&lt;T&gt;</c> call and a paired
+/// <c>GovUkComponentRenderer.RegisterComponent</c>/<c>RegisterField</c> call, order-sensitive
+/// registrations with no compile-time or startup-time check a host did both.
 /// <see cref="WayfinderCatalogExtensionHandler"/> now runs every discovered
 /// <see cref="IWayfinderCatalogExtension"/> automatically at startup.
 /// </summary>

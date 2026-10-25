@@ -6,12 +6,10 @@ namespace Wayfinder.Umbraco.Extensions;
 /// A host's own extension to Wayfinder's component/support-system catalog — implement this on a
 /// class in the host's own assembly and it is discovered and run automatically at startup, via
 /// Umbraco's own <c>TypeLoader</c> assembly scanning (see <see cref="WayfinderCatalogExtensionHandler"/>).
-/// No composer wiring, no ordering, and no forgotten registration call: today, adding a custom
-/// component type means a static <c>ComponentTypeRegistry.Register&lt;T&gt;</c> call, a paired
-/// <c>GovUkComponentRenderer.RegisterComponent</c>/<c>RegisterField</c> call, and (for a type the
-/// REST/MCP authoring surface should accept) a separate <c>AddServiceBlueprintAuthoringApi()</c>
-/// registration — three separate calls in the right order, before anything reads the registry,
-/// with no compile-time or startup-time check that a host did all three. Implementing this
+/// No composer wiring, no ordering, and no forgotten registration call: without it, adding a custom
+/// component type means a static <c>ComponentTypeRegistry.Register&lt;T&gt;</c> call and a paired
+/// <c>GovUkComponentRenderer.RegisterComponent</c>/<c>RegisterField</c> call, in the right order,
+/// before anything reads the registry, with no check that a host did both. Implementing this
 /// interface instead just needs the class to exist.
 /// </summary>
 public interface IWayfinderCatalogExtension

@@ -2,6 +2,7 @@ import { type APIRequestContext, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { demoDir, demoRun, mcpAgentClientId, mcpAgentClientSecret, seededDefinitionKey } from './demo-config.js';
+import { parse, stringify } from 'yaml';
 
 const tokenEndpoint = '/umbraco/management/api/v1/security/back-office/token';
 const blueprintsEndpoint = '/umbraco/management/api/v1/wayfinder/service-blueprints';
@@ -75,7 +76,7 @@ async function agentDesignIsSaved(request: APIRequestContext): Promise<boolean> 
   const response = await request
     .get(`${blueprintsEndpoint}/${demoRun.newDefinitionKey}`, { headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true })
     .catch(() => null);
-  return response?.ok() ? isCompleteDesign(await response.json()) : false;
+  return response?.ok() ? isCompleteDesign(parse(await response.text())) : false;
 }
 
 /** Waits (up to 55 minutes) for the agent to save a complete design to the live engine. */
@@ -91,7 +92,7 @@ export async function waitForAgentDesign(request: APIRequestContext): Promise<vo
  * real take.
  */
 export async function saveRehearsalBlueprint(request: APIRequestContext, wait: (ms: number) => Promise<void>): Promise<void> {
-  const fixture = JSON.parse(readFileSync(path.join(demoDir, 'support', 'rehearsal-fake-blueprint.json'), 'utf8'));
+  const fixture = parse(readFileSync(path.join(demoDir, 'support', 'rehearsal-fake-blueprint.yaml'), 'utf8'));
   demoRun.newDefinitionKey = fixture.definitionKey;
   demoRun.newDisplayName = fixture.displayName;
 
@@ -103,9 +104,9 @@ export async function saveRehearsalBlueprint(request: APIRequestContext, wait: (
   if (!token) throw new Error('Rehearsal mode: could not mint a token to PUT the fake blueprint.');
 
   const putResp = await request.put(`${blueprintsEndpoint}/${demoRun.newDefinitionKey}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/yaml' },
     ignoreHTTPSErrors: true,
-    data: fixture
+    data: stringify(fixture)
   });
   expect(putResp.ok(), `rehearsal PUT of the fake blueprint failed: ${await putResp.text()}`).toBeTruthy();
 }

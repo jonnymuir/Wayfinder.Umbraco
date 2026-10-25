@@ -1,6 +1,5 @@
 using Moq;
 using System.Security.Claims;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -29,9 +28,8 @@ public sealed class UserServiceValueDefaultingTests
 
     private static string? RenderedValue(ClaimsPrincipal user, string fieldKey)
     {
-        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "njf-coaching-register.json"));
-        var definition = JsonSerializer.Deserialize<ServiceBlueprint>(
-            json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, AllowOutOfOrderMetadataProperties = true })!;
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "njf-coaching-register.yaml"));
+        var definition = ServiceBlueprintYaml.Deserialize(json);
 
         var engine = new UmbracoProcessManagerEngine(
             NullLogger<UmbracoProcessManagerEngine>.Instance,

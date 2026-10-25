@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core;
@@ -11,7 +10,7 @@ using Wayfinder.Models.ServiceDesign;
 namespace Wayfinder.Umbraco.ReferenceApp;
 
 /// <summary>
-/// Seeds this reference app's service blueprints (service-blueprints/*.json) into
+/// Seeds this reference app's service blueprints (service-blueprints/*.yaml) into
 /// Wayfinder.Umbraco's own <see cref="IServiceBlueprintSourceStore"/> on first boot, so the
 /// stage/worklist Block Grid blocks placed on the seeded pages (<see cref="ReferenceContentSeeder"/>)
 /// have something real to render rather than an empty backoffice:
@@ -38,16 +37,10 @@ public class ReferenceBlueprintSeeder(
 
     private static readonly (string Key, string File)[] Blueprints =
     [
-        (DefinitionKey, "reference-demo.json"),
-        (CoachingRegisterDefinitionKey, "njf-coaching-register.json"),
-        (ContactDefinitionKey, "contact-us.json"),
+        (DefinitionKey, "reference-demo.yaml"),
+        (CoachingRegisterDefinitionKey, "njf-coaching-register.yaml"),
+        (ContactDefinitionKey, "contact-us.yaml"),
     ];
-
-    private static readonly JsonSerializerOptions ReadOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        AllowOutOfOrderMetadataProperties = true
-    };
 
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
     {
@@ -64,9 +57,7 @@ public class ReferenceBlueprintSeeder(
             }
 
             var path = Path.Combine(env.ContentRootPath, "service-blueprints", file);
-            var json = await File.ReadAllTextAsync(path, cancellationToken);
-            var blueprint = JsonSerializer.Deserialize<ServiceBlueprint>(json, ReadOptions)
-                ?? throw new InvalidOperationException($"Failed to deserialize {path}.");
+            var blueprint = ServiceBlueprintYaml.Deserialize(await File.ReadAllTextAsync(path, cancellationToken));
 
             var result = await store.SaveAsync(blueprint, expectedVersion: 0, cancellationToken);
             if (!result.Saved)

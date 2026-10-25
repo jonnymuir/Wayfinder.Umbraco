@@ -1,6 +1,7 @@
 import type { UmbControllerHost } from '@umbraco-cms/backoffice/controller-api';
 import type { UmbDetailDataSource } from '@umbraco-cms/backoffice/repository';
 import { serviceBlueprintFetch } from '../../service-blueprint-http.js';
+import { loadWayfinderElements } from '../../wayfinder-elements-bundle.js';
 import { UMB_SERVICE_BLUEPRINT_ENTITY_TYPE, type ServiceBlueprintEntityModel } from '../../entity.js';
 
 /**
@@ -10,7 +11,7 @@ import { UMB_SERVICE_BLUEPRINT_ENTITY_TYPE, type ServiceBlueprintEntityModel } f
  *
  * Deliberately thin: this backoffice screen (collection + entity actions + workspace routing)
  * only ever needs `definitionKey`/`displayName` to identify and list a service blueprint. The actual
- * authored JSON is read/written entirely by `<wayfinder-service-blueprint-editor>` via its own
+ * authored YAML is read/written entirely by `<wayfinder-service-blueprint-editor>` via its own
  * `UmbracoWayfinderServiceBlueprintSource` — this data source's `update()` is never called by anything
  * (the workspace registers no generic Save action; the editor's own Save button is the only one),
  * and its `create()` posts the minimal valid definition the editor needs to then load and build
@@ -35,11 +36,12 @@ export class UmbServiceBlueprintDetailServerDataSource implements UmbDetailDataS
   }
 
   async read(unique: string) {
-    const response = await serviceBlueprintFetch(this.#host, `/${encodeURIComponent(unique)}`);
+    const response = await serviceBlueprintFetch(this.#host, `/${encodeURIComponent(unique)}`, { headers: { Accept: 'application/yaml' } });
     if (!response.ok) {
       return { error: new Error(`Failed to load service blueprint '${unique}' (${response.status}).`) };
     }
-    const payload = (await response.json()) as { definitionKey: string; displayName: string };
+    const { parseServiceBlueprintYaml } = await loadWayfinderElements();
+    const payload = parseServiceBlueprintYaml(await response.text()) as { definitionKey: string; displayName: string };
     return {
       data: {
         entityType: UMB_SERVICE_BLUEPRINT_ENTITY_TYPE,
@@ -77,10 +79,11 @@ export class UmbServiceBlueprintDetailServerDataSource implements UmbDetailDataS
       ],
     };
 
+    const { serializeAuthoredServiceBlueprint } = await loadWayfinderElements();
     const response = await serviceBlueprintFetch(this.#host, `/${encodeURIComponent(model.definitionKey)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/yaml' },
+      body: serializeAuthoredServiceBlueprint(body),
     });
 
     if (!response.ok) {

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -35,18 +34,42 @@ public sealed class ServiceRequestTransitionedNotificationTests
     };
 
     private const string Blueprint = """
-        {
-          "definitionKey": "contact", "displayName": "Contact us", "version": 1, "initialStage": "write",
-          "queues": [ { "key": "visitor", "displayName": "Visitor", "actor": "citizen" }, { "key": "team", "displayName": "Team", "actor": "caseworker" } ],
-          "stages": [
-            { "stageKey": "write", "displayName": "Write", "queueKey": "visitor",
-              "components": [ { "type": "text", "fieldKey": "message", "label": "Message", "required": true } ],
-              "routes": [ { "id": "write--send--respond", "target": "respond", "trigger": "send" } ] },
-            { "stageKey": "respond", "displayName": "Respond", "queueKey": "team",
-              "components": [ { "type": "text", "fieldKey": "answer", "label": "Answer" } ],
-              "routes": [ { "id": "respond--reply--write", "target": "write", "trigger": "reply" } ] }
-          ]
-        }
+        definitionKey: contact
+        displayName: Contact us
+        version: 1
+        initialStage: write
+        requestPolicy: single
+        queues:
+          - key: visitor
+            displayName: Visitor
+            actor: citizen
+          - key: team
+            displayName: Team
+            actor: caseworker
+        stages:
+          - stageKey: write
+            displayName: Write
+            queueKey: visitor
+            components:
+              - type: text
+                fieldKey: message
+                label: Message
+                required: true
+            routes:
+              - id: write--send--respond
+                target: respond
+                trigger: send
+          - stageKey: respond
+            displayName: Respond
+            queueKey: team
+            components:
+              - type: text
+                fieldKey: answer
+                label: Answer
+            routes:
+              - id: respond--reply--write
+                target: write
+                trigger: reply
         """;
 
     private static (UmbracoProcessManagerEngine Engine, List<ServiceRequestTransitionedNotification> Published) Build(bool handlerThrows = false)
@@ -63,7 +86,7 @@ public sealed class ServiceRequestTransitionedNotificationTests
                 }
             });
 
-        var definition = JsonSerializer.Deserialize<ServiceBlueprint>(Blueprint, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        var definition = ServiceBlueprintYaml.Deserialize(Blueprint);
         var engine = new UmbracoProcessManagerEngine(
             NullLogger<UmbracoProcessManagerEngine>.Instance,
             new SingleDefinitionServiceBlueprintStore(definition),

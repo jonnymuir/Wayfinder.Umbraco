@@ -7,10 +7,11 @@
 // The editor bundle (wayfinder-elements.js, from the Wayfinder.Editor NuGet package's static web
 // assets) is loaded at runtime by URL, not npm-installed — see loadWayfinderElements() in
 // wayfinder-elements-bundle.js. That means this file has no compile-time type import from it
-// either: ServiceBlueprintSaveError/sanitise*/hydrateServiceBlueprintDefinition/
+// either: ServiceBlueprintSaveError/sanitise*/parseServiceBlueprintYaml/
 // serializeAuthoredServiceBlueprint are all read off the dynamically-imported module at runtime,
 // and the wire shapes below are typed loosely (Record<string, unknown> / the handful of fields
 // this file actually branches on) rather than duplicating the editor's own large canonical types.
+// A whole blueprint travels as YAML (application/yaml) both ways; lists and outcomes are JSON.
 
 import { loadWayfinderElements } from './wayfinder-elements-bundle.js';
 
@@ -143,15 +144,14 @@ export class UmbracoWayfinderServiceBlueprintSource {
 
   async load(blueprintKey: string): Promise<AuthoredServiceBlueprint> {
     const response = await fetch(`${API_BASE}/${encodeURIComponent(blueprintKey)}`, {
-      headers: await this.authHeaders({ Accept: 'application/json' }),
+      headers: await this.authHeaders({ Accept: 'application/yaml' }),
       credentials: 'same-origin',
     });
     if (!response.ok) {
       throw new Error(`Failed to load service blueprint '${blueprintKey}' (${response.status} ${response.statusText}).`);
     }
-    const payload = (await response.json()) as AuthoredServiceBlueprint;
-    const { hydrateServiceBlueprintDefinition } = await loadWayfinderElements();
-    return hydrateServiceBlueprintDefinition(payload);
+    const { parseServiceBlueprintYaml } = await loadWayfinderElements();
+    return parseServiceBlueprintYaml(await response.text());
   }
 
   async save(blueprintKey: string, serviceBlueprint: AuthoredServiceBlueprint): Promise<void> {
@@ -159,7 +159,7 @@ export class UmbracoWayfinderServiceBlueprintSource {
     const body = serializeAuthoredServiceBlueprint(serviceBlueprint);
     const response = await fetch(`${API_BASE}/${encodeURIComponent(blueprintKey)}`, {
       method: 'PUT',
-      headers: await this.authHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      headers: await this.authHeaders({ 'Content-Type': 'application/yaml', Accept: 'application/json' }),
       credentials: 'same-origin',
       body,
     });
@@ -182,7 +182,7 @@ export class UmbracoWayfinderServiceBlueprintSource {
     const { serializeAuthoredServiceBlueprint } = await loadWayfinderElements();
     const response = await fetch(`${API_BASE}/validate`, {
       method: 'POST',
-      headers: await this.authHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+      headers: await this.authHeaders({ 'Content-Type': 'application/yaml', Accept: 'application/json' }),
       credentials: 'same-origin',
       body: serializeAuthoredServiceBlueprint(serviceBlueprint),
     });

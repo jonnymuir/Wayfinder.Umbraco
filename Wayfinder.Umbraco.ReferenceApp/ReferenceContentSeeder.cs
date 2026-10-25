@@ -182,7 +182,7 @@ public class ReferenceContentSeeder(
         var node = contentService.Create(name, -1, homeType.Alias);
 
         // Seed a real placed block, not an empty Block Grid — otherwise there is nothing to log in
-        // and see: the demo blueprint (reference-demo.json, ReferenceBlueprintSeeder) exists, but a
+        // and see: the demo blueprint (reference-demo.yaml, ReferenceBlueprintSeeder) exists, but a
         // citizen/caseworker persona has no page rendering either block until an editor places one
         // by hand in the backoffice. This is the same BlockGridValue JSON shape Umbraco's own
         // Management API round-trips (confirmed live via GET after a PUT through the real
