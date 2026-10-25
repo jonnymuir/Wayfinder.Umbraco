@@ -144,6 +144,21 @@ public sealed class AutomateCoachingStandardsSeeder(
         return true;
     }
 
+    /// <summary>One resolve step: which outcome it reports, and the note that goes with it.</summary>
+    /// <param name="FromOfficer">
+    /// The note is the standards officer's comment from the approval dialog, with
+    /// <paramref name="Note"/> as the fallback when they leave it blank.
+    /// </param>
+    private sealed record ResolveOutcome(string Alias, string Name, string OutcomeKey, string Note, bool FromOfficer);
+
+    // The note as a JSON value. The officer's comment is bound with "| json", which encodes
+    // whatever they typed (quotes, line breaks) so the payload stays valid JSON. The fixed notes are
+    // plain text with no quotes, and a fallback can't contain ':', '|' or '}', which delimit
+    // bindings, filters and their arguments.
+    private static string NoteJson(ResolveOutcome outcome) => outcome.FromOfficer
+        ? $"${{steps.{DecisionStepAlias}.comment | fallback:{outcome.Note} | json}}"
+        : $"\"{outcome.Note}\"";
+
     private static Automation BuildAutomation(Guid workspaceId, string? signingKey)
     {
         var checkExperience = Guid.NewGuid();
@@ -156,34 +171,25 @@ public sealed class AutomateCoachingStandardsSeeder(
         // Resolve the invocation via the in-process ResolveSupportSystemOutcomeAction rather than
         // an HTTP Request step: Automate's built-in HttpRequestAction blocks loopback (SSRF
         // protection), so an automation on the same box as Wayfinder cannot call the site back.
-        // noteJson is already a JSON value: a literal for the automatic path, or a binding ending
-        // in "| json" for the reviewed paths, which encodes whatever the officer typed (quotes,
-        // line breaks) so the payload stays valid JSON.
-        static StepConfiguration Resolve(Guid id, string alias, string name, string outcome, string noteJson, double x, double y) => new()
+        static StepConfiguration Resolve(Guid id, ResolveOutcome outcome, StepPosition position) => new()
         {
             Id = id,
-            Alias = alias,
+            Alias = outcome.Alias,
             ActionAlias = "wayfinder.resolveSupportSystemOutcome",
-            Name = name,
-            Position = new StepPosition { X = x, Y = y },
+            Name = outcome.Name,
+            Position = position,
             Settings = new()
             {
                 ["invocationId"] = "${trigger.body.invocationId}",
-                ["outcomeKey"] = outcome,
+                ["outcomeKey"] = outcome.OutcomeKey,
                 ["resultPayload"] = $$"""
                     {
-                      "coachingStandardsOutcome": "{{outcome}}",
-                      "coachingStandardsNote": {{noteJson}}
+                      "coachingStandardsOutcome": "{{outcome.OutcomeKey}}",
+                      "coachingStandardsNote": {{NoteJson(outcome)}}
                     }
                     """,
             },
         };
-
-        // The officer's comment from the approval dialog becomes the note the registrar and the
-        // applicant see, falling back to a standard note when they leave it blank. Fallback text
-        // can't contain ':', '|' or '}', which delimit bindings, filters and their arguments.
-        static string OfficerComment(string fallback) =>
-            $"${{steps.{DecisionStepAlias}.comment | fallback:{fallback} | json}}";
 
         var steps = new List<StepConfiguration>
         {
@@ -214,9 +220,9 @@ public sealed class AutomateCoachingStandardsSeeder(
                         """),
                 },
             },
-            Resolve(autoAccredit, "resolveAccredited", "Resolve: accredited (auto)", "accredited",
-                "\"Auto-accredited: two or more years' experience and a safeguarding disclosure reference on file.\"",
-                x: -240, y: 160),
+            Resolve(autoAccredit, new("resolveAccredited", "Resolve: accredited (auto)", "accredited",
+                "Auto-accredited: two or more years' experience and a safeguarding disclosure reference on file.", FromOfficer: false),
+                new StepPosition { X = -240, Y = 160 }),
             new()
             {
                 Id = emailOfficer,
@@ -245,12 +251,12 @@ public sealed class AutomateCoachingStandardsSeeder(
                     ["timeoutHours"] = 72,
                 },
             },
-            Resolve(resolveProvisional, "resolveProvisional", "Resolve: provisional", "provisional",
-                OfficerComment("Provisionally accredited by the NJF standards officer. Complete a mentored session within 6 months."),
-                x: 60, y: 480),
-            Resolve(resolveReferred, "resolveReferred", "Resolve: referred", "referred",
-                OfficerComment("Referred to the NJF safeguarding lead. The applicant will be contacted directly."),
-                x: 420, y: 480),
+            Resolve(resolveProvisional, new("resolveProvisional", "Resolve: provisional", "provisional",
+                "Provisionally accredited by the NJF standards officer. Complete a mentored session within 6 months.", FromOfficer: true),
+                new StepPosition { X = 60, Y = 480 }),
+            Resolve(resolveReferred, new("resolveReferred", "Resolve: referred", "referred",
+                "Referred to the NJF safeguarding lead. The applicant will be contacted directly.", FromOfficer: true),
+                new StepPosition { X = 420, Y = 480 }),
         };
 
         // SourceHandle is the canvas node's output handle id; for a branching step it is the same

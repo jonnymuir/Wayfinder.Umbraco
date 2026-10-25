@@ -40,6 +40,21 @@ const adminCredentials = { email: 'admin@example.test', password: 'Wayfinder123!
 const mailpitOrigin = 'https://localhost:8025';
 const officerComment = 'Lovely three-ball cascade. Book a mentored session before 1 March.';
 
+async function approveWithComment(page: Page, comment: string): Promise<void> {
+  await humanClick(
+    page,
+    page.getByRole('row', { name: /NJF Coaching Standards/ }).getByRole('button', { name: 'Approve' })
+  );
+  await page.waitForTimeout(500);
+  // Not page.getByRole('dialog'): that role matches an unrelated, buttonless element elsewhere
+  // in this backoffice. The real approval modal is this custom element, rendered in a portal
+  // container rather than nested under anything ARIA reports as role="dialog".
+  const approvalModal = page.locator('ua-approval-decision-modal');
+  await humanType(page, approvalModal.locator('textarea').first(), comment);
+  await humanClick(page, approvalModal.getByRole('button', { name: 'Approve', exact: true }));
+  await page.waitForTimeout(1_500);
+}
+
 test.describe.serial('Wayfinder.Umbraco coaching-register + Automate demo', () => {
   let page: Page;
 
@@ -219,18 +234,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register + Automate demo', () =
     await page.goto('/umbraco/section/automate/dashboard/approvals');
     await page.waitForTimeout(1_200);
     await beat(page, 'intent', "Approving as provisional, with a comment. Whatever the officer types here goes back to the registrar.");
-    await humanClick(
-      page,
-      page.getByRole('row', { name: /NJF Coaching Standards/ }).getByRole('button', { name: 'Approve' })
-    );
-    await page.waitForTimeout(500);
-    // Not page.getByRole('dialog'): that role matches an unrelated, buttonless element elsewhere
-    // in this backoffice, confirmed live. The real approval modal is this custom element, rendered
-    // in a portal container rather than nested under anything ARIA reports as role="dialog".
-    const approvalModal = page.locator('ua-approval-decision-modal');
-    await humanType(page, approvalModal.locator('textarea').first(), officerComment);
-    await humanClick(page, approvalModal.getByRole('button', { name: 'Approve', exact: true }));
-    await page.waitForTimeout(1_500);
+    await approveWithComment(page, officerComment);
 
     await beat(
       page,
@@ -246,9 +250,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register + Automate demo', () =
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
     await expect(page.getByRole('heading', { name: 'Confirm the outcome' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(officerComment)).toBeVisible();
-    await beat(page, 'note', "And there's the standards officer's comment, word for word, typed in Automate a moment ago.");
-
-    await beat(page, 'note', "Team-tray ownership survived the whole send-and-wait round trip. Still Casey's case.");
+    await beat(page, 'note', "The standards officer's comment, word for word, and team-tray ownership kept it Casey's case.");
     await humanClick(page, page.getByRole('button', { name: 'Record and notify the applicant' }));
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
