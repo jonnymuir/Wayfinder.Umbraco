@@ -1,7 +1,7 @@
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Services;
@@ -29,10 +29,14 @@ public sealed class AutomateCoachingStandardsSeeder(
     ILogger<AutomateCoachingStandardsSeeder> logger)
     : BackgroundService
 {
-    // Must match the automationId in appsettings.json's Wayfinder:SupportSystems[0].endpoint.url.
-    private static readonly Guid AutomationId = new("6f1c0000-0000-0000-0000-00000000c0de");
+    /// <summary>Must match the automation id in appsettings.json's <c>Wayfinder:SupportSystems[0].endpoint.url</c>.</summary>
+    public static readonly Guid AutomationId = new("6f1c0000-0000-0000-0000-00000000c0de");
 
     private const string StandardsOfficerEmail = "standards-officer@example.test";
+
+    // The approval step's alias, so later steps bind to its output by name
+    // (${steps.standardsOfficerDecision.comment}) rather than by a generated step id.
+    private const string DecisionStepAlias = "standardsOfficerDecision";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -85,7 +89,7 @@ public sealed class AutomateCoachingStandardsSeeder(
         // and publishing requires the workspace to have a service-account user with the sections
         // its trigger and actions need. Reuse the first workspace if a human already made one,
         // otherwise stand up a plain one whose service account is this reference app's own
-        // unattended admin (an Administrator, so it has every section — a deliberate shortcut for
+        // unattended admin (an Administrator, so it has every section: a deliberate shortcut for
         // a single-tenant demo, not a pattern for a real multi-user host).
         Workspace workspace;
         try
@@ -110,7 +114,7 @@ public sealed class AutomateCoachingStandardsSeeder(
         }
         catch
         {
-            // Automate's own schema/services not ready yet — try again next tick.
+            // Automate's own schema/services not ready yet, so try again next tick.
             return false;
         }
 
@@ -130,6 +134,7 @@ public sealed class AutomateCoachingStandardsSeeder(
             existing.Trigger = automation.Trigger;
             existing.Steps = automation.Steps;
             existing.Connections = automation.Connections;
+            existing.CanvasState = automation.CanvasState;
             await automationService.UpdateAutomationAsync(existing, cancellationToken: ct);
             logger.LogInformation("AUTOMATE COACHING STANDARDS SEEDER: refreshed automation {Id}.", AutomationId);
         }
@@ -138,6 +143,21 @@ public sealed class AutomateCoachingStandardsSeeder(
         logger.LogInformation("AUTOMATE COACHING STANDARDS SEEDER: published automation {Id}.", AutomationId);
         return true;
     }
+
+    /// <summary>One resolve step: which outcome it reports, and the note that goes with it.</summary>
+    /// <param name="FromOfficer">
+    /// The note is the standards officer's comment from the approval dialog, with
+    /// <paramref name="Note"/> as the fallback when they leave it blank.
+    /// </param>
+    private sealed record ResolveOutcome(string Alias, string Name, string OutcomeKey, string Note, bool FromOfficer);
+
+    // The note as a JSON value. The officer's comment is bound with "| json", which encodes
+    // whatever they typed (quotes, line breaks) so the payload stays valid JSON. The fixed notes are
+    // plain text with no quotes, and a fallback can't contain ':', '|' or '}', which delimit
+    // bindings, filters and their arguments.
+    private static string NoteJson(ResolveOutcome outcome) => outcome.FromOfficer
+        ? $"${{steps.{DecisionStepAlias}.comment | fallback:{outcome.Note} | json}}"
+        : $"\"{outcome.Note}\"";
 
     private static Automation BuildAutomation(Guid workspaceId, string? signingKey)
     {
@@ -151,18 +171,22 @@ public sealed class AutomateCoachingStandardsSeeder(
         // Resolve the invocation via the in-process ResolveSupportSystemOutcomeAction rather than
         // an HTTP Request step: Automate's built-in HttpRequestAction blocks loopback (SSRF
         // protection), so an automation on the same box as Wayfinder cannot call the site back.
-        static StepConfiguration Resolve(Guid id, string name, string outcome, string note, double x) => new()
+        static StepConfiguration Resolve(Guid id, ResolveOutcome outcome, StepPosition position) => new()
         {
             Id = id,
+            Alias = outcome.Alias,
             ActionAlias = "wayfinder.resolveSupportSystemOutcome",
-            Name = name,
-            Position = new StepPosition { X = x, Y = 480 },
+            Name = outcome.Name,
+            Position = position,
             Settings = new()
             {
                 ["invocationId"] = "${trigger.body.invocationId}",
-                ["outcomeKey"] = outcome,
+                ["outcomeKey"] = outcome.OutcomeKey,
                 ["resultPayload"] = $$"""
-                    {"coachingStandardsOutcome":"{{outcome}}","coachingStandardsNote":"{{note}}"}
+                    {
+                      "coachingStandardsOutcome": "{{outcome.OutcomeKey}}",
+                      "coachingStandardsNote": {{NoteJson(outcome)}}
+                    }
                     """,
             },
         };
@@ -177,40 +201,34 @@ public sealed class AutomateCoachingStandardsSeeder(
                 Position = new StepPosition { X = 0, Y = 0 },
                 Settings = new()
                 {
-                    ["conditions"] = new ConditionSet
-                    {
-                        Groups =
-                        [
-                            new ConditionGroup
+                    // Groups are ORed, conditions within a group ANDed: two or more years AND a
+                    // disclosure reference. Written exactly as the canvas's condition builder saves
+                    // it (PascalCase keys, operator names). A typed ConditionSet is stored camelCase
+                    // with numeric operators, which the engine still evaluates but the builder
+                    // opens as empty, and saving an empty set makes every application fast-track.
+                    ["conditions"] = JsonSerializer.Deserialize<JsonElement>("""
+                        {
+                          "Groups": [
                             {
-                                Conditions =
-                                [
-                                    new Condition
-                                    {
-                                        LeftOperand = "${trigger.body.inputs.yearsCoaching}",
-                                        Operator = ConditionOperator.GreaterThanOrEquals,
-                                        RightOperand = "2",
-                                    },
-                                    new Condition
-                                    {
-                                        LeftOperand = "${trigger.body.inputs.disclosureReference}",
-                                        Operator = ConditionOperator.IsNotEmpty,
-                                        RightOperand = "",
-                                    },
-                                ],
-                            },
-                        ],
-                    },
+                              "Conditions": [
+                                { "LeftOperand": "${trigger.body.inputs.yearsCoaching}", "Operator": "GreaterThanOrEquals", "RightOperand": "2" },
+                                { "LeftOperand": "${trigger.body.inputs.disclosureReference}", "Operator": "IsNotEmpty", "RightOperand": "" }
+                              ]
+                            }
+                          ]
+                        }
+                        """),
                 },
             },
-            Resolve(autoAccredit, "Resolve: accredited (auto)", "accredited",
-                "Auto-accredited: two or more years' experience and a safeguarding disclosure reference on file.", -200),
+            Resolve(autoAccredit, new("resolveAccredited", "Resolve: accredited (auto)", "accredited",
+                "Auto-accredited: two or more years' experience and a safeguarding disclosure reference on file.", FromOfficer: false),
+                new StepPosition { X = -240, Y = 160 }),
             new()
             {
                 Id = emailOfficer,
                 ActionAlias = "umbracoAutomate.sendEmail",
                 Name = "Email the standards officer",
-                Position = new StepPosition { X = 200, Y = 160 },
+                Position = new StepPosition { X = 240, Y = 160 },
                 Settings = new()
                 {
                     ["to"] = StandardsOfficerEmail,
@@ -222,19 +240,23 @@ public sealed class AutomateCoachingStandardsSeeder(
             new()
             {
                 Id = requestApproval,
+                Alias = DecisionStepAlias,
                 ActionAlias = "umbracoAutomate.requestApproval",
                 Name = "Accredit, provisional, or refer?",
-                Position = new StepPosition { X = 200, Y = 320 },
+                Position = new StepPosition { X = 240, Y = 320 },
                 Settings = new()
                 {
-                    ["prompt"] = "Approve to mark this coach 'provisional'; reject to 'refer'. Applicant: ${trigger.body.inputs.applicantName}.",
+                    ["prompt"] = "Approve to mark this coach 'provisional'; reject to 'refer'. Applicant: ${trigger.body.inputs.applicantName}, " +
+                        "${trigger.body.inputs.yearsCoaching} year(s) coaching. Your comment goes back to the registrar and the applicant as the standards officer's note.",
                     ["timeoutHours"] = 72,
                 },
             },
-            Resolve(resolveProvisional, "Resolve: provisional", "provisional",
-                "Provisionally accredited by the NJF standards officer. Complete a mentored session within 6 months.", 80),
-            Resolve(resolveReferred, "Resolve: referred", "referred",
-                "Referred to the NJF safeguarding lead. The applicant will be contacted directly.", 320),
+            Resolve(resolveProvisional, new("resolveProvisional", "Resolve: provisional", "provisional",
+                "Provisionally accredited by the NJF standards officer. Complete a mentored session within 6 months.", FromOfficer: true),
+                new StepPosition { X = 60, Y = 480 }),
+            Resolve(resolveReferred, new("resolveReferred", "Resolve: referred", "referred",
+                "Referred to the NJF safeguarding lead. The applicant will be contacted directly.", FromOfficer: true),
+                new StepPosition { X = 420, Y = 480 }),
         };
 
         // SourceHandle is the canvas node's output handle id; for a branching step it is the same
@@ -280,6 +302,9 @@ public sealed class AutomateCoachingStandardsSeeder(
             Trigger = trigger,
             Steps = steps,
             Connections = connections,
+            // The canvas draws the trigger from the saved canvas state, defaulting to a spot that
+            // sits on top of the first step, so place it directly above the If.
+            CanvasState = JsonSerializer.Serialize(new { triggerPosition = new { x = 0, y = -160 } }),
         };
     }
 }
