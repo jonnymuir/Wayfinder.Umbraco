@@ -30,7 +30,7 @@ dotnet run --project Wayfinder.Umbraco.AppHost
 ```
 
 The Aspire dashboard lists two resources: **referenceapp** (`https://localhost:44399`) and
-**mailpit** (`https://localhost:8025`, the mailbox UI — served with the machine's trusted
+**mailpit** (`https://localhost:8025`, the mailbox UI, served with the machine's trusted
 ASP.NET Core dev certificate, so `dotnet dev-certs https --trust` must have been run once).
 Wait for `referenceapp` to finish its unattended install.
 
@@ -63,7 +63,8 @@ is unset the app generates an ephemeral one at startup so the signed webhook sti
   automation via `IAutomationService` on every boot: an HMAC-SHA256 webhook trigger (keyed off
   the same `Wayfinder:SupportSystems` auth config the outbound client uses, so the two always
   agree), an **If** branch on the applicant's own data, a **Send Email** to the standards
-  officer, a **Request Approval**, and a `ResolveSupportSystemOutcome` step per outcome. It also
+  officer, a **Request Approval** (alias `standardsOfficerDecision`), and a
+  `ResolveSupportSystemOutcome` step per outcome. It also
   creates an Automate workspace if none exists, using this reference app's own admin as the
   workspace service account (a single-tenant demo shortcut).
 - **`ResolveSupportSystemOutcomeAction`** is a custom Automate `[Action]` in this reference app.
@@ -81,6 +82,46 @@ There is nothing to build by hand.
 
 ---
 
+## How the data moves
+
+Everything the automation knows arrives in one signed POST, and everything Wayfinder learns comes
+back through one resolve step.
+
+1. **Wayfinder to Automate.** When the registrar runs the check, the `support-system-call` action
+   maps blueprint fields onto the capability's inputs and POSTs this envelope to the webhook
+   trigger:
+
+   ```json
+   {
+     "invocationId": "…",
+     "instanceId": "…",
+     "supportSystemKey": "njf-coaching-standards",
+     "capabilityKey": "check-coaching-standards",
+     "inputs": { "applicantName": "…", "yearsCoaching": 1, "disclosureReference": "…", "firstAidExpiry": "…" }
+   }
+   ```
+
+   Inside the automation that body is `trigger.body`, so every step reads it through a binding.
+2. **Inside Automate.** Open the automation (**Automation** section, tree **Default > NJF Coaching
+   Standards**) and select a step, then its edit button, to see its bindings:
+
+   | Step | Reads |
+   |---|---|
+   | **Meets the fast-track criteria?** (If) | `${trigger.body.inputs.yearsCoaching}` >= `2` AND `${trigger.body.inputs.disclosureReference}` is not empty. True goes straight to **Resolve: accredited (auto)**. |
+   | **Email the standards officer** | `${trigger.body.inputs.applicantName}` and `${trigger.body.inputs.yearsCoaching}` in the body. |
+   | **Accredit, provisional, or refer?** (Request Approval) | The applicant's name and experience in its prompt. Approve means `provisional`, reject means `referred`. Its output, including the officer's **Comment**, is available to later steps as `steps.standardsOfficerDecision`. |
+   | **Resolve: provisional** / **Resolve: referred** | `${trigger.body.invocationId}` to find the waiting case, and `${steps.standardsOfficerDecision.comment \| fallback:… \| json}` as the note. |
+
+3. **Automate to Wayfinder.** The resolve step hands Wayfinder the outcome key and a result
+   payload. The payload's keys are the capability's declared outputs, so they land as the case's
+   `coachingStandardsOutcome` and `coachingStandardsNote` fields, which the registrar's **Confirm
+   the outcome** stage and the coach's completion page display. The officer's comment therefore
+   reaches both of them word for word, and a blank comment falls back to a standard note for that
+   outcome. The `| json` filter encodes the comment as a JSON string, so quotes and line breaks
+   in it cannot break the payload.
+
+---
+
 ## Run the journey
 
 1. **As the coach**: at `/demo/login` choose **Alex Applicant**, open **Apply to coach** and
@@ -91,15 +132,19 @@ There is nothing to build by hand.
    **Coaching register queue**, pick up the application, open **Review application**, and click
    **Run coaching-standards check**. The stage shows a waiting screen.
 3. **In Mailpit**, the "needs review" email to the standards officer has arrived.
-4. **In the backoffice Automate section** (`/umbraco`, signed in as `admin@example.test`), open
-   the run for the automation and its **Pending approvals**; approve. The run history shows the
-   **Resolve: provisional** step completing.
-5. **Back as the registrar** (Casey), the case is still yours: the `registrar` queue is
+4. **In the backoffice** (`/umbraco`, signed in as `admin@example.test`), open the
+   **Automation** section's **Approvals** tab. Select **Approve** on the NJF Coaching Standards
+   row, type a **Comment** (for example `Lovely three-ball cascade. Book a mentored session
+   before 1 March.`) and select **Approve**.
+5. On the **Runs** tab, open the NJF Coaching Standards run. Every step shows **Completed**,
+   ending with **Resolve Wayfinder support-system outcome**. The run view shows each step's status
+   and timings, not its output; the comment shows up on the registrar's screen.
+6. **Back as the registrar** (Casey), the case is still yours: the `registrar` queue is
    `team-tray`, so pickup ownership survives the send-and-wait round trip, and it shows
    **With you** rather than as a fresh pick-up. The wait screen has released into **Confirm the
-   outcome**, showing `coachingStandardsOutcome` = `provisional` and the standards officer's
-   note. Click **Record and notify the applicant**.
-6. **As the coach** (Alex), the wait screen releases into **Application complete**, showing the
+   outcome**, showing `coachingStandardsOutcome` = `provisional` and, as the standards officer's
+   note, the comment typed in step 4. Click **Record and notify the applicant**.
+7. **As the coach** (Alex), the wait screen releases into **Application complete**, showing the
    outcome and the note.
 
 Re-run with `yearsCoaching` = `5` and a disclosure reference to see the auto-`accredited` path
