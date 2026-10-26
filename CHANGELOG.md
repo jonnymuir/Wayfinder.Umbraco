@@ -9,6 +9,18 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- `Wayfinder.Umbraco.Starter`, a new package for trying Wayfinder on a fresh Umbraco site with no
+  code. It adds a home page, a sample *Request a callback* service with a public queue and a staff
+  queue, a page for every saved blueprint at `/services/{key}`, a one-click demo caseworker with a
+  work queue, and the MCP design partner endpoint with backoffice sign-in. Access comes from the
+  blueprints themselves: a blueprint's first queue is public and every other queue is staff work,
+  so a service designed in conversation works as soon as it is saved. Development only: it refuses
+  to start in any other environment unless `Wayfinder:Starter:AllowOutsideDevelopment` is set. It
+  is released with `Wayfinder.Umbraco`, at the same version. See
+  [Try it in five minutes](README.md#try-it-in-five-minutes).
+
 ## [6.0.0] — 2026-10-25
 
 Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and

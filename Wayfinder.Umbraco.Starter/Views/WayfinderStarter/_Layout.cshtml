@@ -1,0 +1,85 @@
+@{
+    // Versioned by the rendering package's own version, so an upgrade is never served from a stale browser cache.
+    var assetVersion = typeof(Wayfinder.Rendering.GovUk.GovUkComponents).Assembly.GetName().Version?.ToString() ?? "0";
+    var isCaseworker = StarterPersonas.IsCaseworker(Context.User);
+    var returnUrl = Context.Request.PathBase + Context.Request.Path;
+}
+<!doctype html>
+<html lang="en" class="govuk-template">
+<head>
+    <meta charset="utf-8">
+    <title>@ViewData["Title"]: Wayfinder starter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1d70b8">
+    <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/govuk-frontend/govuk-frontend.min.css?v=@assetVersion">
+    <link rel="stylesheet" href="/_content/Wayfinder.Rendering.GovUk/css/wayfinder-components.css?v=@assetVersion">
+</head>
+<body class="govuk-template__body">
+    <script>document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');</script>
+    <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
+
+    <header class="govuk-template__header">
+        <div class="govuk-generic-header">
+            <div class="govuk-generic-header__container govuk-width-container">
+                <div class="govuk-generic-header__logo">
+                    <a href="/" class="govuk-generic-header__homepage-link">Wayfinder starter</a>
+                </div>
+            </div>
+        </div>
+        <div class="govuk-service-navigation" data-module="govuk-service-navigation">
+            <div class="govuk-width-container">
+                <div class="govuk-service-navigation__container">
+                    <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
+                        <ul class="govuk-service-navigation__list">
+                            <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/">Home</a></li>
+                            <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="@StarterRoutes.WorkQueue">Work queue</a></li>
+                            <li class="govuk-service-navigation__item"><a class="govuk-service-navigation__link" href="/umbraco">Backoffice</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="govuk-width-container">
+        @if (isCaseworker)
+        {
+            <div class="govuk-notification-banner" role="region" aria-labelledby="starter-persona-title" data-module="govuk-notification-banner" data-wayfinder-starter-persona="caseworker">
+                <div class="govuk-notification-banner__header">
+                    <h2 class="govuk-notification-banner__title" id="starter-persona-title">Demo staff sign-in</h2>
+                </div>
+                <div class="govuk-notification-banner__content">
+                    <p class="govuk-body">You are signed in as @StarterPersonas.CaseworkerName, a caseworker.</p>
+                    <form method="post" action="@StarterRoutes.SignOut">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Sign out and use the site as the public</button>
+                    </form>
+                </div>
+            </div>
+        }
+        <main class="govuk-main-wrapper" id="main-content">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="govuk-template__footer">
+        <div class="govuk-footer">
+            <div class="govuk-width-container">
+                <div class="govuk-footer__meta">
+                    <div class="govuk-footer__meta-item govuk-footer__meta-item--grow">
+                        <h2 class="govuk-visually-hidden">Support links</h2>
+                        <div class="govuk-footer__meta-custom">
+                            A <a class="govuk-footer__link" href="https://github.com/jonnymuir/Wayfinder.Umbraco">Wayfinder.Umbraco</a> starter site, for local development only.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-govuk-frontend-init.js?v=@assetVersion"></script>
+    <script src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-slider.js?v=@assetVersion"></script>
+    <script type="module" src="/_content/Wayfinder.Rendering.GovUk/js/wayfinder-live-form.js?v=@assetVersion"></script>
+</body>
+</html>

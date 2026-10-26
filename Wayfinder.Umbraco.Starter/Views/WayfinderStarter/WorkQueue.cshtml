@@ -1,0 +1,20 @@
+@{
+    Layout = "~/Views/WayfinderStarter/_Layout.cshtml";
+    ViewData["Title"] = "Work queue";
+}
+<h1 class="govuk-heading-l">Work queue</h1>
+@if (StarterPersonas.IsCaseworker(Context.User))
+{
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderWorklistForPage.cshtml", 20)
+}
+else
+{
+    <p class="govuk-body">
+        Requests from the public arrive here for staff to pick up and decide. On this starter site you
+        can sign in as a demo caseworker without a password.
+    </p>
+    <form method="post" action="@StarterRoutes.SignIn">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="govuk-button" data-module="govuk-button">Sign in as @StarterPersonas.CaseworkerName</button>
+    </form>
+}

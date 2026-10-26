@@ -30,6 +30,9 @@ pushes.
 |---|---|
 | `Wayfinder.Umbraco` | The publishable package: store, authoring API, the two Block Grid blocks, uSync handlers, the composer that wires it all with zero host `Program.cs`. |
 | `Wayfinder.Umbraco.ReferenceApp` | A real bootable Umbraco 17 site proving the package end to end (citizen block, caseworker worklist, pickup/putback, the MCP authoring surface). Never ships. |
+| `Wayfinder.Umbraco.Starter` | The second publishable package, released with `Wayfinder.Umbraco` at the same version: the no-code "try it" kit (home page, sample blueprint, `/services/{key}` pages, demo caseworker, MCP endpoint wired through an `UmbracoPipelineFilter`). Development only. Never a dependency of `Wayfinder.Umbraco`. |
+| `Wayfinder.Umbraco.StarterSite` | A stock `dotnet new umbraco` site plus the starter reference, nothing else. Never ships. |
+| `Wayfinder.Umbraco.Starter.IntegrationTests` | Booted-host suite over `Wayfinder.Umbraco.StarterSite`, its own test process for the same one-boot-per-process reason as `Wayfinder.Umbraco.IntegrationTests`. |
 | `Wayfinder.Umbraco.Client` | The backoffice bundles (Blueprints tab + manifests), packed into the NuGet package via `wwwroot/dist`. |
 | `Wayfinder.Umbraco.AppHost` | .NET Aspire orchestrator for the reference app. |
 | `Wayfinder.Umbraco.Tests` | xUnit unit/component suite — fast, no host boot. |
