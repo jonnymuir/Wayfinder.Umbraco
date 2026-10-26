@@ -1,7 +1,10 @@
 <Solution>
   <Project Path="Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
+  <Project Path="Wayfinder.Umbraco.Starter/Wayfinder.Umbraco.Starter.csproj" />
   <Project Path="Wayfinder.Umbraco.Tests/Wayfinder.Umbraco.Tests.csproj" />
   <Project Path="Wayfinder.Umbraco.IntegrationTests/Wayfinder.Umbraco.IntegrationTests.csproj" />
   <Project Path="Wayfinder.Umbraco.ReferenceApp/Wayfinder.Umbraco.ReferenceApp.csproj" />
+  <Project Path="Wayfinder.Umbraco.StarterSite/Wayfinder.Umbraco.StarterSite.csproj" />
+  <Project Path="Wayfinder.Umbraco.Starter.IntegrationTests/Wayfinder.Umbraco.Starter.IntegrationTests.csproj" />
   <Project Path="Wayfinder.Umbraco.AppHost/Wayfinder.Umbraco.AppHost.csproj" />
 </Solution>

@@ -1,0 +1,17 @@
+@model ServiceBlueprint
+@{
+    Layout = "~/Views/WayfinderStarter/_Layout.cshtml";
+    ViewData["Title"] = Model.DisplayName;
+}
+<h1 class="govuk-heading-l">@Model.DisplayName</h1>
+@if (StarterPersonas.IsCaseworker(Context.User))
+{
+    <p class="govuk-body" data-wayfinder-starter="staff-on-public-page">
+        Caseworkers do not use the public side of a service. Sign out to try it as a member of the
+        public, or go to the <a class="govuk-link" href="@StarterRoutes.WorkQueue">work queue</a>.
+    </p>
+}
+else
+{
+    @await Html.PartialAsync("~/Views/Partials/_WayfinderStageForBlueprint.cshtml", Model.DefinitionKey)
+}

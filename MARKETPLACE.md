@@ -23,6 +23,28 @@ blueprint and service-design engine.
 
 ![The visual editor showing a branching service blueprint](https://raw.githubusercontent.com/jonnymuir/Wayfinder.Umbraco/main/assets/screenshots/visual-editor-graph.png)
 
+## Try it in five minutes
+
+The [starter kit](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.Starter/README.md) turns a brand new Umbraco site into a working
+Wayfinder demo with no code: a home page, a sample service with a public side and a caseworker
+queue, a one-click demo caseworker, and the design partner endpoint ready for an AI assistant.
+
+```bash
+dotnet new umbraco -n TryWayfinder -r LTS --development-database-type SQLite \
+  --friendly-name "Admin" --email admin@example.test --password "ChangeMe123!"
+cd TryWayfinder
+dotnet add package Wayfinder.Umbraco.Starter
+dotnet run
+```
+
+Open the address `dotnet run` prints. Send a request on **Request a callback**, then work it from
+the **Work queue** as the caseworker. Connect Claude Code with the command on the home page,
+describe a service, and try it at `/services/{key}` as soon as it is saved.
+
+The starter is for your own machine only: its caseworker sign-in has no password, so it refuses
+to run outside the Development environment. A real site uses the
+[Quickstart](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#quickstart) instead.
+
 ## What it's for
 
 Wayfinder for Umbraco is for teams that design and run public-facing services and have chosen
@@ -467,6 +489,11 @@ To report a vulnerability, see [SECURITY.md](https://github.com/jonnymuir/Wayfin
 Umbraco 17 site that runs this package end to end: the citizen stage block, the caseworker
 worklist, pickup and putback, access control, the Automate-driven support system, and the MCP
 authoring surface. Backoffice and demo logins are documented there.
+
+`Wayfinder.Umbraco.StarterSite` is the other sample: a stock `dotnet new umbraco` site, with the
+template's own [`Program.cs`](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/Wayfinder.Umbraco.StarterSite/Program.cs), whose only change is the
+starter kit reference. The starter's integration tests boot it to prove the
+[five-minute path](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#try-it-in-five-minutes) works.
 
 ## Requirements and compatibility
 

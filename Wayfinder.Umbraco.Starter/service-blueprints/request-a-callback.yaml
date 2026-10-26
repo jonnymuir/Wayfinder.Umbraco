@@ -1,0 +1,124 @@
+definitionKey: request-a-callback
+displayName: Request a callback
+version: 1
+description: A member of the public asks for a phone call back, and the contact centre arranges it. The smallest service with both a public queue and a staff queue.
+initialStage: your-request
+requestPolicy: single
+allowManualRestart: true
+queues:
+  - key: caller
+    displayName: Person asking for a callback
+    actor: applicant
+  - key: contact-centre
+    displayName: Contact centre
+    actor: caseworker
+stages:
+  - stageKey: your-request
+    displayName: Request a callback
+    queueKey: caller
+    components:
+      - type: text
+        fieldKey: full-name
+        label: Full name
+        required: true
+        maxLength: 100
+      - type: text
+        fieldKey: phone-number
+        label: Phone number
+        required: true
+        maxLength: 30
+      - type: radio
+        fieldKey: best-time
+        label: When is the best time to call?
+        required: true
+        options:
+          - Morning
+          - Afternoon
+          - Evening
+      - type: textarea
+        fieldKey: reason
+        label: What would you like to talk about?
+        required: true
+    routes:
+      - id: your-request--submit--to-contact-centre
+        target: to-contact-centre
+        trigger: submit
+        label: Send request
+        style: primary
+  - stageKey: arrange-callback
+    displayName: Arrange the callback
+    queueKey: contact-centre
+    components:
+      - type: summary-list
+        title: Callback request
+        children:
+          - type: text
+            fieldKey: full-name
+            label: Full name
+          - type: text
+            fieldKey: phone-number
+            label: Phone number
+          - type: text
+            fieldKey: best-time
+            label: Best time to call
+          - type: text
+            fieldKey: reason
+            label: Reason for the call
+    routes:
+      - id: arrange-callback--arranged--callback-decided
+        target: callback-decided
+        trigger: arranged
+        label: Callback arranged
+        style: primary
+      - id: arrange-callback--declined--callback-decided
+        target: callback-decided
+        trigger: declined
+        label: We cannot call back
+        style: secondary
+  - stageKey: callback-arranged
+    displayName: Callback arranged
+    stageType: Confirmation
+    queueKey: caller
+    components:
+      - type: panel
+        heading: Your callback is arranged
+      - type: body
+        content: Someone from the contact centre will call you at the time you chose.
+  - stageKey: callback-declined
+    displayName: We cannot call you back
+    stageType: Confirmation
+    queueKey: caller
+    components:
+      - type: panel
+        heading: We cannot call you back
+      - type: body
+        content: The contact centre cannot arrange a callback this time. You can request another one.
+gateways:
+  - key: to-contact-centre
+    displayName: Pass to the contact centre
+    gatewayType: Split
+    queueKey: caller
+    routes:
+      - id: to-contact-centre--submit--arrange-callback
+        target: arrange-callback
+        trigger: submit
+      - id: to-contact-centre--submit--callback-decided
+        target: callback-decided
+        trigger: submit
+  - key: callback-decided
+    displayName: Callback decided
+    gatewayType: Join
+    queueKey: caller
+    waitingContent: The contact centre has your request. This page will update once they have arranged your callback.
+    waitingExpectedSeconds: 60
+    waitingPollIntervalMs: 5000
+    routes:
+      - id: callback-decided--arranged--callback-arranged
+        target: callback-arranged
+        trigger: arranged
+      - id: callback-decided--declined--callback-declined
+        target: callback-declined
+        trigger: declined
+    requiredIncomingQueues:
+      - caller
+      - contact-centre

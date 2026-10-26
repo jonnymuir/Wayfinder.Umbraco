@@ -1,0 +1,77 @@
+@using Microsoft.Extensions.Hosting
+@using Microsoft.Extensions.Options
+@using Umbraco.Extensions
+@using Wayfinder.Umbraco.Mcp
+@model Umbraco.Cms.Core.Models.PublishedContent.IPublishedContent
+@inject Wayfinder.Engine.Abstractions.IProcessManager ProcessManager
+@inject IOptions<WayfinderMcpOptions> McpOptions
+@inject IHostEnvironment Environment
+@*
+    The starter home page's body, rendered by the wayfinderStarterHome template the starter creates.
+    The introduction is content, editable in the backoffice; the service list is every saved blueprint.
+*@
+@{
+    var services = ProcessManager.GetAllDefinitions().OrderBy(blueprint => blueprint.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+    var introduction = Model.Value<string>("introduction");
+    var connection = DesignPartnerConnection.Describe(
+        new Uri($"{Context.Request.Scheme}://{Context.Request.Host.Value}"),
+        StarterComposer.McpPath,
+        McpOptions.Value,
+        WayfinderMcpRedirectUris.For(McpOptions.Value, Environment),
+        Environment.IsDevelopment());
+    var claudeCode = $"claude mcp add --transport http {connection.ServerName} {connection.ServerUrl} --client-id {connection.ClientId} --callback-port {connection.CallbackPort}";
+}
+<h1 class="govuk-heading-xl">@Model.Name</h1>
+@if (!string.IsNullOrWhiteSpace(introduction))
+{
+    <p class="govuk-body-l">@introduction</p>
+}
+
+<h2 class="govuk-heading-l">Services on this site</h2>
+@if (services.Count == 0)
+{
+    <p class="govuk-body">There are no services yet. Design one with an AI assistant (below), or in the backoffice under Settings, Blueprints.</p>
+}
+else
+{
+    <ul class="govuk-list" data-wayfinder-starter="services">
+        @foreach (var service in services)
+        {
+            <li class="govuk-!-margin-bottom-6">
+                <h3 class="govuk-heading-m govuk-!-margin-bottom-1">
+                    <a class="govuk-link" href="@StarterRoutes.Service(service.DefinitionKey)">@service.DisplayName</a>
+                </h3>
+                @if (!string.IsNullOrWhiteSpace(service.Description))
+                {
+                    <p class="govuk-body">@service.Description</p>
+                }
+            </li>
+        }
+    </ul>
+}
+
+<h2 class="govuk-heading-l">Work the requests</h2>
+<p class="govuk-body">
+    Each service has a public side and a staff side. Anyone can use a service without signing in.
+    Requests then arrive on the <a class="govuk-link" href="@StarterRoutes.WorkQueue">work queue</a>,
+    where a demo caseworker picks them up and decides them. No password is needed.
+</p>
+
+<h2 class="govuk-heading-l">Design a service in conversation</h2>
+<p class="govuk-body">
+    This site has a design partner endpoint. Connect an AI assistant to it, sign in with your
+    backoffice account when it asks, and describe the service you want. A service it saves appears
+    in the list above straight away.
+</p>
+<h3 class="govuk-heading-s">Claude Code</h3>
+<pre class="govuk-body govuk-!-font-size-16" data-wayfinder-starter="claude-code-command"><code>@claudeCode</code></pre>
+<h3 class="govuk-heading-s">Other assistants</h3>
+<p class="govuk-body">
+    In the <a class="govuk-link" href="/umbraco">backoffice</a>, open Settings, then Blueprints, and
+    choose <strong>Connect a design partner</strong> for setup steps for Claude Desktop, VS Code and others.
+</p>
+<h3 class="govuk-heading-s">Something to try</h3>
+<div class="govuk-inset-text">
+    Design a service for reporting a broken streetlight. The person reporting it gives the location and
+    what is wrong, and the highways team decides whether to send someone out.
+</div>

@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
+    <ProjectReference Include="../Wayfinder.Umbraco.Starter/Wayfinder.Umbraco.Starter.csproj" />
   </ItemGroup>
 
   <!-- The reference app's own committed config + blueprint, linked so a test can assert the two

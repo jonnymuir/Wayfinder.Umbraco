@@ -34,6 +34,12 @@ jobs:
             exit 1
           fi
 
+          STARTER_VERSION=$(grep -oE '<Version>[^<]+</Version>' Wayfinder.Umbraco.Starter/Wayfinder.Umbraco.Starter.csproj | head -1 | sed -E 's#</?Version>##g')
+          if [ "$STARTER_VERSION" != "$VERSION" ]; then
+            echo "::error::Wayfinder.Umbraco.Starter.csproj <Version>${STARTER_VERSION}</Version> does not match Wayfinder.Umbraco ${VERSION}. The two packages are released together at one version."
+            exit 1
+          fi
+
       # No `cache:` input here on purpose — a release workflow must not restore a cache a
       # PR could have poisoned. With no cache configured there is nothing to exploit, so
       # the residual zizmor cache-poisoning hit on setup-node is a false positive.
