@@ -505,7 +505,7 @@ starter kit reference. The starter's integration tests boot it to prove the
 | **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 6.0.0 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 6.1.0 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|

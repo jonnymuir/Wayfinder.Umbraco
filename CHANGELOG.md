@@ -9,6 +9,12 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [6.1.0] — 2026-10-26
+
+Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and
+Wayfinder.Rendering.GovUk 0.12.0. `Wayfinder.Umbraco.Starter` 6.1.0 also depends on
+Wayfinder.Engine.Mcp 0.25.0.
+
 ### Added
 
 - `Wayfinder.Umbraco.Starter`, a new package for trying Wayfinder on a fresh Umbraco site with no
