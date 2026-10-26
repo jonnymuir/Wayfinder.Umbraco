@@ -29,3 +29,4 @@
 GHSA-j3p4-wp97-rph4  # HistogramEqualization: an image processor nothing in this repo invokes.
 GHSA-j9gm-c75j-xc9q  # TIFF CCITT T4 encoder: only reached when writing TIFF; nothing here encodes TIFF.
 GHSA-jjfr-hcj7-qf5w  # TIFF CCITT T6 encoder: same as above.
+GHSA-v76p-62qx-wwq2  # Tiled CCITT fax TIFF decoder heap overflow: reachable only by decoding a tiled fax TIFF. Accepted 2026-10-26 with the others; revisit with them when Umbraco ships patched ImageSharp.
