@@ -2,7 +2,7 @@
 // about this site (DesignPartnerController). Kept apart from the element so every snippet is
 // plain data.
 
-export type DesignPartnerClient = 'claude-code' | 'claude-desktop' | 'vscode';
+export type DesignPartnerClient = 'claude-code' | 'claude-desktop' | 'vscode' | 'github-copilot';
 
 export interface DesignPartnerConnection {
   serverName: string;
@@ -36,6 +36,10 @@ export const claudeCodeProjectFile = (c: DesignPartnerConnection) =>
 /** `.vscode/mcp.json`. VS Code asks for the client ID the first time it signs in. */
 export const vsCodeFile = (c: DesignPartnerConnection) =>
   json({ servers: { [c.serverName]: { type: 'http', url: c.serverUrl } } });
+
+/** An entry for `~/.copilot/mcp-config.json`, GitHub Copilot CLI's MCP server list. */
+export const copilotCliFile = (c: DesignPartnerConnection) =>
+  json({ mcpServers: { [c.serverName]: { type: 'http', url: c.serverUrl, oauth: { clientId: c.clientId } } } });
 
 export const redirectUrisSetting = (uris: string[]) => json({ Wayfinder: { Mcp: { RedirectUris: uris } } });
 

@@ -152,11 +152,15 @@ app.MapWayfinderUmbracoMcpOAuthDiscovery(McpEndpointPath);     // 5. the discove
   Code (`http://127.0.0.1:33418/`) use are registered for you. Anywhere else, list your MCP
   client's real callback URLs under `Wayfinder:Mcp:RedirectUris` in `appsettings.json`. Claude
   Desktop and claude.ai use `https://claude.ai/api/mcp/auth_callback`.
+- A registered callback on a loopback IP address (`127.0.0.1` or `[::1]`) accepts any port, as
+  [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252#section-7.3) requires, because some clients
+  listen on a port the operating system picks. GitHub Copilot CLI is one. Everything else about the
+  callback must match exactly, and `localhost` callbacks still need their exact port.
 
 ### Connecting a design partner
 
 Once MCP authoring is on, **Connect a design partner** on the Blueprints screen gives each designer
-the setup for Claude Code, Claude Desktop, VS Code or any other MCP client, with this site's server
+the setup for Claude Code, Claude Desktop, VS Code, GitHub Copilot CLI or any other MCP client, with this site's server
 URL, client ID and callback port filled in. Each step has a copy button, the Claude Code and VS
 Code config files download in one click, and two starter prompts get a conversation going: one to
 design a new service, one to work through the design notes on a blueprint. If a client's sign-in

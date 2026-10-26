@@ -44,6 +44,9 @@ public sealed record DesignPartnerConnection(
                 Setup("claude-code", accepted, $"http://localhost:{callbackPort}/callback"),
                 Setup("claude-desktop", accepted, ClaudeConnectorCallback),
                 Setup("vscode", accepted, VsCodeCallback),
+                // Copilot CLI listens on a port of its own choosing; any port on a registered
+                // 127.0.0.1 callback is accepted (WayfinderMcpLoopbackRedirectUri).
+                Setup("github-copilot", accepted, VsCodeCallback),
             ]);
     }
 
