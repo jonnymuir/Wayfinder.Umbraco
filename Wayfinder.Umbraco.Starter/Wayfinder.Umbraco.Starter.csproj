@@ -14,7 +14,7 @@
     <PackageId>Wayfinder.Umbraco.Starter</PackageId>
     <Title>Wayfinder for Umbraco: starter kit</Title>
     <!-- Released with Wayfinder.Umbraco, always at the same version (package-release.yml checks). -->
-    <Version>6.2.0</Version>
+    <Version>6.2.1</Version>
     <Authors>Jonny Muir</Authors>
     <Company>Wayfinder</Company>
     <Description>Try Wayfinder on a fresh Umbraco site with no code: a home page, a sample service with a public and a staff queue, demo staff sign-in, and the MCP authoring endpoint wired up so you can design a service in conversation with an AI assistant. For local development only, never install it on a real site.</Description>

@@ -9,6 +9,12 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [6.2.1] — 2026-10-27
+
+Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and
+Wayfinder.Rendering.GovUk 0.12.0. `Wayfinder.Umbraco.Starter` 6.2.1 also depends on
+Wayfinder.Engine.Mcp 0.25.0.
+
 ### Fixed
 
 - The **GitHub Copilot** tab's `~/.copilot/mcp-config.json` entry uses the top-level `oauthClientId`
