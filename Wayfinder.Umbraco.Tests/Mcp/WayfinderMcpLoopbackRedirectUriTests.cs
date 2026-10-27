@@ -14,7 +14,8 @@ namespace Wayfinder.Umbraco.Tests.Mcp;
 /// SECURITY REGRESSION. The MCP client may come back to any port on a registered loopback IP
 /// callback, as RFC 8252 section 7.3 requires (GitHub Copilot CLI listens on an ephemeral port).
 /// Nothing else is loosened: a different path, host, scheme or client, or <c>localhost</c>, still
-/// needs an exact match.
+/// needs an exact match, and so does any URI not written in canonical form, because OpenIddict
+/// redirects to the URI exactly as it was sent.
 /// </summary>
 public class WayfinderMcpLoopbackRedirectUriTests
 {
@@ -46,6 +47,18 @@ public class WayfinderMcpLoopbackRedirectUriTests
     [InlineData("http://[::1]:61566/")]
     [InlineData("http://127.0.0.2.example:61566/")]
     [InlineData("http://evil.example:33418/")]
+    [InlineData("http://127.0.0.1:61566")]
+    [InlineData("http://127.1:61566/")]
+    [InlineData("http://0x7f000001:61566/")]
+    [InlineData("http://2130706433:61566/")]
+    [InlineData("HTTP://127.0.0.1:61566/")]
+    [InlineData("http://127.0.0.1:061566/")]
+    [InlineData("http://127.0.0.1:61566/x/../")]
+    [InlineData("http://127.0.0.1:61566/%2e%2e/")]
+    [InlineData("http://127.0.0.1:61566/\n")]
+    [InlineData(" http://127.0.0.1:61566/")]
+    [InlineData("http://127.0.0.1:61566\\@evil.example/")]
+    [InlineData("http://evil.example@127.0.0.1:61566/")]
     public async Task AnythingButThePortStillHasToMatch(string redirectUri)
     {
         var context = await Validate(McpClientId, redirectUri);

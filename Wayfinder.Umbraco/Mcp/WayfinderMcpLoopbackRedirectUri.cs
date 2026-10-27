@@ -16,7 +16,9 @@ namespace Wayfinder.Umbraco.Mcp;
 /// </summary>
 /// <remarks>
 /// Only for the MCP client, and only when the requested URI matches a registered loopback IP
-/// redirect URI (<c>127.0.0.1</c> or <c>[::1]</c>, plain http) in everything but the port.
+/// redirect URI (<c>127.0.0.1</c> or <c>[::1]</c>, plain http) in everything but the port. The
+/// requested URI must already be in canonical form, because OpenIddict redirects to it as sent:
+/// <c>127.1</c>, dot segments or stray whitespace fall through to the exact match and fail.
 /// <c>localhost</c> gets no such leniency: RFC 8252 section 8.3 recommends against it, and the
 /// port rule is defined for loopback IP literals. Every other request, for every other client, goes
 /// to OpenIddict's own handler unchanged. Loopback callbacks are registered for a Development host
@@ -42,6 +44,7 @@ public sealed class WayfinderMcpLoopbackRedirectUri(
     {
         if (string.Equals(context.ClientId, options.Value.ClientId, StringComparison.Ordinal)
             && LoopbackIp(context.RedirectUri) is { } requested
+            && string.Equals(context.RedirectUri, requested.AbsoluteUri, StringComparison.Ordinal)
             && await applicationManager.FindByClientIdAsync(context.ClientId!) is { } application)
         {
             foreach (var registered in await applicationManager.GetRedirectUrisAsync(application))
