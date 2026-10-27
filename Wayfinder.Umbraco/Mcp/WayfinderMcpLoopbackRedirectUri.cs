@@ -43,8 +43,7 @@ public sealed class WayfinderMcpLoopbackRedirectUri(
     public async ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
     {
         if (string.Equals(context.ClientId, options.Value.ClientId, StringComparison.Ordinal)
-            && LoopbackIp(context.RedirectUri) is { } requested
-            && string.Equals(context.RedirectUri, requested.AbsoluteUri, StringComparison.Ordinal)
+            && CanonicalLoopbackIp(context.RedirectUri) is { } requested
             && await applicationManager.FindByClientIdAsync(context.ClientId!) is { } application)
         {
             foreach (var registered in await applicationManager.GetRedirectUrisAsync(application))
@@ -58,6 +57,9 @@ public sealed class WayfinderMcpLoopbackRedirectUri(
 
         await _openIddict.HandleAsync(context);
     }
+
+    private static Uri? CanonicalLoopbackIp(string? value) =>
+        LoopbackIp(value) is { } uri && string.Equals(value, uri.AbsoluteUri, StringComparison.Ordinal) ? uri : null;
 
     private static Uri? LoopbackIp(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
