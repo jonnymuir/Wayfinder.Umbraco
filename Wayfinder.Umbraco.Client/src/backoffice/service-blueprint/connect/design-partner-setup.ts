@@ -39,7 +39,7 @@ export const vsCodeFile = (c: DesignPartnerConnection) =>
 
 /** An entry for `~/.copilot/mcp-config.json`, GitHub Copilot CLI's MCP server list. */
 export const copilotCliFile = (c: DesignPartnerConnection) =>
-  json({ mcpServers: { [c.serverName]: { type: 'http', url: c.serverUrl, oauth: { clientId: c.clientId } } } });
+  json({ mcpServers: { [c.serverName]: { type: 'http', url: c.serverUrl, oauthClientId: c.clientId } } });
 
 export const redirectUrisSetting = (uris: string[]) => json({ Wayfinder: { Mcp: { RedirectUris: uris } } });
 

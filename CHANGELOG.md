@@ -9,6 +9,11 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Fixed
+
+- The **GitHub Copilot** tab's `~/.copilot/mcp-config.json` entry uses the top-level `oauthClientId`
+  key, so Copilot CLI no longer warns that the nested `oauth.clientId` key is deprecated.
+
 ## [6.2.0] — 2026-10-27
 
 Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and
