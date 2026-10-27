@@ -9,6 +9,19 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Fixed
+
+- GitHub Copilot CLI, and any other MCP client that listens on a port the operating system picks,
+  can now sign in to the design partner endpoint. It was refused with "the specified redirect_uri
+  is not valid for this client application". A registered loopback IP callback (`127.0.0.1` or
+  `[::1]`) now accepts any port, as RFC 8252 section 7.3 requires; everything else about the
+  callback must still match exactly.
+
+### Added
+
+- A **GitHub Copilot** tab in **Connect a design partner**, with the `~/.copilot/mcp-config.json`
+  entry for this site.
+
 ## [6.1.0] — 2026-10-26
 
 Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and

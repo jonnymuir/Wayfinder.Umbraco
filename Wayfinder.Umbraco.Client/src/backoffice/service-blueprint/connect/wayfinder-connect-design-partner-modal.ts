@@ -12,6 +12,7 @@ import {
   claudeCodeAdd,
   claudeCodeLogin,
   claudeCodeProjectFile,
+  copilotCliFile,
   newServicePrompt,
   notesPrompt,
   redirectUrisSetting,
@@ -27,6 +28,7 @@ const CLIENTS: { id: DesignPartnerClient | 'other'; label: string }[] = [
   { id: 'claude-code', label: 'Claude Code' },
   { id: 'claude-desktop', label: 'Claude Desktop' },
   { id: 'vscode', label: 'VS Code' },
+  { id: 'github-copilot', label: 'GitHub Copilot' },
   { id: 'other', label: 'Other MCP client' },
 ];
 
@@ -155,6 +157,27 @@ export class WayfinderConnectDesignPartnerModalElement extends UmbElementMixin(L
     `;
   }
 
+  private _githubCopilot(c: DesignPartnerConnection) {
+    return html`
+      ${this._missingCallbacks(c, 'github-copilot', 'GitHub Copilot')}
+      <p class="note">For Copilot Chat in VS Code, use the VS Code tab. These steps are for the Copilot CLI.</p>
+      ${usesLocalCertificate(c)
+        ? html`<p class="note">
+            This is a local site with a development certificate, which the Copilot CLI doesn't trust on its own. Trust it
+            first, as <a href=${WALKTHROUGH_URL} target="_blank" rel="noopener">the walkthrough</a> shows for Claude Code.
+          </p>`
+        : nothing}
+      <ol>
+        <li>
+          Add this server to <code>~/.copilot/mcp-config.json</code>, alongside any servers already in its
+          <code>mcpServers</code>:${this._snippet('copilot-file', 'mcp-config.json', copilotCliFile(c))}
+        </li>
+        <li>Start <code>copilot</code>. When it signs in to the server, your browser opens this backoffice; approve the request.</li>
+        <li>Paste a starter prompt from below.</li>
+      </ol>
+    `;
+  }
+
   private _other(c: DesignPartnerConnection) {
     return html`
       <p>Any MCP client that supports streamable HTTP and OAuth sign-in with a public client (PKCE, no secret) can connect.</p>
@@ -166,7 +189,8 @@ export class WayfinderConnectDesignPartnerModalElement extends UmbElementMixin(L
         <dt>Sign-in callbacks this site accepts</dt>
         <dd>
           ${c.redirectUris.length
-            ? html`<ul>${c.redirectUris.map((uri) => html`<li><code>${uri}</code></li>`)}</ul>`
+            ? html`<ul>${c.redirectUris.map((uri) => html`<li><code>${uri}</code></li>`)}</ul>
+                <p class="note">A callback on <code>127.0.0.1</code> may use any port, for clients that pick their own.</p>`
             : html`<p>None yet. Add your client's callback to <code>Wayfinder:Mcp:RedirectUris</code>.</p>`}
         </dd>
       </dl>
@@ -181,6 +205,8 @@ export class WayfinderConnectDesignPartnerModalElement extends UmbElementMixin(L
         return this._claudeDesktop(c);
       case 'vscode':
         return this._vsCode(c);
+      case 'github-copilot':
+        return this._githubCopilot(c);
       default:
         return this._other(c);
     }

@@ -26,7 +26,7 @@ public class DesignPartnerConnectionTests
     }
 
     [Fact]
-    public void On_a_development_site_claude_code_and_vs_code_are_ready_with_no_configuration()
+    public void On_a_development_site_claude_code_vs_code_and_github_copilot_are_ready_with_no_configuration()
     {
         var connection = Describe(new WayfinderMcpOptions(), Environments.Development);
 
@@ -34,6 +34,7 @@ public class DesignPartnerConnectionTests
         connection.CallbackPort.Should().Be(33418);
         Client(connection, "claude-code").Ready.Should().BeTrue();
         Client(connection, "vscode").Ready.Should().BeTrue();
+        Client(connection, "github-copilot").Ready.Should().BeTrue();
     }
 
     [Fact]
@@ -54,6 +55,7 @@ public class DesignPartnerConnectionTests
         connection.RedirectUris.Should().BeEmpty();
         Client(connection, "claude-code").MissingRedirectUris.Should().Equal("http://localhost:33418/callback");
         Client(connection, "vscode").MissingRedirectUris.Should().Equal("http://127.0.0.1:33418/");
+        Client(connection, "github-copilot").MissingRedirectUris.Should().Equal("http://127.0.0.1:33418/");
     }
 
     [Fact]

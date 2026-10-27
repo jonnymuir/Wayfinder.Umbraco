@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenIddict.Server;
 using OpenIddict.Server.AspNetCore;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Events;
@@ -82,6 +83,11 @@ public static class WayfinderUmbracoMcpExtensions
                 configuration.UseScopedHandler<WayfinderMcpDropResourceParameter>().SetOrder(int.MaxValue - 100_000));
             options.AddEventHandler<ExtractTokenRequestContext>(configuration =>
                 configuration.UseScopedHandler<WayfinderMcpDropResourceParameter>().SetOrder(int.MaxValue - 100_000));
+
+            // A native MCP client on a loopback IP may pick any port (RFC 8252 section 7.3). This
+            // handler applies that to the MCP client and hands every other request to OpenIddict's own.
+            options.RemoveEventHandler(OpenIddictServerHandlers.Authentication.ValidateClientRedirectUri.Descriptor);
+            options.AddEventHandler(WayfinderMcpLoopbackRedirectUri.Descriptor);
         });
 
         return builder;
