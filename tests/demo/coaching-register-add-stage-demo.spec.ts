@@ -9,7 +9,7 @@ import {
   getWaitSegments, markWaitStart, markWaitEnd, showFastForwardChip, hideFastForwardChip,
   humanClick, humanType, startDemoTerminalSession, sendTerminalText, sendTerminalKey,
   showTerminalMirror, stopTerminalMirror, stripAnsiForMatching, waitForPaneStable,
-  waitForPromptText, waitForPromptTextGone, captureTerminal
+  waitForPromptText, waitForPromptTextGone, captureTerminal, configureTerminalSession, ansiToHtml
 } from 'wayfinder-demo-recording-kit';
 import { compressDeadTime } from 'wayfinder-demo-recording-kit/compress-dead-time';
 import { parse } from 'yaml';
@@ -36,15 +36,93 @@ function tryConvertToMp4(webmPath: string): void {
 }
 
 // Not a CI test, a demo-recording tool. Run with `npm run demo:record:add-stage` from tests/demo
-// (see README.md for the full operator setup). Mirrors Demo 3, Beats A-C of
-// docs/demos/service-design-meetup-talk.md (Umbraco.Prism): a small, live conversational edit to
-// the same njf-coaching-register definition the Automate demo runs, not a from-scratch build. The
-// bigger "design an entire service" capability is what mcp-authoring-demo.spec.ts records instead.
+// (see README.md for the full operator setup). Mirrors Demo 3's Claude Code fallback in
+// docs/demos/service-design-meetup-talk.md (Umbraco.Prism), Beats A-D: a small, live
+// conversational edit to the same njf-coaching-register definition the Automate demo runs, the
+// canvas following the agent's save, then a note pinned on the new stage that the agent works
+// through. The bigger "design an entire service" capability is what mcp-authoring-demo.spec.ts
+// records instead.
 
 const adminCredentials = { email: 'admin@example.test', password: 'Wayfinder123!' };
 const mcpAgentClientId = 'wayfinder-demo-agent';
 const mcpAgentClientSecret = 'DemoAgentLocal!12345';
 const definitionKey = 'njf-coaching-register';
+const editorPath = `/umbraco/section/settings/workspace/wayfinder-service-blueprint/edit/${definitionKey}`;
+// Plain http on purpose, as in the talk's fallback: the claude CLI does not trust the .NET dev
+// certificate, and the OAuth login works the same over loopback http.
+const mcpUrl = 'http://localhost:5299/wayfinder/service-blueprint-authoring/mcp';
+const designNote = 'Make the nicknames sillier, and add one for diabolo players.';
+const terminalSocket = 'wayfinder-umbraco-demo';
+const terminalSession = 'wayfinder-umbraco-demo-terminal';
+configureTerminalSession(terminalSocket, terminalSession);
+
+// Beats C and D need the canvas and the agent on screen together, so the room sees the canvas
+// move on its own when the agent saves. The kit's terminal mirror takes over the whole page, so
+// this narrows the backoffice to the left and mirrors a narrower tmux pane on the right.
+const splitTerminalWidth = 860;
+const splitTerminalCols = 88;
+const splitTerminalRows = 46;
+let splitTimer: ReturnType<typeof setInterval> | null = null;
+
+async function showSplitTerminal(page: Page): Promise<void> {
+  execFileSync('tmux', ['-L', terminalSocket, 'resize-window', '-t', terminalSession,
+    '-x', String(splitTerminalCols), '-y', String(splitTerminalRows)]);
+  await page.evaluate(width => {
+    const left = `${window.innerWidth - width}px`;
+    document.documentElement.style.width = left;
+    document.body.style.width = left;
+    const panel = document.createElement('div');
+    panel.id = 'demo-split-terminal';
+    Object.assign(panel.style, {
+      position: 'fixed', top: '0', right: '0', width: `${width}px`, height: '100vh',
+      background: '#0d1117', zIndex: '2147483000', boxSizing: 'border-box', padding: '18px 20px',
+      borderLeft: '2px solid #30363d', overflow: 'hidden'
+    });
+    const content = document.createElement('pre');
+    content.id = 'demo-split-terminal-content';
+    Object.assign(content.style, {
+      margin: '0', color: '#e6edf3', whiteSpace: 'pre',
+      font: '400 15px/21px "SF Mono", ui-monospace, Menlo, Consolas, monospace'
+    });
+    panel.appendChild(content);
+    document.body.appendChild(panel);
+    window.dispatchEvent(new Event('resize'));
+  }, splitTerminalWidth);
+
+  let busy = false;
+  let lastFrame = '';
+  splitTimer = setInterval(() => {
+    if (busy) return;
+    busy = true;
+    void (async () => {
+      try {
+        const raw = captureTerminal();
+        if (raw !== lastFrame) {
+          lastFrame = raw;
+          const html = ansiToHtml(raw.replace(/\n$/, ''));
+          await page.evaluate(html => {
+            const content = document.getElementById('demo-split-terminal-content');
+            if (content) content.innerHTML = html;
+          }, html);
+        }
+      } catch {
+        // A capture hiccup, the next tick catches up.
+      }
+      busy = false;
+    })();
+  }, 300);
+}
+
+async function hideSplitTerminal(page: Page): Promise<void> {
+  if (splitTimer) clearInterval(splitTimer);
+  splitTimer = null;
+  await page.evaluate(() => {
+    document.getElementById('demo-split-terminal')?.remove();
+    document.documentElement.style.width = '';
+    document.body.style.width = '';
+    window.dispatchEvent(new Event('resize'));
+  }).catch(() => {});
+}
 const claudeSessionLogPath = '/tmp/wayfinder-umbraco-add-stage-demo-claude-session.log';
 // Deliberately outside this repo, same reasoning as mcp-authoring-demo.spec.ts's own scratchDir:
 // the whole point is proving the agent has no filesystem access to the codebase, only the MCP
@@ -54,6 +132,101 @@ mkdirSync(scratchDir, { recursive: true });
 
 test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () => {
   let page: Page;
+
+  let newStageKey = '';
+
+  async function mintAgentToken(): Promise<string | null> {
+    const resp = await page.request.post('/umbraco/management/api/v1/security/back-office/token', {
+      ignoreHTTPSErrors: true,
+      form: {
+        grant_type: 'client_credentials',
+        client_id: `umbraco-back-office-${mcpAgentClientId}`,
+        client_secret: mcpAgentClientSecret
+      }
+    }).catch(() => null);
+    if (!resp?.ok()) return null;
+    const body = await resp.json();
+    return body.access_token ?? null;
+  }
+
+  async function readDefinition(token: string): Promise<{ stages?: Array<{ stageKey: string }> } | null> {
+    const resp = await page.request.get(
+      `/umbraco/management/api/v1/wayfinder/service-blueprints/${definitionKey}`,
+      { headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true }
+    ).catch(() => null);
+    if (!resp?.ok()) return null;
+    return parse(await resp.text());
+  }
+
+  // A freshly launched interactive agent session hits its own "MCP server needs authentication"
+  // gate on its first real tool call, even after `claude mcp login`, and can ask again if an
+  // authorization code expires. The URL comes from the session log's OSC 8 hyperlink target,
+  // because the visible text is hard-wrapped. The sign-in runs in a side tab, so the recorded
+  // page keeps the canvas on screen; its own video is discarded.
+  const agentAuthorizeUrlPattern =
+    /\x1b\]8;[^;]*;(https?:\/\/localhost:(?:44399|5299)\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?[^\x07\x1b]+)/g;
+  let lastHandledAuthUrl = '';
+
+  async function driveAgentAuthorizationIfWaiting(): Promise<void> {
+    const logText = existsSync(claudeSessionLogPath) ? readFileSync(claudeSessionLogPath, 'utf8') : '';
+    const matches = [...logText.matchAll(agentAuthorizeUrlPattern)].map(m => m[1]);
+    if (!matches.length) return;
+    const authUrl = matches[matches.length - 1];
+    if (authUrl === lastHandledAuthUrl) return;
+    lastHandledAuthUrl = authUrl;
+
+    await beat(page, 'note', "The agent's first tool call asks for the same backoffice sign-in once more.", { position: 'top' });
+    const authPage = await page.context().newPage();
+    const callbackRequest = authPage
+      .waitForRequest(r => r.url().startsWith('http://localhost:33418/callback'), { timeout: 30_000 })
+      .catch(() => null);
+    await authPage.goto(authUrl, { waitUntil: 'commit' }).catch(() => {});
+    const raced = await Promise.race([
+      callbackRequest.then(r => ({ pending: false as const, req: r })),
+      authPage.waitForTimeout(2_000).then(() => ({ pending: true as const, req: null }))
+    ]);
+    let callbackReq = raced.req;
+    if (raced.pending) {
+      if (await authPage.locator('#username-input').isVisible({ timeout: 4_000 }).catch(() => false)) {
+        await authPage.locator('#username-input').fill(adminCredentials.email);
+        await authPage.locator('#password-input').fill(adminCredentials.password);
+        await authPage.getByRole('button', { name: /login/i }).first().click();
+      }
+      const consent = authPage.getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i }).first();
+      if (await consent.isVisible({ timeout: 6_000 }).catch(() => false)) {
+        await consent.click();
+      }
+      callbackReq = await callbackRequest;
+    }
+    const sideVideo = authPage.video();
+    await authPage.close();
+    await sideVideo?.delete().catch(() => {});
+    await page.bringToFront();
+
+    const redirectUrl = callbackReq?.url() ?? '';
+    if (redirectUrl) {
+      await waitForPaneStable();
+      await sendTerminalText(redirectUrl);
+      sendTerminalKey('Enter');
+      await page.waitForTimeout(1_500);
+    } else {
+      console.log('Mid-conversation authorization: no loopback callback captured from the authorize redirect.');
+    }
+  }
+
+  // The save lands while the agent is usually still writing its wrap-up, so let the turn end
+  // before moving on, and the recording never leaves it mid-sentence.
+  async function waitForAgentTurnToEnd(): Promise<void> {
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      if (!captureTerminal().includes('esc to interrupt')) {
+        await waitForPaneStable(2_000);
+        if (!captureTerminal().includes('esc to interrupt')) return;
+      }
+      await page.waitForTimeout(2_000);
+    }
+  }
+
 
   test.beforeAll(async ({ browser }) => {
     const recordingSize = { width: 1920, height: 1080 };
@@ -68,6 +241,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
 
   test.afterAll(async () => {
     stopTerminalMirror();
+    if (splitTimer) clearInterval(splitTimer);
     const video = page?.video();
     await page?.close();
     if (video) {
@@ -102,7 +276,8 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
         'Building an entire service from scratch with an AI design partner is one thing. Most ' +
         "days you're not doing that, you're changing something small on a service that's already " +
         "live. We'll ask an agent to add one new stage to the coaching-register blueprint we've " +
-        'already watched work end to end, and see it land, live, in seconds.',
+        'already watched work end to end, watch it land on the canvas, then point at it and ask ' +
+        'for a change.',
       holdMs: 12_000
     });
     await clearSlate(page);
@@ -130,16 +305,12 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
     await page.waitForTimeout(800);
 
     await waitForPaneStable();
-    await sendTerminalText('export NODE_EXTRA_CA_CERTS=~/.aspnet/dev-cert.pem');
-    sendTerminalKey('Enter');
-    await waitForPaneStable();
     await sendTerminalText('export BROWSER=true');
     sendTerminalKey('Enter');
     await waitForPaneStable();
 
-    const mcpUrl = 'https://localhost:44399/wayfinder/service-blueprint-authoring/mcp';
     const authorizeUrlPattern =
-      /https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?\S+/g;
+      /https?:\/\/localhost:(?:44399|5299)\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?\S+/g;
     const readSessionLog = (): string =>
       existsSync(claudeSessionLogPath) ? readFileSync(claudeSessionLogPath, 'utf8') : '';
 
@@ -274,9 +445,22 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
     });
     await clearSlate(page);
 
+    // The canvas goes on screen first and is never reloaded from here on, so everything it shows
+    // after the agent saves is the editor following the change by itself.
+    stopTerminalMirror();
+    await page.goto(editorPath);
+    await expect(page.locator('[data-wayfinder-stage="apply"]')).toBeVisible({ timeout: 30_000 });
+    await showSplitTerminal(page);
+    await page.waitForTimeout(800);
+    await humanClick(page, page.getByRole('button', { name: 'Fit to screen' }));
+    await beat(page, 'note', "The canvas on the left, the agent on the right. Nobody touches the canvas from here.", { position: 'top' });
+
     // Act 1 only registered and authenticated the MCP server, it never started an interactive
     // claude session to actually use it. Launch one now, same restricted-tools/bypass shape as
     // mcp-authoring-demo.spec.ts's own Act 2, before sending anything to the pane.
+    await waitForPaneStable();
+    await sendTerminalText('clear');
+    sendTerminalKey('Enter');
     await waitForPaneStable();
     await sendTerminalText(
       'claude --model sonnet ' +
@@ -287,16 +471,8 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
 
     // Two one-time consent gates can appear on a genuinely fresh scratch-directory launch, in
     // order: workspace trust, then BypassPermissions. Neither appears on every Claude Code
-    // version. Checking the LIVE pane (not a rolling log tail) before answering either. Confirmed
-    // live that the trust-folder gate can take longer than a few seconds to render on a loaded
-    // machine, an 8s window missed it entirely once and the brief got typed straight into the
-    // still-open gate, so this budgets generously rather than tightly.
-    //
-    // Also confirmed live: this Claude Code version (2.1.283) renders the trust-folder gate as a
-    // plain arrow-selectable list with no numbered options at all ("No, exit" highlighted first,
-    // "Yes, I trust this folder" second), sending the digit "1" is not a valid input for it and
-    // does nothing, which silently corrupted an earlier take. Down then Enter is what actually
-    // moves the selection onto "Yes, I trust this folder" and confirms it.
+    // version. The trust gate is an arrow-selectable list with "No, exit" first, so Down then
+    // Enter is what accepts it; a digit does nothing there.
     if (await waitForPromptText(/trust this folder/i, 20_000)) {
       await waitForPaneStable();
       sendTerminalKey('Down');
@@ -311,8 +487,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
       await waitForPromptTextGone(/Yes, I accept/i, 8_000);
     }
 
-    // Belt and braces: never send the brief while either gate is still visibly on screen, however
-    // that happened. Typing free text into an open selection menu corrupts the whole session.
+    // Typing free text into an open selection menu corrupts the whole session.
     const stillGated = () => /trust this folder|Yes, I accept/i.test(stripAnsiForMatching(captureTerminal()));
     for (let guard = 0; guard < 10 && stillGated(); guard++) {
       await page.waitForTimeout(1_000);
@@ -329,175 +504,88 @@ test.describe.serial('Wayfinder.Umbraco coaching-register add-a-stage demo', () 
     await markWaitStart('act2-design');
     await showFastForwardChip(page, 'The agent is making the change');
 
-    // Confirmed live: claude mcp login (Act 1) authenticates the CLI's own meta-commands
-    // (mcp add/list), but a freshly launched interactive agent session still hits its own,
-    // separate "1 MCP server needs authentication" gate on its first real tool call, printing a
-    // fresh authorize URL into the conversation and then waiting for a human to drive it. Missing
-    // this once burned a full 12-minute poll budget for nothing.
-    //
-    // The URL must come from the session log's own OSC 8 hyperlink target, not the visually
-    // wrapped text the TUI renders (confirmed live: the pane/log both hard-wrap a URL this long
-    // at 150 columns as real line breaks, truncating a plain \S+ match at the first wrap; the
-    // OSC 8 URI parameter itself carries the whole URL with no wrapping).
-    //
-    // Confirmed live this can happen more than once in the same conversation: an authorization
-    // code can expire before the agent finishes processing it, and the agent then asks for a
-    // fresh URL itself rather than getting stuck, so this re-triggers on any new, different
-    // authorize URL rather than only ever handling the first one it sees.
-    const authorizeUrlPattern =
-      /\x1b\]8;[^;]*;(https:\/\/localhost:44399\/umbraco\/management\/api\/v1\/security\/back-office\/authorize\?[^\x07\x1b]+)/g;
-    async function driveAuthorizeUrl(authUrl: string): Promise<string> {
-      const callbackRequest = page
-        .waitForRequest(r => r.url().startsWith('http://localhost:33418/callback'), { timeout: 30_000 })
-        .catch(() => null);
-      await page.goto(authUrl, { waitUntil: 'commit' }).catch(() => {});
-
-      const raced = await Promise.race([
-        callbackRequest.then(r => ({ pending: false as const, req: r })),
-        page.waitForTimeout(2_000).then(() => ({ pending: true as const, req: null }))
-      ]);
-      let callbackReq = raced.req;
-      if (raced.pending) {
-        if (await page.locator('#username-input').isVisible({ timeout: 4_000 }).catch(() => false)) {
-          await humanType(page, page.locator('#username-input'), adminCredentials.email);
-          await humanType(page, page.locator('#password-input'), adminCredentials.password);
-          await humanClick(page, page.getByRole('button', { name: /login/i }).first());
-        }
-        const consent = page
-          .getByRole('button', { name: /allow|authori[sz]e|accept|continue|grant|^yes/i })
-          .first();
-        if (await consent.isVisible({ timeout: 6_000 }).catch(() => false)) {
-          await humanClick(page, consent);
-        }
-        callbackReq = await callbackRequest;
-      }
-      return callbackReq?.url() ?? '';
-    }
-
-    let lastHandledAuthUrl = '';
-    async function driveAgentAuthorizationIfWaiting(): Promise<void> {
-      const logText = existsSync(claudeSessionLogPath) ? readFileSync(claudeSessionLogPath, 'utf8') : '';
-      const matches = [...logText.matchAll(authorizeUrlPattern)].map(m => m[1]);
-      if (!matches.length) return;
-      const authUrl = matches[matches.length - 1];
-      if (authUrl === lastHandledAuthUrl) return;
-      lastHandledAuthUrl = authUrl;
-
-      await beat(
-        page,
-        'note',
-        "The agent's own first tool call needs a fresh authorization, same backoffice sign-in, " +
-          'one more time.',
-        { position: 'top' }
-      );
-      const redirectUrl = await driveAuthorizeUrl(authUrl);
-      // The OAuth redirect chain (login -> consent -> loopback callback) can still be settling
-      // its own navigation the instant driveAuthorizeUrl returns, confirmed live:
-      // showTerminalMirror's own page.evaluate raced an in-flight navigation and threw "Execution
-      // context was destroyed". A settle wait plus one retry covers it without guessing a fixed
-      // delay that's either too short on a slow run or wasted time on a fast one.
-      await page.waitForLoadState('load', { timeout: 5_000 }).catch(() => {});
-      await page.waitForTimeout(500);
-      try {
-        await showTerminalMirror(page);
-      } catch {
-        await page.waitForTimeout(1_000);
-        await showTerminalMirror(page);
-      }
-      await page.waitForTimeout(500);
-      if (redirectUrl) {
-        await waitForPaneStable();
-        await sendTerminalText(redirectUrl);
-        sendTerminalKey('Enter');
-        await page.waitForTimeout(1_500);
-      } else {
-        console.log('Mid-conversation authorization: no loopback callback captured from the authorize redirect.');
-      }
-    }
-
-    async function mintAgentToken(): Promise<string | null> {
-      const resp = await page.request.post('/umbraco/management/api/v1/security/back-office/token', {
-        ignoreHTTPSErrors: true,
-        form: {
-          grant_type: 'client_credentials',
-          client_id: `umbraco-back-office-${mcpAgentClientId}`,
-          client_secret: mcpAgentClientSecret
-        }
-      }).catch(() => null);
-      if (!resp?.ok()) return null;
-      const body = await resp.json();
-      return body.access_token ?? null;
-    }
-
-    async function readDefinition(token: string): Promise<{ stages?: unknown[] } | null> {
-      const resp = await page.request.get(
-        `/umbraco/management/api/v1/wayfinder/service-blueprints/${definitionKey}`,
-        { headers: { Authorization: `Bearer ${token}` }, ignoreHTTPSErrors: true }
-      ).catch(() => null);
-      if (!resp?.ok()) return null;
-      return parse(await resp.text());
-    }
-
     const initialToken = await mintAgentToken();
-    if (!initialToken) throw new Error('Could not mint the demo agent token to read the starting stage count.');
+    if (!initialToken) throw new Error('Could not mint the demo agent token to read the starting definition.');
     const initial = await readDefinition(initialToken);
-    const initialStageCount = initial?.stages?.length ?? 0;
-
+    const initialStageKeys = new Set((initial?.stages ?? []).map(stage => stage.stageKey));
     await expect.poll(
       async () => {
         await driveAgentAuthorizationIfWaiting();
         const token = await mintAgentToken();
         if (!token) return false;
         const definition = await readDefinition(token);
-        return (definition?.stages?.length ?? 0) > initialStageCount;
+        newStageKey = (definition?.stages ?? []).map(stage => stage.stageKey).find(key => !initialStageKeys.has(key)) ?? '';
+        return newStageKey !== '';
       },
       { timeout: 12 * 60_000, intervals: [5_000] }
     ).toBe(true);
 
-    // The save has landed, but the agent is usually still finishing its wrap-up message. Let its
-    // turn actually end before cutting away, so the recording never leaves it visibly mid-sentence.
-    const turnEndDeadline = Date.now() + 60_000;
-    while (Date.now() < turnEndDeadline) {
-      if (!captureTerminal().includes('esc to interrupt')) {
-        await waitForPaneStable(2_000);
-        if (!captureTerminal().includes('esc to interrupt')) break;
-      }
-      await page.waitForTimeout(2_000);
-    }
+    await waitForAgentTurnToEnd();
     await markWaitEnd();
     await hideFastForwardChip(page);
+
+    await expect(page.getByText(/Updated elsewhere, from version/)).toBeVisible({ timeout: 60_000 });
+    await humanClick(page, page.getByRole('button', { name: 'Fit to screen' }));
+    await expect(page.locator(`[data-wayfinder-stage="${newStageKey}"]`)).toBeVisible({ timeout: 15_000 });
 
     await beat(
       page,
       'recap',
-      "Done, and it's already live. It read the existing definition as its own style reference, " +
-        "added one stage in the right place, and validated and simulated before it saved. Same " +
-        'discipline whether the change is one stage or twenty.',
+      'Nobody clicked reload. The canvas followed the agent to the new version and highlights what ' +
+        'changed. It read the live definition as its style reference, added one stage in the right ' +
+        'place, and validated and simulated before it saved.',
       { position: 'top' }
     );
   });
 
-  test('Act 3, see it in the graph', async () => {
-    await beat(page, 'intent', "Let's see what it actually built, no restart, no redeploy.");
+  test('Act 3, point at it', async () => {
+    test.setTimeout(15 * 60_000);
 
-    await page.goto('/umbraco/section/settings');
-    await page.waitForTimeout(1_200);
-    await humanClick(page, page.getByText('Blueprints', { exact: true }));
-    await page.waitForTimeout(1_200);
-    await humanClick(page, page.getByRole('link', { name: 'Register as a juggling coach' }));
-    await page.waitForTimeout(1_500);
+    const newStage = page.locator(`[data-wayfinder-stage="${newStageKey}"]`);
+    await beat(page, 'intent', "Now I don't describe what's wrong in prose. I point at it.", { position: 'top' });
+    await humanClick(page, newStage);
+    const selectionNotes = page.locator('[data-wayfinder-selection-notes]');
+    if ((await selectionNotes.getAttribute('open')) === null) {
+      await humanClick(page, selectionNotes.locator('summary'));
+    }
+    const noteForm = page.locator('[data-wayfinder-add-design-note]');
+    await humanType(page, noteForm.getByRole('textbox'), designNote);
+    await humanClick(page, noteForm.getByRole('button', { name: 'Add note' }));
+    await expect(newStage).toHaveAttribute('data-wayfinder-stage-notes', '1', { timeout: 15_000 });
+    await beat(page, 'note', 'A note marker on the stage itself.', { position: 'top' });
 
-    await humanClick(page, page.getByRole('button', { name: 'Fit to screen' }));
-    await page.waitForTimeout(600);
+    await waitForPaneStable();
+    await sendTerminalText(`Work through my notes on ${definitionKey}.`, 12);
+    await page.waitForTimeout(300);
+    sendTerminalKey('Enter');
+
+    await markWaitStart('act3-notes');
+    await showFastForwardChip(page, 'The agent is working through the note');
+    await expect.poll(
+      async () => {
+        await driveAgentAuthorizationIfWaiting();
+        return (await newStage.getAttribute('data-wayfinder-stage-notes')) === null;
+      },
+      { timeout: 12 * 60_000, intervals: [5_000] }
+    ).toBe(true);
+    await waitForAgentTurnToEnd();
+    await markWaitEnd();
+    await hideFastForwardChip(page);
+
+    await beat(page, 'recap', 'The canvas moved to the next version again, and the marker cleared.', { position: 'top' });
+    await humanClick(page, page.getByRole('tab', { name: /Notes/ }));
+    await page.waitForTimeout(800);
+    await humanClick(page, page.getByRole('button', { name: /^Resolved \(\d+\)$/ }));
+    await expect(page.locator('[data-wayfinder-design-note-resolution]').first()).toBeVisible({ timeout: 15_000 });
 
     await beat(
       page,
       'recap',
-      'That new stage is sitting right there in the graph, between the accredited outcome and ' +
-        'confirmation. Nobody touched a line of code, and nothing in the brief named a stage, a ' +
-        'component type, or where in the YAML it goes. That vocabulary is the agent\'s, from ' +
-        'reading the live definition, not mine.'
+      "The agent answers on the thing I pointed at, with what it did and the version it did it in. " +
+        'If it needs a decision from me, it replies to the note with a question instead of guessing.',
+      { position: 'top' }
     );
+    await hideSplitTerminal(page);
   });
 
   test('Closing slate', async () => {

@@ -52,11 +52,15 @@ builder.Services.AddWayfinderVisitors(visitors =>
 builder.Services.AddSingleton<Wayfinder.Engine.Abstractions.IRequestConcurrencyPolicy>(
     new LatestRequestPolicy(ReferenceBlueprintSeeder.ContactDefinitionKey));
 
-// No mail server in the reference app: Umbraco writes each email to a folder instead.
-var mailFolder = Path.Combine(builder.Environment.ContentRootPath, "umbraco", "Data", "Mail");
+// With no mail server (a bare run, not the Aspire AppHost's Mailpit), Umbraco writes each email
+// to a folder instead. Umbraco prefers a pickup folder over a host, so it is only set without one.
 builder.Configuration["Umbraco:CMS:Global:Smtp:From"] ??= "noreply@reference.example";
-builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] ??= mailFolder;
-Directory.CreateDirectory(builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"]!);
+if (string.IsNullOrEmpty(builder.Configuration["Umbraco:CMS:Global:Smtp:Host"]))
+{
+    var mailFolder = Path.Combine(builder.Environment.ContentRootPath, "umbraco", "Data", "Mail");
+    builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] ??= mailFolder;
+    Directory.CreateDirectory(builder.Configuration["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"]!);
+}
 
 // AddWayfinderUmbraco() above already registers ServiceBlueprintAuthoringService (the same
 // transport-agnostic service the backoffice REST authoring controller uses) — this just adds
