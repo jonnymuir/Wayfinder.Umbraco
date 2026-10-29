@@ -43,7 +43,7 @@ const officerComment = 'Lovely three-ball cascade. Book a mentored session befor
 async function approveWithComment(page: Page, comment: string): Promise<void> {
   await humanClick(
     page,
-    page.getByRole('row', { name: /NJF Coaching Standards/ }).getByRole('button', { name: 'Approve' })
+    page.getByRole('row', { name: /NJF Coaching Standards/ }).last().getByRole('button', { name: 'Approve' })
   );
   await page.waitForTimeout(500);
   // Not page.getByRole('dialog'): that role matches an unrelated, buttonless element elsewhere
@@ -213,7 +213,7 @@ test.describe.serial('Wayfinder.Umbraco coaching-register + Automate demo', () =
 
     await humanClick(page, page.getByRole('tab', { name: 'Approvals' }));
     await page.waitForTimeout(1_000);
-    await expect(page.getByRole('row', { name: /NJF Coaching Standards/ })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('row', { name: /NJF Coaching Standards/ }).last()).toBeVisible({ timeout: 15_000 });
 
     await beat(
       page,
