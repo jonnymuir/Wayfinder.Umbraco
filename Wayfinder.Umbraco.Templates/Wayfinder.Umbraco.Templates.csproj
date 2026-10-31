@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageType>Template</PackageType>
+    <PackageId>Wayfinder.Umbraco.Templates</PackageId>
+    <Title>Wayfinder for Umbraco: templates</Title>
+    <!-- Released with Wayfinder.Umbraco, always at the same version (package-release.yml checks). -->
+    <Version>6.4.0</Version>
+    <Authors>Jonny Muir</Authors>
+    <Company>Wayfinder</Company>
+    <Description>dotnet new templates for Wayfinder for Umbraco sites. `dotnet new wayfinder-agents` adds AGENTS.md, the rules that steer AI coding agents to build services as Wayfinder blueprints rather than Umbraco pages and code.</Description>
+    <PackageTags>Umbraco;ServiceDesign;Wayfinder;Templates;AI;AGENTS.md</PackageTags>
+    <PackageProjectUrl>https://github.com/jonnymuir/Wayfinder.Umbraco</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jonnymuir/Wayfinder.Umbraco</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageIcon>assets/icon-wayfinder-umbraco.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <!-- .template.config is a dot-folder, which pack leaves out by default. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <!-- A template package has no assemblies, so there is nothing for these to apply to. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="templates/**/*" />
+    <None Include="../assets/icon-wayfinder-umbraco.png" Pack="true" PackagePath="assets/" />
+    <None Include="../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

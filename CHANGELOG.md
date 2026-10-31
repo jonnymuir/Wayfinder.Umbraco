@@ -9,6 +9,26 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [6.4.0] — 2026-10-31
+
+Depends on Wayfinder 0.27.0, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and
+Wayfinder.Rendering.GovUk 0.13.0. `Wayfinder.Umbraco.Starter` 6.4.0 also depends on
+Wayfinder.Engine.Mcp 0.27.0.
+
+### Added
+
+- [Building a site with Wayfinder for Umbraco](docs/building-a-site.md): which parts of a site are
+  blueprints and which stay Umbraco content, the signs a build has gone the wrong way, a checklist
+  for rebuilding an existing design or site, mocking a business system, and styling with tokens.
+- A new package, `Wayfinder.Umbraco.Templates`, released with this one. `dotnet new
+  wayfinder-agents` adds an `AGENTS.md` (and a `CLAUDE.md` pointing to it) that steers AI coding
+  agents to build services as blueprints rather than Umbraco pages and code.
+- A support system in `Wayfinder:SupportSystems` can be a mock (`mock: true`), answering from
+  `appsettings.json` until the real system's API exists (Wayfinder 0.27.0).
+- Agents connecting to the MCP authoring endpoint are told how to work with it and get three
+  prompts: `design-a-service`, `convert-an-existing-design` and `work-through-design-notes`
+  (Wayfinder.Engine.Mcp 0.27.0). The starter's own guidance follows Wayfinder's.
+
 ### Changed
 
 - Requires Umbraco 17.8.0 or later on the 17 line (OpenIddict 7.7.1), which brings ImageSharp

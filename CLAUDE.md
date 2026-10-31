@@ -31,6 +31,7 @@ pushes.
 | `Wayfinder.Umbraco` | The publishable package: store, authoring API, the two Block Grid blocks, uSync handlers, the composer that wires it all with zero host `Program.cs`. |
 | `Wayfinder.Umbraco.ReferenceApp` | A real bootable Umbraco 17 site proving the package end to end (citizen block, caseworker worklist, pickup/putback, the MCP authoring surface). Never ships. |
 | `Wayfinder.Umbraco.Starter` | The second publishable package, released with `Wayfinder.Umbraco` at the same version: the no-code "try it" kit (home page, sample blueprint, `/services/{key}` pages, demo caseworker, MCP endpoint wired through an `UmbracoPipelineFilter`). Development only. Never a dependency of `Wayfinder.Umbraco`. |
+| `Wayfinder.Umbraco.Templates` | The third publishable package, released with `Wayfinder.Umbraco` at the same version: `dotnet new` templates. `wayfinder-agents` adds `AGENTS.md` (the short form of `docs/building-a-site.md`) and a `CLAUDE.md` that imports it. Keep the two in step. |
 | `Wayfinder.Umbraco.StarterSite` | A stock `dotnet new umbraco` site plus the starter reference, nothing else. Never ships. |
 | `Wayfinder.Umbraco.Starter.IntegrationTests` | Booted-host suite over `Wayfinder.Umbraco.StarterSite`, its own test process for the same one-boot-per-process reason as `Wayfinder.Umbraco.IntegrationTests`. |
 | `Wayfinder.Umbraco.Client` | The backoffice bundles (Blueprints tab + manifests), packed into the NuGet package via `wwwroot/dist`. |
@@ -152,6 +153,9 @@ table.
 - README screenshots in `assets/screenshots/` come from `tests/demo/screenshots.spec.ts`
   (`npm run demo:screenshots` against a running reference app); regenerate them after a visible
   UI change.
+- `evals/agent-build/` checks that the agent-facing guidance (`docs/building-a-site.md`, the
+  `wayfinder-agents` template, the MCP instructions) still steers an agent to blueprints. Run it
+  after changing any of them.
 - Use the vocabulary in Wayfinder's
   [`docs/glossary.md`](https://github.com/jonnymuir/Wayfinder/blob/main/docs/glossary.md).
 

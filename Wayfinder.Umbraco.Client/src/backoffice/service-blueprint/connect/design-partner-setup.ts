@@ -59,6 +59,16 @@ export const newServicePrompt = () =>
     'Ask me anything you need, in plain language. Validate the blueprint, then save it.',
   ].join('\n');
 
+export const existingDesignPrompt = () =>
+  [
+    'I have an existing design to rebuild the Wayfinder way: [where it is, or what it covers].',
+    '',
+    'Make it as simple as possible: a service blueprint for every journey and staff screen, Umbraco content only for',
+    'pages that inform, and the look from design tokens. Mock any business system data as a support system and',
+    'write down what each mock assumes. Before building, list the gaps the Wayfinder way cannot cover and wait for',
+    'my decisions.',
+  ].join('\n');
+
 export const notesPrompt = (displayName: string, definitionKey: string) =>
   [
     `Work through my open design notes on the "${displayName}" blueprint (${definitionKey}).`,
