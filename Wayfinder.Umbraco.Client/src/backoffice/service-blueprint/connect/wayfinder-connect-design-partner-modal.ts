@@ -13,6 +13,7 @@ import {
   claudeCodeLogin,
   claudeCodeProjectFile,
   copilotCliFile,
+  existingDesignPrompt,
   newServicePrompt,
   notesPrompt,
   redirectUrisSetting,
@@ -218,6 +219,8 @@ export class WayfinderConnectDesignPartnerModalElement extends UmbElementMixin(L
       <h3>Starter prompts</h3>
       <h4>Design a new service</h4>
       ${this._snippet('prompt-new', 'new service prompt', newServicePrompt(), true)}
+      <h4>Rebuild an existing design</h4>
+      ${this._snippet('prompt-existing', 'existing design prompt', existingDesignPrompt(), true)}
       ${blueprint
         ? html`
             <h4>Work through my notes</h4>

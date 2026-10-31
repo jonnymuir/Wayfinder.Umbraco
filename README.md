@@ -25,6 +25,14 @@ blueprint and service-design engine.
 New to it? [How Wayfinder works in Umbraco](docs/how-it-works.md) explains how blueprints, blocks
 and pages fit together, and where you can extend or override each part.
 
+**Building a site, or asking an AI agent to?** Read
+[Building a site with Wayfinder for Umbraco](docs/building-a-site.md) first. Every form, step,
+decision, calculation, staff screen and call to a business system is a blueprint, not a document
+type, template or controller; Umbraco content is for the pages that only inform. Run
+`dotnet new install Wayfinder.Umbraco.Templates` and `dotnet new wayfinder-agents` to give your
+agent these rules as an `AGENTS.md`, and mock business systems with `mock: true` until their
+APIs exist.
+
 ![The visual editor showing a branching service blueprint](assets/screenshots/visual-editor-graph.png)
 
 ## Try it in five minutes
@@ -536,18 +544,18 @@ starter kit reference. The starter's integration tests boot it to prove the
 
 | | |
 |---|---|
-| **Umbraco** | 17.x (17.7.0 or later). The package targets one Umbraco major at a time, and restore fails on Umbraco 18 rather than loading against an untested API. |
+| **Umbraco** | 17.x (17.8.0 or later). The package targets one Umbraco major at a time, and restore fails on Umbraco 18 rather than loading against an untested API. |
 | **.NET** | 10 |
 | **Database** | SQL Server or SQLite, whichever the site uses. CI runs the integration suite against both. |
-| **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
+| **uSync** | 17.x (17.4.3 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 6.3.0 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 6.4.0 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|
-| `Wayfinder` | 0.26.0 | The domain model and calculation engine. |
-| `Wayfinder.Engine` | 0.26.0 | The state-machine engine. |
+| `Wayfinder` | 0.27.0 | The domain model and calculation engine. |
+| `Wayfinder.Engine` | 0.27.0 | The state-machine engine. |
 | `Wayfinder.Rendering.GovUk` | 0.13.0 | GOV.UK Design System rendering and the component catalog. |
 | `Wayfinder.Editor` | 0.12.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
 | `Wayfinder.Engine.Worklist` | 0.6.0 | The caseworker worklist rendering. |
