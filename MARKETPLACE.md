@@ -512,15 +512,15 @@ starter kit reference. The starter's integration tests boot it to prove the
 | **uSync** | 17.x (17.4.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 6.2.1 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 6.3.0 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|
-| `Wayfinder` | 0.25.0 | The domain model and calculation engine. |
-| `Wayfinder.Engine` | 0.25.0 | The state-machine engine. |
-| `Wayfinder.Rendering.GovUk` | 0.12.0 | GOV.UK Design System rendering and the component catalog. |
-| `Wayfinder.Editor` | 0.11.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
-| `Wayfinder.Engine.Worklist` | 0.5.0 | The caseworker worklist rendering. |
+| `Wayfinder` | 0.26.0 | The domain model and calculation engine. |
+| `Wayfinder.Engine` | 0.26.0 | The state-machine engine. |
+| `Wayfinder.Rendering.GovUk` | 0.13.0 | GOV.UK Design System rendering and the component catalog. |
+| `Wayfinder.Editor` | 0.12.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
+| `Wayfinder.Engine.Worklist` | 0.6.0 | The caseworker worklist rendering. |
 
 Two more are optional and added by the host: `Wayfinder.Engine.Mcp` for
 [MCP authoring](https://github.com/jonnymuir/Wayfinder.Umbraco/blob/main/README.md#turning-on-mcp-authoring-in-your-own-site), and `Wayfinder.Engine.Http` for an
