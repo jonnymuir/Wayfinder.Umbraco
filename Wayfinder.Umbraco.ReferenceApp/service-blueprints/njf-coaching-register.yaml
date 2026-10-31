@@ -184,7 +184,7 @@ gateways:
     gatewayType: Join
     queueKey: registrar
     waitingContent: The NJF Coaching Standards team is reviewing this application. This page updates once a decision is made.
-    waitingExpectedSeconds: 120
+    waitingPace: Later
     waitingPollIntervalMs: 5000
     routes:
       - id: standards-check-complete--accredited--registrar-decision
@@ -204,7 +204,7 @@ gateways:
     gatewayType: Join
     queueKey: applicant
     waitingContent: The NJF is reviewing your application to join the coaching register. We'll update this page once a decision is made.
-    waitingExpectedSeconds: 180
+    waitingPace: Later
     waitingPollIntervalMs: 5000
     routes:
       - id: decision-made--record-outcome--outcome

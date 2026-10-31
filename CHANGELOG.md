@@ -9,6 +9,22 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Added
+
+- [How Wayfinder works in Umbraco](docs/how-it-works.md): one page on how blueprints, blocks and
+  pages fit together, and where each part can be extended or overridden.
+
+### Changed
+
+- The waiting stage renders its components through `<wayfinder-component>`, so it shows
+  Wayfinder's waiting page: "Still working on it", how long it usually takes when the blueprint
+  says so, an optional icon, and a message when the service cannot be reached. A site can
+  restyle it with `Views/Partials/Components/_Component-Waiting.cshtml`. The stage's own "Need to
+  leave this page?" box, with its fixed `/my-workflows` link, is gone; the blueprint's
+  `waitingDeferMessage` shows instead.
+- Requires Wayfinder 0.26.0. Give each Join gateway a `waitingPace` (`WhileTheyWait` or `Later`),
+  or its waiting page stays neutral and validation warns.
+
 ## [6.2.1] — 2026-10-27
 
 Depends on Wayfinder 0.25.0, Wayfinder.Editor 0.11.0, Wayfinder.Engine.Worklist 0.5.0 and

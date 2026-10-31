@@ -109,7 +109,7 @@ gateways:
     gatewayType: Join
     queueKey: visitor
     waitingContent: We'll email you when we reply, and you can come back to this page to carry on the conversation.
-    waitingExpectedSeconds: 86400
+    waitingPace: Later
     waitingPollIntervalMs: 60000
     routes:
       - id: awaiting-reply--reply--follow-up

@@ -30,7 +30,7 @@
   <ItemGroup>
     <!-- Becomes a Wayfinder.Umbraco package dependency at the same version when packed. -->
     <ProjectReference Include="../Wayfinder.Umbraco/Wayfinder.Umbraco.csproj" />
-    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.25.0" />
+    <PackageReference Include="Wayfinder.Engine.Mcp" Version="0.26.0" />
   </ItemGroup>
 
   <ItemGroup>
