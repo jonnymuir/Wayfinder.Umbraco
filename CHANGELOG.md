@@ -9,6 +9,12 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+## [6.3.0] — 2026-10-31
+
+Depends on Wayfinder 0.26.0, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and
+Wayfinder.Rendering.GovUk 0.13.0. `Wayfinder.Umbraco.Starter` 6.3.0 also depends on
+Wayfinder.Engine.Mcp 0.26.0.
+
 ### Added
 
 - [How Wayfinder works in Umbraco](docs/how-it-works.md): one page on how blueprints, blocks and
