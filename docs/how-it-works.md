@@ -10,7 +10,9 @@ of reader:
 - **If you know service design**, it shows where your blueprint lives, how it reaches a real page,
   and which parts you, or your developers, can change.
 
-It tells the story once and links to the detailed guides for each part.
+It tells the story once and links to the detailed guides for each part. Building a whole site, or
+rebuilding one? [Building a site with Wayfinder for Umbraco](building-a-site.md) says which parts
+belong in a blueprint and which stay as Umbraco content.
 
 ## The short version
 

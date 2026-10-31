@@ -36,7 +36,13 @@ jobs:
 
           STARTER_VERSION=$(grep -oE '<Version>[^<]+</Version>' Wayfinder.Umbraco.Starter/Wayfinder.Umbraco.Starter.csproj | head -1 | sed -E 's#</?Version>##g')
           if [ "$STARTER_VERSION" != "$VERSION" ]; then
-            echo "::error::Wayfinder.Umbraco.Starter.csproj <Version>${STARTER_VERSION}</Version> does not match Wayfinder.Umbraco ${VERSION}. The two packages are released together at one version."
+            echo "::error::Wayfinder.Umbraco.Starter.csproj <Version>${STARTER_VERSION}</Version> does not match Wayfinder.Umbraco ${VERSION}. The packages are released together at one version."
+            exit 1
+          fi
+
+          TEMPLATES_VERSION=$(grep -oE '<Version>[^<]+</Version>' Wayfinder.Umbraco.Templates/Wayfinder.Umbraco.Templates.csproj | head -1 | sed -E 's#</?Version>##g')
+          if [ "$TEMPLATES_VERSION" != "$VERSION" ]; then
+            echo "::error::Wayfinder.Umbraco.Templates.csproj <Version>${TEMPLATES_VERSION}</Version> does not match Wayfinder.Umbraco ${VERSION}. The packages are released together at one version."
             exit 1
           fi
 

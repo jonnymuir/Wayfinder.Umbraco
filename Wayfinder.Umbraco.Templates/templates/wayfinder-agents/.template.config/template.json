@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Jonny Muir",
+  "classifications": [ "Umbraco", "Wayfinder", "AI" ],
+  "identity": "Wayfinder.Umbraco.Templates.Agents",
+  "name": "Wayfinder agent rules",
+  "description": "Adds AGENTS.md (and a CLAUDE.md that points to it) so AI coding agents build this site's services as Wayfinder blueprints rather than Umbraco pages and code.",
+  "shortName": "wayfinder-agents",
+  "tags": {
+    "type": "item"
+  }
+}
