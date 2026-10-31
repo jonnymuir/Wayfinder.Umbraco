@@ -9,6 +9,12 @@ Releases before 3.0.0 are listed on
 
 ## [Unreleased]
 
+### Changed
+
+- Requires Umbraco 17.8.0 or later on the 17 line (OpenIddict 7.7.1), which brings ImageSharp
+  3.2.0 in place of 3.1.12 and its security advisories. Update a site to 17.8.0 before this
+  version.
+
 ## [6.3.0] — 2026-10-31
 
 Depends on Wayfinder 0.26.0, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and
