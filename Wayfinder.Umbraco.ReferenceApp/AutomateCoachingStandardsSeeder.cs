@@ -44,27 +44,34 @@ public sealed class AutomateCoachingStandardsSeeder(
         {
             // Wait for Umbraco to reach Run (past unattended install) and for Automate's own
             // schema migration to finish, then seed (creating a workspace first if none exists).
+            Exception? lastFailure = null;
             for (var attempt = 0; attempt < 60 && !stoppingToken.IsCancellationRequested; attempt++)
             {
-                if (runtimeState.Level == RuntimeLevel.Run && await TrySeedAsync(stoppingToken))
+                try
                 {
-                    return;
+                    if (runtimeState.Level == RuntimeLevel.Run && await TrySeedAsync(stoppingToken))
+                    {
+                        return;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Automate's tables can still be migrating, or SQLite briefly locked, after its
+                    // workspace service already answers. Try again next tick rather than giving up.
+                    lastFailure = ex;
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
 
             logger.LogWarning(
+                lastFailure,
                 "AUTOMATE COACHING STANDARDS SEEDER: gave up. Build the automation by hand per " +
                 "docs/automate-support-system-walkthrough.md.");
         }
         catch (OperationCanceledException)
         {
             // Host shutting down.
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "AUTOMATE COACHING STANDARDS SEEDER: could not seed the automation.");
         }
     }
 
