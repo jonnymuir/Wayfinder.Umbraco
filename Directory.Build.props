@@ -8,7 +8,7 @@
          Umbraco major is a deliberate, matrix-tested step: bump UmbracoMajor + UmbracoVersion
          together (the range ceiling follows UmbracoMajor). See CLAUDE.md § Umbraco version support. -->
     <UmbracoMajor>17</UmbracoMajor>
-    <UmbracoVersion>17.7.1</UmbracoVersion>
+    <UmbracoVersion>17.8.0</UmbracoVersion>
     <UmbracoPackageRange>[$(UmbracoVersion), $([MSBuild]::Add($(UmbracoMajor), 1)).0.0)</UmbracoPackageRange>
     <!-- uSync's major tracks Umbraco's, so it gets the same treatment. -->
     <USyncVersion>17.4.3</USyncVersion>
@@ -21,7 +21,7 @@
          bump that moves OpenIddict without this pin moving in lockstep fails `dotnet restore`
          here (NU1107) rather than crashing a host at boot (as a 7.6.0 -> 7.6.1 drift once did —
          see dependabot.yml's OpenIddict* ignore). -->
-    <OpenIddictVersion>7.6.0</OpenIddictVersion>
+    <OpenIddictVersion>7.7.1</OpenIddictVersion>
     <!-- Microsoft.OpenApi is deliberately NOT pinned in this repo: it flows transitively from
          Umbraco.Cms.Api.Management ($(UmbracoVersion)) at the version Umbraco itself requires
          (17.6.x → 2.9.0+, which clears GHSA-v5pm-xwqc-g5wc, the OpenAPI-parsing resource-exhaustion

@@ -62,7 +62,7 @@ public class WayfinderWorklistSurfaceController(
     {
         var target = Url.IsLocalUrl(returnTo) ? returnTo! : "/";
         var separator = target.Contains('?') ? '&' : '?';
-        return Redirect($"{target}{separator}instanceId={Uri.EscapeDataString(instanceId)}&blueprintKey={Uri.EscapeDataString(blueprintKey)}");
+        return LocalRedirect($"{target}{separator}instanceId={Uri.EscapeDataString(instanceId)}&blueprintKey={Uri.EscapeDataString(blueprintKey)}");
     }
 
     // [ValidateAntiForgeryToken] validates the __RequestVerificationToken
