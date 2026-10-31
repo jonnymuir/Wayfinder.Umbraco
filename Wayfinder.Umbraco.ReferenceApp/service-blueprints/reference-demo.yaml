@@ -82,7 +82,7 @@ gateways:
     gatewayType: Join
     queueKey: citizen
     waitingContent: A caseworker is reviewing your request. We'll update this page once a decision is made.
-    waitingExpectedSeconds: 60
+    waitingPace: Later
     waitingPollIntervalMs: 5000
     routes:
       - id: post-review--approve--approved

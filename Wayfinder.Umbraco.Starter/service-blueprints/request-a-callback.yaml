@@ -110,7 +110,7 @@ gateways:
     gatewayType: Join
     queueKey: caller
     waitingContent: The contact centre has your request. This page will update once they have arranged your callback.
-    waitingExpectedSeconds: 60
+    waitingPace: Later
     waitingPollIntervalMs: 5000
     routes:
       - id: callback-decided--arranged--callback-arranged

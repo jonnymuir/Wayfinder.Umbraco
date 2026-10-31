@@ -22,6 +22,9 @@ blueprint and service-design engine.
 | **See it** | A blueprint is content in Umbraco. Drop the stage block onto a page and it renders as a real GOV.UK journey. Changing the journey is a content change, not a redeploy. |
 | **Run it** | The in-process engine routes each request, evaluates the decision points, and holds work in the right queue. The worklist block gives caseworkers pickup, filtering, and paging. |
 
+New to it? [How Wayfinder works in Umbraco](docs/how-it-works.md) explains how blueprints, blocks
+and pages fit together, and where you can extend or override each part.
+
 ![The visual editor showing a branching service blueprint](assets/screenshots/visual-editor-graph.png)
 
 ## Try it in five minutes
