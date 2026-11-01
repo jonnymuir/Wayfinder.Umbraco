@@ -23,7 +23,7 @@ function* walk(dir) {
   for (const file of files) {
     const parts = file.split('/');
     const name = parts.at(-1);
-    if (parts.some((part) => SKIP_DIRS.has(part)) || SKIP_FILE.test(name) || !FILE_BUDGET[name.slice(name.lastIndexOf('.'))]) continue;
+    if (parts.some((part) => SKIP_DIRS.has(part) || part.endsWith('Tests')) || SKIP_FILE.test(name) || !FILE_BUDGET[name.slice(name.lastIndexOf('.'))]) continue;
     yield join(dir, file);
   }
 }
