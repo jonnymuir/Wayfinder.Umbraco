@@ -11,7 +11,7 @@ namespace Wayfinder.Umbraco.Persistence;
 /// and written back as canonical YAML; one that can't be read is logged and left as it was, to
 /// fix or reseed, rather than stopping the site from starting.
 /// </summary>
-public class StoreBlueprintsAsYaml(IMigrationContext context) : AsyncMigrationBase(context)
+public partial class StoreBlueprintsAsYaml(IMigrationContext context) : AsyncMigrationBase(context)
 {
     private const string Table = "wayfinderServiceBlueprint";
 
@@ -32,10 +32,13 @@ public class StoreBlueprintsAsYaml(IMigrationContext context) : AsyncMigrationBa
             }
             catch (ServiceBlueprintYamlException ex)
             {
-                Logger.LogWarning(ex, "Service blueprint '{DefinitionKey}' could not be converted to YAML and was left as stored.", row.DefinitionKey);
+                NotConvertedToYaml(Logger, ex, row.DefinitionKey);
             }
         }
 
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Service blueprint '{DefinitionKey}' could not be converted to YAML and was left as stored.")]
+    private static partial void NotConvertedToYaml(ILogger logger, Exception exception, string definitionKey);
 }

@@ -46,15 +46,16 @@ public class WayfinderMcpOAuthClientInstallerTests
             new WayfinderMcpOptions { LocalCallbackPorts = [33418, 40000] },
             environmentName: Environments.Development);
 
-        client.RedirectUris.Select(u => u.ToString()).Should().BeEquivalentTo(new[]
-        {
+        string[] expected =
+        [
             "http://localhost:33418/callback",
             "http://127.0.0.1:33418/callback",
             "http://127.0.0.1:33418/",
             "http://localhost:40000/callback",
             "http://127.0.0.1:40000/callback",
             "http://127.0.0.1:40000/",
-        });
+        ];
+        client.RedirectUris.Select(u => u.ToString()).Should().BeEquivalentTo(expected);
     }
 
     [Fact]

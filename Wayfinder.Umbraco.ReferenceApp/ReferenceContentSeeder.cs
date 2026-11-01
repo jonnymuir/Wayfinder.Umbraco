@@ -20,7 +20,7 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 /// <c>wayfinderServiceRequestWorklist</c> — see <c>Wayfinder.Umbraco/Persistence/CreateServiceRequestStageBlock.cs</c>/
 /// <c>CreateServiceRequestWorklistBlock.cs</c>) onto, which is this whole app's reason to exist.
 /// </summary>
-public class ReferenceContentSeeder(
+public partial class ReferenceContentSeeder(
     IContentTypeService contentTypeService,
     ITemplateService templateService,
     IContentService contentService,
@@ -54,7 +54,7 @@ public class ReferenceContentSeeder(
             return;
         }
 
-        logger.LogInformation("REFERENCE CONTENT SEEDER: starting");
+        Starting(logger);
 
         var homeType = await EnsureHomeDocumentTypeAsync();
 
@@ -81,7 +81,7 @@ public class ReferenceContentSeeder(
         // the team answers from the same caseworker queue page as every other service.
         EnsureContent(homeType, "Contact us", ReferenceBlueprintSeeder.ContactDefinitionKey, citizenArea: true, caseworkerArea: false);
 
-        logger.LogInformation("REFERENCE CONTENT SEEDER: complete");
+        Complete(logger);
     }
 
     private async Task<IContentType> EnsureHomeDocumentTypeAsync()
@@ -127,7 +127,7 @@ public class ReferenceContentSeeder(
 
         await EnsureTemplateAsync(homeType);
 
-        logger.LogInformation("REFERENCE CONTENT SEEDER: created {Alias} document type.", HomeAlias);
+        DocumentTypeCreated(logger, HomeAlias);
         return homeType;
     }
 
@@ -139,7 +139,7 @@ public class ReferenceContentSeeder(
             "step should have run before this seeder (see WayfinderMigrationPlan).");
     }
 
-    private async Task EnsureTemplateAsync(IContentType contentType)
+    private async Task EnsureTemplateAsync(ContentType contentType)
     {
         var template = await templateService.GetAsync(contentType.Alias);
         if (template == null)
@@ -151,7 +151,7 @@ public class ReferenceContentSeeder(
 
         if (template == null)
         {
-            logger.LogError("REFERENCE CONTENT SEEDER: failed to create template for {Alias}.", contentType.Alias);
+            TemplateFailed(logger, contentType.Alias);
             return;
         }
 
@@ -205,11 +205,11 @@ public class ReferenceContentSeeder(
 
         if (!result.Success)
         {
-            logger.LogError("REFERENCE CONTENT SEEDER: failed to publish {Name} content node: {Result}", name, result.Result);
+            PublishFailed(logger, name, result.Result);
             return;
         }
 
-        logger.LogInformation("REFERENCE CONTENT SEEDER: created and published {Name} content node.", name);
+        ContentPublished(logger, name);
     }
 
     private static string BuildStageBlockGridValue(string blueprintKey)
@@ -277,4 +277,22 @@ public class ReferenceContentSeeder(
 
         return JsonSerializer.Serialize(blockValue, BlockValueWriteOptions);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE CONTENT SEEDER: starting")]
+    private static partial void Starting(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE CONTENT SEEDER: complete")]
+    private static partial void Complete(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE CONTENT SEEDER: created {Alias} document type.")]
+    private static partial void DocumentTypeCreated(ILogger logger, string alias);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "REFERENCE CONTENT SEEDER: failed to create template for {Alias}.")]
+    private static partial void TemplateFailed(ILogger logger, string alias);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "REFERENCE CONTENT SEEDER: failed to publish {Name} content node: {Result}")]
+    private static partial void PublishFailed(ILogger logger, string name, PublishResultType result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE CONTENT SEEDER: created and published {Name} content node.")]
+    private static partial void ContentPublished(ILogger logger, string name);
 }

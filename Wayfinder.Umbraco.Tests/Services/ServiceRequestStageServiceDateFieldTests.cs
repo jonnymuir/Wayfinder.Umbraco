@@ -26,7 +26,7 @@ namespace Wayfinder.Umbraco.Tests.Services;
 /// </summary>
 public sealed class ServiceRequestStageServiceDateFieldTests
 {
-    private static IFormCollection Form(params (string Key, string Value)[] entries)
+    private static FormCollection Form(params (string Key, string Value)[] entries)
     {
         var dict = entries.ToDictionary(e => e.Key, e => new StringValues(e.Value));
         return new FormCollection(dict);

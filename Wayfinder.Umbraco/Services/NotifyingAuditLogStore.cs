@@ -10,7 +10,7 @@ namespace Wayfinder.Umbraco.Services;
 /// save has landed, which makes this the one place that sees every completed move, including a
 /// caseworker's move into a queue they can no longer see.
 /// </summary>
-internal sealed class NotifyingAuditLogStore(IAuditLogStore inner, IEventAggregator eventAggregator, ILogger logger) : IAuditLogStore
+internal sealed partial class NotifyingAuditLogStore(IAuditLogStore inner, IEventAggregator eventAggregator, ILogger logger) : IAuditLogStore
 {
     public void Record(AuditEvent auditEvent)
     {
@@ -26,7 +26,7 @@ internal sealed class NotifyingAuditLogStore(IAuditLogStore inner, IEventAggrega
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "A ServiceRequestTransitionedNotification handler failed for instance {InstanceId}; the move stands.", auditEvent.InstanceId);
+            NotificationHandlerFailed(logger, ex, auditEvent.InstanceId);
         }
     }
 
@@ -41,4 +41,7 @@ internal sealed class NotifyingAuditLogStore(IAuditLogStore inner, IEventAggrega
         int pageIndex = 0,
         int pageSize = 50) =>
         inner.Query(instanceId, actor, minimumSeverity, fromUtc, toUtc, pageIndex, pageSize);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "A ServiceRequestTransitionedNotification handler failed for instance {InstanceId}; the move stands.")]
+    private static partial void NotificationHandlerFailed(ILogger logger, Exception exception, string instanceId);
 }

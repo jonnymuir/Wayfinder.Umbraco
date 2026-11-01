@@ -7,8 +7,6 @@ versions it depends on; see [Requirements and compatibility](README.md#requireme
 Releases before 3.0.0 are listed on
 [GitHub Releases](https://github.com/jonnymuir/Wayfinder.Umbraco/releases).
 
-## [Unreleased]
-
 ## [6.4.0] — 2026-10-31
 
 Depends on Wayfinder 0.27.0, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and

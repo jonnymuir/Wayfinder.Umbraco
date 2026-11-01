@@ -203,7 +203,7 @@ public class ComponentTagHelper : TagHelper
     // worth introducing.
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024;
 
-    private string RenderFileUpload(FieldContext ctx)
+    private static string RenderFileUpload(FieldContext ctx)
     {
         var field = ctx.Field;
         var acceptList = field.AcceptedFileTypes is { Count: > 0 } ? string.Join(",", field.AcceptedFileTypes) : string.Empty;

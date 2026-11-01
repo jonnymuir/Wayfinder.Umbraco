@@ -10,7 +10,7 @@ using Wayfinder.Umbraco.Visitors;
 namespace Wayfinder.Umbraco.Emails;
 
 /// <summary>Sends one queued email: renders its template for the request and sends it through Umbraco's email sender.</summary>
-public sealed class WayfinderEmailSender(
+public sealed partial class WayfinderEmailSender(
     IOptions<WayfinderEmailOptions> options,
     IServiceRequestStore requests,
     RazorEmailRenderer renderer,
@@ -26,14 +26,14 @@ public sealed class WayfinderEmailSender(
 
         if (!requests.TryGet(job.InstanceId, out var request) || request.BlueprintKey != email.BlueprintKey)
         {
-            logger.LogWarning("Request {InstanceId} no longer exists; the {EmailName} email was not sent.", job.InstanceId, job.EmailName);
+            RequestGone(logger, job.InstanceId, job.EmailName);
             return;
         }
 
         var recipients = Recipients(email, request.FieldValues.GetValueOrDefault(email.ToField ?? "")?.ToString());
         if (recipients.Count == 0)
         {
-            logger.LogWarning("The {EmailName} email for request {InstanceId} has no valid address to go to.", job.EmailName, job.InstanceId);
+            NoValidRecipient(logger, job.EmailName, job.InstanceId);
             return;
         }
 
@@ -52,7 +52,7 @@ public sealed class WayfinderEmailSender(
                 expires: TimeSpan.FromDays(1));
         }
 
-        logger.LogInformation("Sent the {EmailName} email for request {InstanceId}.", job.EmailName, job.InstanceId);
+        EmailSent(logger, job.EmailName, job.InstanceId);
     }
 
     // Only well-formed single addresses: a field's value is whatever someone typed into a form.
@@ -77,4 +77,13 @@ public sealed class WayfinderEmailSender(
             ?? throw new InvalidOperationException($"The {email.Name} email asks for a private link, which needs AddWayfinderVisitors.");
         return links.Issue(publicBaseUrl, instanceId, pagePath);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Request {InstanceId} no longer exists; the {EmailName} email was not sent.")]
+    private static partial void RequestGone(ILogger logger, string instanceId, string emailName);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The {EmailName} email for request {InstanceId} has no valid address to go to.")]
+    private static partial void NoValidRecipient(ILogger logger, string emailName, string instanceId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Sent the {EmailName} email for request {InstanceId}.")]
+    private static partial void EmailSent(ILogger logger, string emailName, string instanceId);
 }

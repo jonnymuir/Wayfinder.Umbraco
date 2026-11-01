@@ -22,7 +22,7 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 /// signing with a previous run's key is refreshed. Never throws: a demo automation failing to
 /// seed must not stop the site.
 /// </summary>
-public sealed class AutomateCoachingStandardsSeeder(
+public sealed partial class AutomateCoachingStandardsSeeder(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     IRuntimeState runtimeState,
@@ -64,10 +64,7 @@ public sealed class AutomateCoachingStandardsSeeder(
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
 
-            logger.LogWarning(
-                lastFailure,
-                "AUTOMATE COACHING STANDARDS SEEDER: gave up. Build the automation by hand per " +
-                "docs/automate-support-system-walkthrough.md.");
+            GaveUp(logger, lastFailure);
         }
         catch (OperationCanceledException)
         {
@@ -131,7 +128,7 @@ public sealed class AutomateCoachingStandardsSeeder(
         if (existing is null)
         {
             await automationService.CreateAutomationAsync(automation, cancellationToken: ct);
-            logger.LogInformation("AUTOMATE COACHING STANDARDS SEEDER: created automation {Id}.", AutomationId);
+            AutomationCreated(logger, AutomationId);
         }
         else
         {
@@ -143,11 +140,11 @@ public sealed class AutomateCoachingStandardsSeeder(
             existing.Connections = automation.Connections;
             existing.CanvasState = automation.CanvasState;
             await automationService.UpdateAutomationAsync(existing, cancellationToken: ct);
-            logger.LogInformation("AUTOMATE COACHING STANDARDS SEEDER: refreshed automation {Id}.", AutomationId);
+            AutomationRefreshed(logger, AutomationId);
         }
 
         await automationService.PublishAutomationAsync(AutomationId, cancellationToken: ct);
-        logger.LogInformation("AUTOMATE COACHING STANDARDS SEEDER: published automation {Id}.", AutomationId);
+        AutomationPublished(logger, AutomationId);
         return true;
     }
 
@@ -314,4 +311,16 @@ public sealed class AutomateCoachingStandardsSeeder(
             CanvasState = JsonSerializer.Serialize(new { triggerPosition = new { x = 0, y = -160 } }),
         };
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "AUTOMATE COACHING STANDARDS SEEDER: gave up. Build the automation by hand per docs/automate-support-system-walkthrough.md.")]
+    private static partial void GaveUp(ILogger logger, Exception? exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "AUTOMATE COACHING STANDARDS SEEDER: created automation {Id}.")]
+    private static partial void AutomationCreated(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "AUTOMATE COACHING STANDARDS SEEDER: refreshed automation {Id}.")]
+    private static partial void AutomationRefreshed(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "AUTOMATE COACHING STANDARDS SEEDER: published automation {Id}.")]
+    private static partial void AutomationPublished(ILogger logger, Guid id);
 }

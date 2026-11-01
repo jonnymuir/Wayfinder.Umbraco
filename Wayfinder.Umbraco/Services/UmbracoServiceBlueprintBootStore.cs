@@ -14,7 +14,7 @@ namespace Wayfinder.Umbraco.Services;
 /// authoring-side store), which pushes saves back into the live engine and therefore must depend
 /// on it. Depending on the engine here would create a DI cycle at construction time.
 /// </summary>
-public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory databaseFactory)
+public sealed partial class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory databaseFactory)
     : IServiceBlueprintStore
 {
     public IReadOnlyDictionary<string, ServiceBlueprint> LoadDefinitions(ILogger logger)
@@ -31,11 +31,17 @@ public sealed class UmbracoServiceBlueprintBootStore(IUmbracoDatabaseFactory dat
             }
             catch (ServiceBlueprintYamlException ex)
             {
-                logger.LogError(ex, "Failed to deserialize CMS Service Blueprint '{Key}' at boot; skipping.", row.DefinitionKey);
+                BlueprintSkipped(logger, ex, row.DefinitionKey);
             }
         }
 
-        logger.LogInformation("CMS Service Blueprint boot store loaded {Count} definition(s) from the database.", definitions.Count);
+        DefinitionsLoaded(logger, definitions.Count);
         return definitions;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to deserialize CMS Service Blueprint '{Key}' at boot; skipping.")]
+    private static partial void BlueprintSkipped(ILogger logger, Exception exception, string key);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "CMS Service Blueprint boot store loaded {Count} definition(s) from the database.")]
+    private static partial void DefinitionsLoaded(ILogger logger, int count);
 }

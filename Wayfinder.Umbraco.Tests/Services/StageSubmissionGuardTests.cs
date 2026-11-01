@@ -43,7 +43,7 @@ public sealed class StageSubmissionGuardTests
         }
     }
 
-    private static IFormCollection Form(string nonce = "nonce-1") => new FormCollection(new Dictionary<string, StringValues>
+    private static FormCollection Form(string nonce = "nonce-1") => new FormCollection(new Dictionary<string, StringValues>
     {
         ["ReturnUrl"] = "/contact-us",
         ["InstanceId"] = "instance-1",

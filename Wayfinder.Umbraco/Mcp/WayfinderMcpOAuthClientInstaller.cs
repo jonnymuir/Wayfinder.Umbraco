@@ -23,7 +23,7 @@ namespace Wayfinder.Umbraco.Mcp;
 /// fast on a singleton consuming it — the same reason
 /// <c>Wayfinder.Umbraco.ReferenceApp</c>'s own MCP demo-agent seeder is registered scoped.
 /// </remarks>
-public sealed class WayfinderMcpOAuthClientInstaller(
+public sealed partial class WayfinderMcpOAuthClientInstaller(
     IOpenIddictApplicationManager applicationManager,
     IOptions<WayfinderMcpOptions> options,
     IHostEnvironment environment,
@@ -44,18 +44,14 @@ public sealed class WayfinderMcpOAuthClientInstaller(
         if (existing is null)
         {
             await applicationManager.CreateAsync(descriptor, cancellationToken);
-            logger.LogInformation(
-                "WAYFINDER MCP OAUTH: registered OpenIddict client {ClientId} with {RedirectUriCount} redirect URI(s).",
-                descriptor.ClientId, descriptor.RedirectUris.Count);
+            ClientRegistered(logger, descriptor.ClientId, descriptor.RedirectUris.Count);
             return;
         }
 
         // Always update — redirect URIs, permissions and display name can all change between
         // deployments, and the client id is stable so this converges rather than duplicates.
         await applicationManager.UpdateAsync(existing, descriptor, cancellationToken);
-        logger.LogInformation(
-            "WAYFINDER MCP OAUTH: updated OpenIddict client {ClientId} ({RedirectUriCount} redirect URI(s)).",
-            descriptor.ClientId, descriptor.RedirectUris.Count);
+        ClientUpdated(logger, descriptor.ClientId, descriptor.RedirectUris.Count);
     }
 
     private static OpenIddictApplicationDescriptor BuildDescriptor(WayfinderMcpOptions options, IHostEnvironment environment)
@@ -94,4 +90,10 @@ public sealed class WayfinderMcpOAuthClientInstaller(
 
         return descriptor;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "WAYFINDER MCP OAUTH: registered OpenIddict client {ClientId} with {RedirectUriCount} redirect URI(s).")]
+    private static partial void ClientRegistered(ILogger logger, string? clientId, int redirectUriCount);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "WAYFINDER MCP OAUTH: updated OpenIddict client {ClientId} ({RedirectUriCount} redirect URI(s)).")]
+    private static partial void ClientUpdated(ILogger logger, string? clientId, int redirectUriCount);
 }

@@ -15,7 +15,7 @@ namespace Wayfinder.Umbraco.Starter;
 /// once per database, so whatever someone then edits or deletes stays that way. Registered after
 /// Wayfinder.Umbraco's own startup migration, which creates the blueprint table this writes to.
 /// </summary>
-public class StarterSeeder(
+public partial class StarterSeeder(
     IRuntimeState runtimeState,
     IKeyValueService keyValueService,
     IServiceBlueprintSourceStore blueprintStore,
@@ -75,7 +75,7 @@ public class StarterSeeder(
         var result = await blueprintStore.SaveAsync(blueprint, expectedVersion: 0, cancellationToken);
         if (!result.Saved)
         {
-            logger.LogError("Wayfinder starter: the sample blueprint {DefinitionKey} was not saved: {Result}", SampleBlueprintKey, result);
+            SampleNotSaved(logger, SampleBlueprintKey, result);
         }
     }
 
@@ -101,7 +101,7 @@ public class StarterSeeder(
 #pragma warning restore CS0618
         if (!published.Success)
         {
-            logger.LogError("Wayfinder starter: the home page was not published: {Result}", published.Result);
+            HomeNotPublished(logger, published.Result);
         }
     }
 
@@ -110,7 +110,7 @@ public class StarterSeeder(
         var textarea = await dataTypeService.GetAsync(Constants.DataTypes.Guids.TextareaGuid);
         if (textarea is null)
         {
-            logger.LogError("Wayfinder starter: Umbraco's Textarea data type is missing, so no home page was created.");
+            TextareaMissing(logger);
             return null;
         }
 
@@ -138,4 +138,13 @@ public class StarterSeeder(
 #pragma warning restore CS0618
         return homeType;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Wayfinder starter: the sample blueprint {DefinitionKey} was not saved: {Result}")]
+    private static partial void SampleNotSaved(ILogger logger, string definitionKey, ServiceBlueprintSaveResult result);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Wayfinder starter: the home page was not published: {Result}")]
+    private static partial void HomeNotPublished(ILogger logger, PublishResultType result);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Wayfinder starter: Umbraco's Textarea data type is missing, so no home page was created.")]
+    private static partial void TextareaMissing(ILogger logger);
 }

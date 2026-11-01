@@ -40,7 +40,7 @@ public sealed class ResolveSupportSystemOutcomeSettings
     Description = "Resolves a waiting Wayfinder support-system invocation in process.",
     Group = "Wayfinder",
     Icon = "icon-checkbox")]
-public sealed class ResolveSupportSystemOutcomeAction(
+public sealed partial class ResolveSupportSystemOutcomeAction(
     ActionInfrastructure infrastructure,
     UmbracoProcessManagerEngine engine,
     ILogger<ResolveSupportSystemOutcomeAction> logger)
@@ -85,9 +85,7 @@ public sealed class ResolveSupportSystemOutcomeAction(
             // An unknown / already-resolved invocation is a safe no-op, not a run failure.
             if (code == "SUPPORT_SYSTEM_INVOCATION_NOT_FOUND")
             {
-                logger.LogInformation(
-                    "Wayfinder support-system invocation {InvocationId} was already resolved or not found; no-op.",
-                    settings.InvocationId);
+                AlreadyResolved(logger, settings.InvocationId);
                 return Task.FromResult(Success(new Output { ResponseState = "no-op" }));
             }
 
@@ -96,4 +94,7 @@ public sealed class ResolveSupportSystemOutcomeAction(
 
         return Task.FromResult(Success(new Output { ResponseState = result.ResponseState }));
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Wayfinder support-system invocation {InvocationId} was already resolved or not found; no-op.")]
+    private static partial void AlreadyResolved(ILogger logger, string invocationId);
 }

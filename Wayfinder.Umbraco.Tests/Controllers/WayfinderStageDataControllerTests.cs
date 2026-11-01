@@ -59,7 +59,7 @@ public sealed class WayfinderStageDataControllerTests
         public HttpContext? HttpContext { get => context; set => throw new NotSupportedException(); }
     }
 
-    private static HttpContext HttpContextFor(string userId)
+    private static DefaultHttpContext HttpContextFor(string userId)
     {
         var context = new DefaultHttpContext();
         context.Items["UserId"] = userId;

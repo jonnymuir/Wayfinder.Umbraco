@@ -13,7 +13,7 @@ namespace Wayfinder.Umbraco.Services;
 /// stop the table growing unbounded from sessions that never come back to expire naturally. It
 /// also removes audit events older than <see cref="WayfinderServiceDesignOptions.AuditRetention"/>.
 /// </summary>
-public sealed class ServiceRequestSweepService(
+public sealed partial class ServiceRequestSweepService(
     IServiceScopeFactory scopeFactory,
     IOptionsMonitor<WayfinderServiceDesignOptions> options,
     ILogger<ServiceRequestSweepService> logger) : BackgroundService
@@ -40,7 +40,7 @@ public sealed class ServiceRequestSweepService(
 
                 if (deleted > 0)
                 {
-                    logger.LogInformation("Service request sweep removed {Count} expired instance(s).", deleted);
+                    ExpiredRequestsRemoved(logger, deleted);
                 }
 
                 SweepAuditEvents(scope.ServiceProvider);
@@ -48,7 +48,7 @@ public sealed class ServiceRequestSweepService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Service request sweep failed; will retry next interval.");
+                SweepFailed(logger, ex);
             }
         }
     }
@@ -65,7 +65,7 @@ public sealed class ServiceRequestSweepService(
         var removed = devices.RemoveUnusedSince(DateTime.UtcNow - visitorOptions.Value.CookieLifetime);
         if (removed > 0)
         {
-            logger.LogInformation("Visitor sweep removed {Count} browser(s) unused for longer than their cookie lasts.", removed);
+            UnusedDevicesRemoved(logger, removed);
         }
     }
 
@@ -81,7 +81,19 @@ public sealed class ServiceRequestSweepService(
         var removed = store.RemoveOlderThan(DateTimeOffset.UtcNow - retention);
         if (removed > 0)
         {
-            logger.LogInformation("Audit sweep removed {Count} event(s) older than {Retention}.", removed, retention);
+            OldAuditEventsRemoved(logger, removed, retention);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Service request sweep removed {Count} expired instance(s).")]
+    private static partial void ExpiredRequestsRemoved(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Service request sweep failed; will retry next interval.")]
+    private static partial void SweepFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Visitor sweep removed {Count} browser(s) unused for longer than their cookie lasts.")]
+    private static partial void UnusedDevicesRemoved(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Audit sweep removed {Count} event(s) older than {Retention}.")]
+    private static partial void OldAuditEventsRemoved(ILogger logger, int count, TimeSpan retention);
 }
