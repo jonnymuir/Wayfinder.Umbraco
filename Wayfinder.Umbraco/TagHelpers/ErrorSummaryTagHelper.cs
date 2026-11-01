@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using System.Globalization;
 using System.Text;
 using Wayfinder.Models.ServiceDesign;
 
@@ -34,7 +35,7 @@ public class ErrorSummaryTagHelper : TagHelper
             sb.Append("            <li>");
             if (!string.IsNullOrEmpty(problem.FieldKey))
             {
-                sb.Append($@"<a href=""#{System.Net.WebUtility.HtmlEncode(problem.FieldKey)}"">{System.Net.WebUtility.HtmlEncode(problem.Message)}</a>");
+                sb.Append(CultureInfo.InvariantCulture, $@"<a href=""#{System.Net.WebUtility.HtmlEncode(problem.FieldKey)}"">{System.Net.WebUtility.HtmlEncode(problem.Message)}</a>");
             }
             else
             {

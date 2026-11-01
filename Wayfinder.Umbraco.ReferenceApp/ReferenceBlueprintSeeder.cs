@@ -20,7 +20,7 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 ///   support system (docs/guides/support-systems.md), resolved by an Umbraco Automate automation.</item>
 /// </list>
 /// </summary>
-public class ReferenceBlueprintSeeder(
+public partial class ReferenceBlueprintSeeder(
     IServiceBlueprintSourceStore store,
     IWebHostEnvironment env,
     IRuntimeState runtimeState,
@@ -62,11 +62,17 @@ public class ReferenceBlueprintSeeder(
             var result = await store.SaveAsync(blueprint, expectedVersion: 0, cancellationToken);
             if (!result.Saved)
             {
-                logger.LogError("REFERENCE BLUEPRINT SEEDER: failed to save {DefinitionKey}: {Result}", key, result);
+                SaveFailed(logger, key, result);
                 continue;
             }
 
-            logger.LogInformation("REFERENCE BLUEPRINT SEEDER: seeded {DefinitionKey}.", key);
+            Seeded(logger, key);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "REFERENCE BLUEPRINT SEEDER: failed to save {DefinitionKey}: {Result}")]
+    private static partial void SaveFailed(ILogger logger, string definitionKey, ServiceBlueprintSaveResult result);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE BLUEPRINT SEEDER: seeded {DefinitionKey}.")]
+    private static partial void Seeded(ILogger logger, string definitionKey);
 }

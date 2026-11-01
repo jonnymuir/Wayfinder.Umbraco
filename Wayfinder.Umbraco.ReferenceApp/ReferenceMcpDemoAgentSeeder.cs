@@ -5,7 +5,9 @@ using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Security;
+using Umbraco.Cms.Core.Security.OperationStatus;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Services.OperationStatus;
 
 namespace Wayfinder.Umbraco.ReferenceApp;
 
@@ -30,7 +32,7 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 /// for *itself* (a call the recording script initiates directly, not one it observes) are
 /// unaffected and work exactly as documented in this project's own README.
 /// </remarks>
-public class ReferenceMcpDemoAgentSeeder(
+public partial class ReferenceMcpDemoAgentSeeder(
     IUserService userService,
     IBackOfficeUserClientCredentialsManager clientCredentialsManager,
     IRuntimeState runtimeState,
@@ -67,12 +69,12 @@ public class ReferenceMcpDemoAgentSeeder(
             var createResult = await userService.CreateAsync(Constants.Security.SuperUserKey, createModel, approveUser: true);
             if (!createResult.Success || createResult.Result.CreatedUser is null)
             {
-                logger.LogError("REFERENCE MCP DEMO AGENT SEEDER: failed to create {Email}: {Status}", Email, createResult.Status);
+                CreateFailed(logger, Email, createResult.Status);
                 return;
             }
 
             userKey = createResult.Result.CreatedUser.Key;
-            logger.LogInformation("REFERENCE MCP DEMO AGENT SEEDER: created {Email}.", Email);
+            Created(logger, Email);
         }
 
         var clientIds = await clientCredentialsManager.GetClientIdsAsync(userKey);
@@ -84,10 +86,22 @@ public class ReferenceMcpDemoAgentSeeder(
         var saveResult = await clientCredentialsManager.SaveAsync(userKey, ClientId, ClientSecret);
         if (!saveResult.Success)
         {
-            logger.LogError("REFERENCE MCP DEMO AGENT SEEDER: failed to register client credentials for {Email}: {Status}", Email, saveResult.Result);
+            CredentialsFailed(logger, Email, saveResult.Result);
             return;
         }
 
-        logger.LogInformation("REFERENCE MCP DEMO AGENT SEEDER: registered client credentials for {Email}.", Email);
+        CredentialsRegistered(logger, Email);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "REFERENCE MCP DEMO AGENT SEEDER: failed to create {Email}: {Status}")]
+    private static partial void CreateFailed(ILogger logger, string email, UserOperationStatus status);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE MCP DEMO AGENT SEEDER: created {Email}.")]
+    private static partial void Created(ILogger logger, string email);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "REFERENCE MCP DEMO AGENT SEEDER: failed to register client credentials for {Email}: {Status}")]
+    private static partial void CredentialsFailed(ILogger logger, string email, BackOfficeUserClientCredentialsOperationStatus status);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "REFERENCE MCP DEMO AGENT SEEDER: registered client credentials for {Email}.")]
+    private static partial void CredentialsRegistered(ILogger logger, string email);
 }

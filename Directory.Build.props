@@ -32,6 +32,15 @@
 
   </PropertyGroup>
 
+  <PropertyGroup>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" Visible="false" />
+  </ItemGroup>
+
   <!-- The existing /// XML doc comments are thorough but never shipped to consumers because no
        project set this. Stage 1: ship what already exists without blocking the build on the
        ~70% of public members that aren't documented yet (CS1591) — see docs backlog for filling

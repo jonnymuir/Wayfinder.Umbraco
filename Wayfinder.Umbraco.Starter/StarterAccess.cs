@@ -61,6 +61,6 @@ public static class StarterAccess
     public static string? PublicQueueKey(ServiceBlueprint blueprint) =>
         blueprint.Stages.FirstOrDefault(stage => stage.StageKey == blueprint.InitialStage)?.QueueKey;
 
-    private static IReadOnlyList<string> OrNone(IReadOnlyCollection<string> queues) =>
+    private static string[] OrNone(HashSet<string> queues) =>
         queues.Count == 0 ? [NoQueue] : queues.ToArray();
 }

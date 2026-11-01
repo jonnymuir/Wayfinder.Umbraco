@@ -1,0 +1,13 @@
+{
+  "files": {},
+  "methods": {
+    "Wayfinder.Umbraco.ReferenceApp/AutomateCoachingStandardsSeeder.cs": 152,
+    "Wayfinder.Umbraco.ReferenceApp/ReferenceAppPageShell.cs": 88,
+    "Wayfinder.Umbraco.Starter/StarterComposer.cs": 67,
+    "Wayfinder.Umbraco/Extensions/WayfinderUmbracoServiceCollectionExtensions.cs": 118,
+    "Wayfinder.Umbraco/Services/ServiceRequestStageService.cs": 147,
+    "Wayfinder.Umbraco/Services/UmbracoServiceBlueprintStore.cs": 64,
+    "Wayfinder.Umbraco/WayfinderUmbracoComposer.cs": 66
+  },
+  "casts": {}
+}

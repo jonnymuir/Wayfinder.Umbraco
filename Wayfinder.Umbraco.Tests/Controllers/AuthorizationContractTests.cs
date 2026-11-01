@@ -81,7 +81,7 @@ public class AuthorizationContractTests
             .GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false }
                         && (typeof(ControllerBase).IsAssignableFrom(t) || typeof(Controller).IsAssignableFrom(t)))
-            .Where(t => t.Namespace?.StartsWith("Wayfinder.Umbraco") == true)
+            .Where(t => t.Namespace?.StartsWith("Wayfinder.Umbraco", StringComparison.Ordinal) == true)
             .Distinct();
 
     public static TheoryData<Type> Controllers()
@@ -186,7 +186,7 @@ public class AuthorizationContractTests
     private static bool IsAction(MethodInfo m) =>
         !m.IsSpecialName
         && m.GetCustomAttribute<NonActionAttribute>() is null
-        && m.DeclaringType?.Namespace?.StartsWith("Wayfinder.Umbraco") == true;
+        && m.DeclaringType?.Namespace?.StartsWith("Wayfinder.Umbraco", StringComparison.Ordinal) == true;
 
     private static bool IsStateChanging(MethodInfo m, bool isSurfaceController)
     {

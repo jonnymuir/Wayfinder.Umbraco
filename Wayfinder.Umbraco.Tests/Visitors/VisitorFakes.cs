@@ -62,11 +62,11 @@ internal static class Visit
 
     /// <summary>The value this response set for <paramref name="name"/>, or null; empty when it deleted it.</summary>
     public static string? SetCookie(HttpContext context, string name) =>
-        SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie.ToArray())
+        SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie.OfType<string>().ToList())
             .LastOrDefault(c => c.Name.Value == name) is { } cookie
             ? cookie.Value.Value ?? ""
             : null;
 
     public static SetCookieHeaderValue? SetCookieHeader(HttpContext context, string name) =>
-        SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie.ToArray()).LastOrDefault(c => c.Name.Value == name);
+        SetCookieHeaderValue.ParseList(context.Response.Headers.SetCookie.OfType<string>().ToList()).LastOrDefault(c => c.Name.Value == name);
 }

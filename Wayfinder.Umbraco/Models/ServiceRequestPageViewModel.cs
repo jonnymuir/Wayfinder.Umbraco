@@ -178,7 +178,7 @@ public class ServiceRequestPageViewModel
                 BlueprintKey = result.BlueprintKey,
                 ReturnUrl = returnUrl,
                 HasError = true,
-                ErrorMessage = envelope.Problems.FirstOrDefault()?.Message
+                ErrorMessage = (envelope.Problems.Count > 0 ? envelope.Problems[0].Message : null)
                     ?? $"Could not start service request '{result.BlueprintKey}'."
             };
         }

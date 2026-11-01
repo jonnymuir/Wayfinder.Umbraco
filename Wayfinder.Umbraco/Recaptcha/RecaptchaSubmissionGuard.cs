@@ -15,7 +15,7 @@ namespace Wayfinder.Umbraco.Recaptcha;
 /// Google reCAPTCHA v3 on every stage form. It fails closed: no token, no secret key, a low score, the
 /// wrong action, or Google unreachable all turn the submission away with a message, never let it through.
 /// </summary>
-public sealed class RecaptchaSubmissionGuard(
+public sealed partial class RecaptchaSubmissionGuard(
     IOptions<WayfinderRecaptchaOptions> options,
     IHttpClientFactory httpClientFactory,
     IFileVersionProvider fileVersions,
@@ -60,8 +60,7 @@ public sealed class RecaptchaSubmissionGuard(
         var token = form[TokenField].ToString();
         if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(settings.SecretKey))
         {
-            logger.LogWarning("reCAPTCHA turned a submission away: {Reason}.",
-                string.IsNullOrEmpty(settings.SecretKey) ? "the secret key is not configured" : "no token was sent");
+            SubmissionTurnedAway(logger, string.IsNullOrEmpty(settings.SecretKey) ? "the secret key is not configured" : "no token was sent");
             return Rejection;
         }
 
@@ -81,13 +80,12 @@ public sealed class RecaptchaSubmissionGuard(
                 return null;
             }
 
-            logger.LogWarning("reCAPTCHA turned a submission away. Success: {Success}, Score: {Score}, Action: {Action}, Errors: {Errors}",
-                result?.Success, result?.Score, result?.Action, string.Join(", ", result?.ErrorCodes ?? []));
+            VerificationFailed(logger, result?.Success, result?.Score, result?.Action, string.Join(", ", result?.ErrorCodes ?? []));
             return Rejection;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
-            logger.LogError(ex, "reCAPTCHA verification could not be completed.");
+            VerificationIncomplete(logger, ex);
             return Rejection;
         }
     }
@@ -97,4 +95,13 @@ public sealed class RecaptchaSubmissionGuard(
         [property: JsonPropertyName("score")] double Score,
         [property: JsonPropertyName("action")] string? Action,
         [property: JsonPropertyName("error-codes")] string[]? ErrorCodes);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "reCAPTCHA turned a submission away: {Reason}.")]
+    private static partial void SubmissionTurnedAway(ILogger logger, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "reCAPTCHA turned a submission away. Success: {Success}, Score: {Score}, Action: {Action}, Errors: {Errors}")]
+    private static partial void VerificationFailed(ILogger logger, bool? success, double? score, string? action, string errors);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "reCAPTCHA verification could not be completed.")]
+    private static partial void VerificationIncomplete(ILogger logger, Exception exception);
 }

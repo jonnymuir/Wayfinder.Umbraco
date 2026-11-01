@@ -61,7 +61,7 @@ public sealed class StageFlashTests
             NullLogger<ServiceRequestStageService>.Instance);
     }
 
-    private static IFormCollection Reply() => new FormCollection(new Dictionary<string, StringValues>
+    private static FormCollection Reply() => new FormCollection(new Dictionary<string, StringValues>
     {
         ["ReturnUrl"] = "/messages", ["InstanceId"] = "instance-1", ["Nonce"] = "nonce-1", ["BlueprintKey"] = "contact",
         ["Action"] = "reply", ["StateVersion"] = "1", ["field:conversation"] = "Test reply",

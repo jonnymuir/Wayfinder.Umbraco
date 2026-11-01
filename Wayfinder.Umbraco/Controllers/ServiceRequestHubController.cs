@@ -97,7 +97,7 @@ public class ServiceRequestHubController(
     /// <see cref="IUrlHelper.IsLocalUrl"/> — so neither operator misconfiguration nor a crafted
     /// request path can turn this into an open redirect (CodeQL cs/web/unvalidated-url-redirection).
     /// </summary>
-    private IActionResult RedirectToLogin()
+    private LocalRedirectResult RedirectToLogin()
     {
         var loginPath = optionsAccessor.Value.LoginPath;
         var returnUrl = $"{Request.PathBase}{Request.Path}{Request.QueryString}";

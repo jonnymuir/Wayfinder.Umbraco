@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
@@ -29,7 +30,7 @@ namespace Wayfinder.Umbraco.Serialization;
 /// fails the sync attempt instead of reaching the database at all.
 /// </summary>
 [SyncSerializer("7a2e4f18-9c3b-4d67-a1e5-8f6b2c9d4a71", "Wayfinder Service Blueprint Serializer", "wayfinderServiceBlueprint")]
-public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSchema>, ISyncSerializer<ServiceBlueprintSchema>
+public partial class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSchema>, ISyncSerializer<ServiceBlueprintSchema>
 {
     private readonly ILogger _logger;
     private readonly IUmbracoDatabaseFactory _databaseFactory;
@@ -80,9 +81,7 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
         }
         catch (ServiceBlueprintYamlException ex)
         {
-            _logger.LogWarning(ex,
-                "Skipping save for service blueprint '{DefinitionKey}': stored YAML failed to parse.",
-                item.DefinitionKey);
+            SaveSkipped(_logger, ex, item.DefinitionKey);
             return Task.CompletedTask;
         }
 
@@ -172,9 +171,13 @@ public class ServiceBlueprintSerializer : SyncSerializerRoot<ServiceBlueprintSch
         return SyncAttempt<ServiceBlueprintSchema>.Succeed(ItemAlias(schema), schema, ChangeType.Import, new List<uSyncChange>());
     }
 
+    [SuppressMessage("Security", "CA5351", Justification = "Derives a stable uSync key from the definition key; not a security use. Changing the algorithm would re-key every existing blueprint.")]
     private static Guid DeterministicGuid(string definitionKey)
     {
         var hash = MD5.HashData(Encoding.UTF8.GetBytes($"wayfinder-service-blueprint:{definitionKey}"));
         return new Guid(hash);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping save for service blueprint '{DefinitionKey}': stored YAML failed to parse.")]
+    private static partial void SaveSkipped(ILogger logger, Exception exception, string definitionKey);
 }

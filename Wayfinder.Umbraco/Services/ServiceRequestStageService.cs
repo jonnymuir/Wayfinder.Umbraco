@@ -19,7 +19,7 @@ namespace Wayfinder.Umbraco.Services;
 /// (<see cref="UmbracoProcessManagerEngine"/>), resolving identity via
 /// <see cref="WayfinderServiceDesignOptions"/> rather than forwarding to a remote "Business App".
 /// </summary>
-public class ServiceRequestStageService(
+public partial class ServiceRequestStageService(
     IProcessManager processManager,
     IOptions<WayfinderServiceDesignOptions> optionsAccessor,
     IStageNonceService nonceService,
@@ -43,14 +43,14 @@ public class ServiceRequestStageService(
     {
         if (string.IsNullOrEmpty(nonce))
         {
-            logger.LogWarning("Stage advance: missing nonce — possible form tampering");
+            MissingNonce(logger);
             return null;
         }
 
         var authoritativeFields = await nonceService.ResolveAsync(nonce, instanceId, userId);
         if (authoritativeFields == null)
         {
-            logger.LogWarning("Stage advance: nonce expired, invalid, or bound to a different instance/user — redirecting to GET");
+            InvalidNonce(logger);
             return null;
         }
 
@@ -107,7 +107,7 @@ public class ServiceRequestStageService(
             // ResponseState == "error" envelope shape GetCurrent/Advance already produce for an
             // *expected* failure, so the Block Grid partial has exactly one error-rendering path
             // regardless of which kind of failure it was.
-            logger.LogError(ex, "Unhandled exception rendering stage {BlueprintKey}/{InstanceId}", blueprintKey, instanceId);
+            StageRenderFailed(logger, ex, blueprintKey, instanceId);
             var errorEnvelope = new ServiceRequestResponseEnvelope
             {
                 InstanceId = instanceId ?? string.Empty,
@@ -243,7 +243,7 @@ public class ServiceRequestStageService(
 
         if (await FirstGuardRejectionAsync(new StageSubmissionGuardContext(ctx, blueprintKey, instanceId), form) is { } rejection)
         {
-            logger.LogWarning("Stage advance: rejected by a submission guard");
+            RejectedByGuard(logger);
             return ServiceRequestStageAdvanceResult.Redirect(
                 returnUrl, instanceId, [new ServiceRequestProblem { FieldKey = "", Message = rejection, Code = "SUBMISSION_REJECTED" }], submittedFields);
         }
@@ -326,7 +326,7 @@ public class ServiceRequestStageService(
 
         if (string.IsNullOrEmpty(instanceId) || !form.ContainsKey("Action"))
         {
-            logger.LogWarning("Stage advance: missing InstanceId or Action");
+            MissingInstanceOrAction(logger);
             return ServiceRequestStageAdvanceResult.Redirect(returnUrl, instanceId);
         }
 
