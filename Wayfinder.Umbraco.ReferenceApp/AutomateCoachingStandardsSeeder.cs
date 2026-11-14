@@ -40,6 +40,8 @@ public sealed partial class AutomateCoachingStandardsSeeder(
     // (${steps.standardsOfficerDecision.comment}) rather than by a generated step id.
     private const string DecisionStepAlias = "standardsOfficerDecision";
 
+    private bool UmbracoHasFinishedStarting => runtimeState.Level == RuntimeLevel.Run && startupComplete.IsReady;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
@@ -54,7 +56,7 @@ public sealed partial class AutomateCoachingStandardsSeeder(
             {
                 try
                 {
-                    if (runtimeState.Level == RuntimeLevel.Run && startupComplete.IsReady && await TrySeedAsync(stoppingToken))
+                    if (UmbracoHasFinishedStarting && await TrySeedAsync(stoppingToken))
                     {
                         return;
                     }

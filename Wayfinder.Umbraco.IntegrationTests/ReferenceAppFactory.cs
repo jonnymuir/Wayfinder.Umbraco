@@ -53,18 +53,15 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
     /// install, package migrations, then its startup work), so a test that starts early meets
     /// missing tables or a half-built cache. Block until Umbraco reports startup complete
     /// (<see cref="IContentRoutingReadiness"/>, which turns true later than the Run level does),
-    /// failing at once with Umbraco's own error if the boot failed, then until a known route
-    /// answers stably.
+    /// failing at once with Umbraco's own error if the boot failed.
     /// </summary>
     public async Task InitializeAsync()
     {
         _sqlServer?.Create();
 
-        using var client = CreateClient(new() { AllowAutoRedirect = false });
-        var deadline = DateTime.UtcNow.AddMinutes(3);
-
         var runtimeState = Services.GetRequiredService<IRuntimeState>();
         var startupComplete = Services.GetRequiredService<IContentRoutingReadiness>();
+        var deadline = DateTime.UtcNow.AddMinutes(3);
         while (!(runtimeState.Level == RuntimeLevel.Run && startupComplete.IsReady))
         {
             if (runtimeState.Level == RuntimeLevel.BootFailed)
@@ -81,34 +78,6 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
 
             await Task.Delay(500);
         }
-
-        var ok = 0;
-        while (DateTime.UtcNow < deadline)
-        {
-            try
-            {
-                var res = await client.GetAsync("/umbraco");
-                if (res.StatusCode is System.Net.HttpStatusCode.OK or System.Net.HttpStatusCode.Redirect)
-                {
-                    if (++ok >= 3)
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    ok = 0;
-                }
-            }
-            catch (HttpRequestException)
-            {
-                ok = 0;
-            }
-
-            await Task.Delay(1000);
-        }
-
-        throw new TimeoutException("Umbraco reference host did not reach a ready state within 3 minutes.");
     }
 
     Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
