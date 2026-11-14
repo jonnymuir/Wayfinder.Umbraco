@@ -31,6 +31,9 @@ jobs:
       actions: read
       pull-requests: write
     with:
+      dotnet-version: |
+        10.0.x
+        11.0.x
       solution: Wayfinder.Umbraco.slnx
       # The backoffice bundles pack as static web assets, so they must exist before the
       # C# build CodeQL analyses — same step ci.yml runs.

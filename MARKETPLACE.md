@@ -556,7 +556,7 @@ All three publish to nuget.org only.
 
 ## Building
 
-You need the .NET 10 SDK and Node 20+. The backoffice bundles are packed as static web assets, so
+You need the .NET 11 SDK, the .NET 10 runtime and Node 20+. The backoffice bundles are packed as static web assets, so
 build them before `dotnet build`:
 
 ```bash

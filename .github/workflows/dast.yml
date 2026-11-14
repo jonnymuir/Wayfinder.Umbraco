@@ -43,6 +43,9 @@ jobs:
     permissions:
       contents: read
     with:
+      dotnet-version: |
+        10.0.x
+        11.0.x
       boot-command: dotnet run --project Wayfinder.Umbraco.ReferenceApp --urls http://127.0.0.1:8080
       target-url: http://127.0.0.1:8080
       # /umbraco (the backoffice login shell) returns 200 once the host is up; the
@@ -62,6 +65,9 @@ jobs:
     permissions:
       contents: read
     with:
+      dotnet-version: |
+        10.0.x
+        11.0.x
       boot-command: dotnet run --project Wayfinder.Umbraco.ReferenceApp --urls http://127.0.0.1:8080
       target-url: http://127.0.0.1:8080
       health-path: /umbraco
