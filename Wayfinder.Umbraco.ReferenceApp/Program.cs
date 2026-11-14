@@ -115,9 +115,8 @@ builder.CreateUmbracoBuilder()
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceContentSeeder>();
 builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, ReferenceBlueprintSeeder>();
 // Builds and publishes the "NJF Coaching Standards" Automate automation in code, so the
-// config-only webhook support system has a real automation ready and waiting. A BackgroundService
-// (not a startup notification) because it must run after Automate has created its default workspace.
-builder.Services.AddHostedService<AutomateCoachingStandardsSeeder>();
+// config-only webhook support system has a real automation ready and waiting.
+builder.Services.AddSingleton<INotificationAsyncHandler<UmbracoApplicationStartedNotification>, AutomateCoachingStandardsSeeder>();
 // Scoped, not Singleton like the other two seeders — IBackOfficeUserClientCredentialsManager is
 // itself registered Scoped by Umbraco, and DI validation fails fast on a Singleton consuming a
 // Scoped dependency (confirmed live).
