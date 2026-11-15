@@ -8,7 +8,7 @@
     <PackageId>Wayfinder.Umbraco.Templates</PackageId>
     <Title>Wayfinder for Umbraco: templates</Title>
     <!-- Released with Wayfinder.Umbraco, always at the same version (package-release.yml checks). -->
-    <Version>6.4.0</Version>
+    <Version>6.4.1</Version>
     <Authors>Jonny Muir</Authors>
     <Company>Wayfinder</Company>
     <Description>dotnet new templates for Wayfinder for Umbraco sites. `dotnet new wayfinder-agents` adds AGENTS.md, the rules that steer AI coding agents to build services as Wayfinder blueprints rather than Umbraco pages and code.</Description>
