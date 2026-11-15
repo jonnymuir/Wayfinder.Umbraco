@@ -54,7 +54,7 @@ public class WayfinderMcpDiscoveryEndpointsTests : IAsyncLifetime
     {
         var response = await _client.GetAsync(path);
         response.StatusCode.Should().Be(HttpStatusCode.OK, "discovery document {0} must be served", path);
-        return JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        return JsonElement.Parse(await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

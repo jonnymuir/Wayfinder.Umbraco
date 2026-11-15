@@ -1,8 +1,12 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Umbraco.Cms.Infrastructure.Persistence;
+using Wayfinder.Umbraco.IntegrationTests;
 
 namespace Wayfinder.Umbraco.Starter.IntegrationTests;
 
@@ -19,6 +23,9 @@ public sealed class BootedStarterSite : ICollectionFixture<StarterSiteFactory>
 public sealed class StarterSiteFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), "wu-starter-" + Guid.NewGuid().ToString("N"));
+
+    private string ConnectionString =>
+        $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True";
 
     /// <summary>A browser of its own: its own cookies, on https so the visitor cookie is sent back.</summary>
     public HttpClient NewBrowser() =>
@@ -65,8 +72,7 @@ public sealed class StarterSiteFactory : WebApplicationFactory<Program>, IAsyncL
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:umbracoDbDSN"] =
-                    $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True",
+                ["ConnectionStrings:umbracoDbDSN"] = ConnectionString,
                 ["ConnectionStrings:umbracoDbDSN_ProviderName"] = "Microsoft.Data.Sqlite",
 
                 // Supplied so Umbraco does not write a generated one back into the site's appsettings.json.
@@ -81,6 +87,9 @@ public sealed class StarterSiteFactory : WebApplicationFactory<Program>, IAsyncL
                 ["Umbraco:CMS:Unattended:UnattendedUserPassword"] = "Wayfinder123!",
             });
         });
+
+        builder.ConfigureTestServices(services =>
+            services.AddSingleton<IProviderSpecificInterceptor>(new CommitInTemplateInsertGap(ConnectionString)));
     }
 
     protected override void Dispose(bool disposing)

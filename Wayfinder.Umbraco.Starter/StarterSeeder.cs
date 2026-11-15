@@ -3,6 +3,7 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Strings;
 using Wayfinder.Engine.Abstractions;
@@ -21,6 +22,7 @@ public partial class StarterSeeder(
     IServiceBlueprintSourceStore blueprintStore,
     IContentTypeService contentTypeService,
     ITemplateService templateService,
+    ICoreScopeProvider scopeProvider,
     IContentService contentService,
     IDataTypeService dataTypeService,
     IShortStringHelper shortStringHelper,
@@ -79,7 +81,20 @@ public partial class StarterSeeder(
         }
     }
 
+    // Umbraco services on SQLite can read before they take their write lock (the template
+    // service's alias check, the document type saving handlers). A commit from another connection
+    // in that gap leaves the transaction unable to write until the retry policy gives up, minutes
+    // later. Taking the content locks first, in Umbraco's own order, makes this transaction the
+    // writer from its first statement, so everything inside it runs without that gap.
     private async Task SeedHomePageAsync()
+    {
+        using var scope = scopeProvider.CreateCoreScope();
+        scope.WriteLock(Constants.Locks.ContentTree, Constants.Locks.ContentTypes);
+        await SeedHomePageLockedAsync();
+        scope.Complete();
+    }
+
+    private async Task SeedHomePageLockedAsync()
     {
         // An existing site keeps its own home page; the starter's pages still work without one.
         if (contentService.GetRootContent().Any())

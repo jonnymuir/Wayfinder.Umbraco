@@ -1,9 +1,10 @@
 using System.Text.Json;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
 namespace Wayfinder.Umbraco.ReferenceApp;
@@ -16,18 +17,20 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 /// an email to the standards officer, a human approval, and a <see cref="ResolveSupportSystemOutcomeAction"/>
 /// step per outcome.
 /// <para/>
-/// Runs as a background service, not a startup notification handler: Automate has no default
-/// workspace on a fresh install and stands one up lazily, so this polls (and creates one itself
-/// if needed) before seeding. Create-or-update then publish on every boot, so a stale automation
-/// signing with a previous run's key is refreshed. Never throws: a demo automation failing to
-/// seed must not stop the site.
+/// A startup notification handler like the other seeders, so it runs after them, one at a time.
+/// SQLite has a single writer, and a background service writing while Umbraco or another seeder
+/// is mid-write can stall the first boot. By the time Umbraco publishes this notification its own
+/// startup work and Automate's schema migration are done. Creates the workspace itself if none
+/// exists, then create-or-update and publish on every boot, so a stale automation signing with a
+/// previous run's key is refreshed. Never throws: a demo automation failing to seed must not stop
+/// the site.
 /// </summary>
 public sealed partial class AutomateCoachingStandardsSeeder(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     IRuntimeState runtimeState,
     ILogger<AutomateCoachingStandardsSeeder> logger)
-    : BackgroundService
+    : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     /// <summary>Must match the automation id in appsettings.json's <c>Wayfinder:SupportSystems[0].endpoint.url</c>.</summary>
     public static readonly Guid AutomationId = new("6f1c0000-0000-0000-0000-00000000c0de");
@@ -38,37 +41,23 @@ public sealed partial class AutomateCoachingStandardsSeeder(
     // (${steps.standardsOfficerDecision.comment}) rather than by a generated step id.
     private const string DecisionStepAlias = "standardsOfficerDecision";
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
     {
+        if (runtimeState.Level < RuntimeLevel.Run)
+        {
+            return;
+        }
+
         try
         {
-            // Wait for Umbraco to reach Run (past unattended install) and for Automate's own
-            // schema migration to finish, then seed (creating a workspace first if none exists).
-            Exception? lastFailure = null;
-            for (var attempt = 0; attempt < 60 && !stoppingToken.IsCancellationRequested; attempt++)
+            if (!await TrySeedAsync(cancellationToken))
             {
-                try
-                {
-                    if (runtimeState.Level == RuntimeLevel.Run && await TrySeedAsync(stoppingToken))
-                    {
-                        return;
-                    }
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    // Automate's tables can still be migrating, or SQLite briefly locked, after its
-                    // workspace service already answers. Try again next tick rather than giving up.
-                    lastFailure = ex;
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                GaveUp(logger, null);
             }
-
-            GaveUp(logger, lastFailure);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Host shutting down.
+            GaveUp(logger, ex);
         }
     }
 
@@ -116,9 +105,9 @@ public sealed partial class AutomateCoachingStandardsSeeder(
                 await workspaceService.UpdateWorkspaceAsync(workspace, cancellationToken: ct);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Automate's own schema/services not ready yet, so try again next tick.
+            WorkspaceFailed(logger, ex);
             return false;
         }
 
@@ -311,6 +300,9 @@ public sealed partial class AutomateCoachingStandardsSeeder(
             CanvasState = JsonSerializer.Serialize(new { triggerPosition = new { x = 0, y = -160 } }),
         };
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "AUTOMATE COACHING STANDARDS SEEDER: could not get or create the Automate workspace.")]
+    private static partial void WorkspaceFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "AUTOMATE COACHING STANDARDS SEEDER: gave up. Build the automation by hand per docs/automate-support-system-walkthrough.md.")]
     private static partial void GaveUp(ILogger logger, Exception? exception);

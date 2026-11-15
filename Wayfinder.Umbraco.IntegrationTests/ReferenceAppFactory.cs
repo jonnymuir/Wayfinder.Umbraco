@@ -1,7 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Infrastructure.Persistence;
 
 namespace Wayfinder.Umbraco.IntegrationTests;
 
@@ -44,45 +50,39 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
     private readonly SqlServerDatabase? _sqlServer =
         Environment.GetEnvironmentVariable(SqlServerVariable) is { Length: > 0 } server ? new SqlServerDatabase(server) : null;
 
+    private string SqliteConnectionString =>
+        $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True";
+
     /// <summary>
-    /// Umbraco reaches its "Run" runtime level asynchronously <em>after</em> the server starts
-    /// accepting connections (unattended install + package migrations run in the background), so
-    /// the first requests can race a not-ready runtime and 500. Block until a known route answers
-    /// stably before any test runs.
+    /// The server accepts requests while Umbraco is still upgrading in the background (unattended
+    /// install, package migrations, then its startup work), so a test that starts early meets
+    /// missing tables or a half-built cache. Block until Umbraco reports startup complete
+    /// (<see cref="IContentRoutingReadiness"/>, which turns true later than the Run level does),
+    /// failing at once with Umbraco's own error if the boot failed.
     /// </summary>
     public async Task InitializeAsync()
     {
         _sqlServer?.Create();
 
-        using var client = CreateClient(new() { AllowAutoRedirect = false });
+        var runtimeState = Services.GetRequiredService<IRuntimeState>();
+        var startupComplete = Services.GetRequiredService<IContentRoutingReadiness>();
         var deadline = DateTime.UtcNow.AddMinutes(3);
-        var ok = 0;
-        while (DateTime.UtcNow < deadline)
+        while (!(runtimeState.Level == RuntimeLevel.Run && startupComplete.IsReady))
         {
-            try
+            if (runtimeState.Level == RuntimeLevel.BootFailed)
             {
-                var res = await client.GetAsync("/umbraco");
-                if (res.StatusCode is System.Net.HttpStatusCode.OK or System.Net.HttpStatusCode.Redirect)
-                {
-                    if (++ok >= 3)
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    ok = 0;
-                }
-            }
-            catch (HttpRequestException)
-            {
-                ok = 0;
+                throw new InvalidOperationException(
+                    $"Umbraco reference host failed to boot ({runtimeState.Reason}).", runtimeState.BootFailedException);
             }
 
-            await Task.Delay(1000);
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException(
+                    $"Umbraco reference host did not finish starting within 3 minutes (runtime level {runtimeState.Level}).");
+            }
+
+            await Task.Delay(500);
         }
-
-        throw new TimeoutException("Umbraco reference host did not reach a ready state within 3 minutes.");
     }
 
     Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
@@ -99,8 +99,7 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:umbracoDbDSN"] = _sqlServer?.ConnectionString
-                    ?? $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True",
+                ["ConnectionStrings:umbracoDbDSN"] = _sqlServer?.ConnectionString ?? SqliteConnectionString,
                 ["ConnectionStrings:umbracoDbDSN_ProviderName"] = _sqlServer is null ? "Microsoft.Data.Sqlite" : "Microsoft.Data.SqlClient",
 
                 // Supplied, so Umbraco does not generate one and write it back into the source
@@ -120,6 +119,12 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
                 ["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] = MailFolder,
             });
         });
+
+        if (_sqlServer is null)
+        {
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<IProviderSpecificInterceptor>(new CommitInTemplateInsertGap(SqliteConnectionString)));
+        }
     }
 
     protected override void Dispose(bool disposing)

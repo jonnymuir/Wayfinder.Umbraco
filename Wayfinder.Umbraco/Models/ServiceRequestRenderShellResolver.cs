@@ -86,7 +86,7 @@ public static class ServiceRequestRenderShellResolver
     }
 
     private static bool ComponentCarriesFieldData(ComponentRenderPayload component) =>
-        component.Fields.Any() || (component.AccordionSections?.Any(section => section.Fields.Any()) ?? false);
+        component.Fields.Count > 0 || (component.AccordionSections?.Any(section => section.Fields.Count > 0) ?? false);
 
     private static bool ComponentHasInteractiveInputs(ComponentRenderPayload component)
     {

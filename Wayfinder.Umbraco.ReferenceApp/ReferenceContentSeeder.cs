@@ -4,6 +4,7 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Strings;
 
@@ -23,6 +24,7 @@ namespace Wayfinder.Umbraco.ReferenceApp;
 public partial class ReferenceContentSeeder(
     IContentTypeService contentTypeService,
     ITemplateService templateService,
+    ICoreScopeProvider scopeProvider,
     IContentService contentService,
     IDataTypeService dataTypeService,
     IShortStringHelper shortStringHelper,
@@ -56,6 +58,23 @@ public partial class ReferenceContentSeeder(
 
         Starting(logger);
 
+        // Umbraco services on SQLite can read before they take their write lock (the template
+        // service's alias check, the document type saving handlers). A commit from another connection
+        // in that gap leaves the transaction unable to write until the retry policy gives up, minutes
+        // later. Taking the content locks first, in Umbraco's own order, makes this transaction the
+        // writer from its first statement, so everything inside it runs without that gap.
+        using (var scope = scopeProvider.CreateCoreScope())
+        {
+            scope.WriteLock(Constants.Locks.ContentTree, Constants.Locks.ContentTypes);
+            await SeedLockedAsync();
+            scope.Complete();
+        }
+
+        Complete(logger);
+    }
+
+    private async Task SeedLockedAsync()
+    {
         var homeType = await EnsureHomeDocumentTypeAsync();
 
         // Three separate pages — a real citizen only ever sees their own apply journey, a real
@@ -80,8 +99,6 @@ public partial class ReferenceContentSeeder(
         // Contact us: anyone can write without signing in (AddWayfinderVisitors in Program.cs), and
         // the team answers from the same caseworker queue page as every other service.
         EnsureContent(homeType, "Contact us", ReferenceBlueprintSeeder.ContactDefinitionKey, citizenArea: true, caseworkerArea: false);
-
-        Complete(logger);
     }
 
     private async Task<IContentType> EnsureHomeDocumentTypeAsync()
