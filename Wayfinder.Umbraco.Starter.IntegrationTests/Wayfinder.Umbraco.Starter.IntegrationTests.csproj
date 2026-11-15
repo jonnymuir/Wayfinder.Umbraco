@@ -32,6 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Wayfinder.Umbraco.IntegrationTests/CommitInTemplateInsertGap.cs" Link="CommitInTemplateInsertGap.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Wayfinder.Umbraco.StarterSite/Wayfinder.Umbraco.StarterSite.csproj" />
   </ItemGroup>
 

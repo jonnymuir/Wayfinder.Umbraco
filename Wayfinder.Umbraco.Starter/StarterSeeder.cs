@@ -3,6 +3,7 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Strings;
 using Wayfinder.Engine.Abstractions;
@@ -21,6 +22,7 @@ public partial class StarterSeeder(
     IServiceBlueprintSourceStore blueprintStore,
     IContentTypeService contentTypeService,
     ITemplateService templateService,
+    ICoreScopeProvider scopeProvider,
     IContentService contentService,
     IDataTypeService dataTypeService,
     IShortStringHelper shortStringHelper,
@@ -105,6 +107,20 @@ public partial class StarterSeeder(
         }
     }
 
+    // Umbraco's TemplateService reads before it inserts without taking a write lock. On SQLite
+    // (WAL), a commit from any other connection in that gap makes the insert fail until the
+    // retry policy gives up, minutes later. Taking a write lock first makes this transaction the
+    // writer from its first statement, so it waits its turn instead.
+    private async Task<ITemplate> EnsureHomeTemplateAsync()
+    {
+        using var scope = scopeProvider.CreateCoreScope();
+        scope.WriteLock(Constants.Locks.ContentTypes);
+        var template = await templateService.GetAsync(HomeAlias)
+            ?? (await templateService.CreateAsync("Wayfinder starter home", HomeAlias, HomeTemplate, Constants.Security.SuperUserKey)).Result;
+        scope.Complete();
+        return template;
+    }
+
     private async Task<IContentType?> CreateHomeTypeAsync()
     {
         var textarea = await dataTypeService.GetAsync(Constants.DataTypes.Guids.TextareaGuid);
@@ -114,8 +130,7 @@ public partial class StarterSeeder(
             return null;
         }
 
-        var template = await templateService.GetAsync(HomeAlias)
-            ?? (await templateService.CreateAsync("Wayfinder starter home", HomeAlias, HomeTemplate, Constants.Security.SuperUserKey)).Result;
+        var template = await EnsureHomeTemplateAsync();
 
         var homeType = new ContentType(shortStringHelper, Constants.System.Root)
         {
