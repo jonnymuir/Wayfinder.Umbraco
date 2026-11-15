@@ -547,15 +547,15 @@ starter kit reference. The starter's integration tests boot it to prove the
 | **Umbraco** | 17.x (17.8.0 or later). The package targets one Umbraco major at a time, and restore fails on Umbraco 18 rather than loading against an untested API. |
 | **.NET** | 10 |
 | **Database** | SQL Server or SQLite, whichever the site uses. CI runs the integration suite against both. |
-| **uSync** | 17.x (17.4.3 or later), for blueprint export and import |
+| **uSync** | 17.x (17.5.2 or later), for blueprint export and import |
 | **Umbraco Automate** | Optional, 17.x, for [support systems](#connect-other-systems-with-umbraco-automate) |
 
-Wayfinder.Umbraco 6.4.0 depends on these Wayfinder packages, installed for you:
+Wayfinder.Umbraco 6.4.1 depends on these Wayfinder packages, installed for you:
 
 | Package | Version | What it provides |
 |---|---|---|
-| `Wayfinder` | 0.27.0 | The domain model and calculation engine. |
-| `Wayfinder.Engine` | 0.27.0 | The state-machine engine. |
+| `Wayfinder` | 0.27.1 | The domain model and calculation engine. |
+| `Wayfinder.Engine` | 0.27.1 | The state-machine engine. |
 | `Wayfinder.Rendering.GovUk` | 0.13.0 | GOV.UK Design System rendering and the component catalog. |
 | `Wayfinder.Editor` | 0.12.0 | The visual editor behind **Settings → Advanced → Blueprints**. |
 | `Wayfinder.Engine.Worklist` | 0.6.0 | The caseworker worklist rendering. |

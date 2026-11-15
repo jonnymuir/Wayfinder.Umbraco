@@ -7,6 +7,26 @@ versions it depends on; see [Requirements and compatibility](README.md#requireme
 Releases before 3.0.0 are listed on
 [GitHub Releases](https://github.com/jonnymuir/Wayfinder.Umbraco/releases).
 
+## [6.4.1] - 2026-11-15
+
+Depends on Wayfinder 0.27.1, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and
+Wayfinder.Rendering.GovUk 0.13.0. `Wayfinder.Umbraco.Starter` 6.4.1 also depends on
+Wayfinder.Engine.Mcp 0.27.1.
+
+### Fixed
+
+- The starter's first boot on SQLite can no longer stall for several minutes and leave the site
+  without its home page. Umbraco's template and document type services read before they take a
+  write lock, so a write from elsewhere at startup could leave the seeding transaction unable to
+  save. The home page is now seeded in one transaction that takes Umbraco's content locks first.
+
+### Changed
+
+- Requires uSync 17.5.2 or later (was 17.4.3).
+- Bulk dataset upload and download use CsvHelper 34 (Wayfinder 0.27.1) and read and write CSV
+  exactly as before. A site that also uses CsvHelper directly now gets CsvHelper 34, which has a
+  new API, so its own CSV code needs updating.
+
 ## [6.4.0] — 2026-10-31
 
 Depends on Wayfinder 0.27.0, Wayfinder.Editor 0.12.0, Wayfinder.Engine.Worklist 0.6.0 and
