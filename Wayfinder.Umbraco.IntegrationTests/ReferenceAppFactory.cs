@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Infrastructure.Persistence;
 
 namespace Wayfinder.Umbraco.IntegrationTests;
 
@@ -47,6 +49,9 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
 
     private readonly SqlServerDatabase? _sqlServer =
         Environment.GetEnvironmentVariable(SqlServerVariable) is { Length: > 0 } server ? new SqlServerDatabase(server) : null;
+
+    private string SqliteConnectionString =>
+        $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True";
 
     /// <summary>
     /// The server accepts requests while Umbraco is still upgrading in the background (unattended
@@ -94,8 +99,7 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:umbracoDbDSN"] = _sqlServer?.ConnectionString
-                    ?? $"Data Source={Path.Combine(_tempRoot, "umbraco", "Data", "Umbraco.sqlite.db")};Cache=Shared;Foreign Keys=True;Pooling=True",
+                ["ConnectionStrings:umbracoDbDSN"] = _sqlServer?.ConnectionString ?? SqliteConnectionString,
                 ["ConnectionStrings:umbracoDbDSN_ProviderName"] = _sqlServer is null ? "Microsoft.Data.Sqlite" : "Microsoft.Data.SqlClient",
 
                 // Supplied, so Umbraco does not generate one and write it back into the source
@@ -115,6 +119,12 @@ public sealed class ReferenceAppFactory : WebApplicationFactory<Program>, IAsync
                 ["Umbraco:CMS:Global:Smtp:PickupDirectoryLocation"] = MailFolder,
             });
         });
+
+        if (_sqlServer is null)
+        {
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<IProviderSpecificInterceptor>(new CommitInTemplateInsertGap(SqliteConnectionString)));
+        }
     }
 
     protected override void Dispose(bool disposing)
