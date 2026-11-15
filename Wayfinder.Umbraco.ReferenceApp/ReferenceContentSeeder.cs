@@ -58,6 +58,23 @@ public partial class ReferenceContentSeeder(
 
         Starting(logger);
 
+        // Umbraco services on SQLite can read before they take their write lock (the template
+        // service's alias check, the document type saving handlers). A commit from another connection
+        // in that gap leaves the transaction unable to write until the retry policy gives up, minutes
+        // later. Taking the content locks first, in Umbraco's own order, makes this transaction the
+        // writer from its first statement, so everything inside it runs without that gap.
+        using (var scope = scopeProvider.CreateCoreScope())
+        {
+            scope.WriteLock(Constants.Locks.ContentTree, Constants.Locks.ContentTypes);
+            await SeedLockedAsync();
+            scope.Complete();
+        }
+
+        Complete(logger);
+    }
+
+    private async Task SeedLockedAsync()
+    {
         var homeType = await EnsureHomeDocumentTypeAsync();
 
         // Three separate pages — a real citizen only ever sees their own apply journey, a real
@@ -82,8 +99,6 @@ public partial class ReferenceContentSeeder(
         // Contact us: anyone can write without signing in (AddWayfinderVisitors in Program.cs), and
         // the team answers from the same caseworker queue page as every other service.
         EnsureContent(homeType, "Contact us", ReferenceBlueprintSeeder.ContactDefinitionKey, citizenArea: true, caseworkerArea: false);
-
-        Complete(logger);
     }
 
     private async Task<IContentType> EnsureHomeDocumentTypeAsync()
@@ -141,20 +156,14 @@ public partial class ReferenceContentSeeder(
             "step should have run before this seeder (see WayfinderMigrationPlan).");
     }
 
-    // Umbraco's TemplateService reads before it inserts without taking a write lock. On SQLite
-    // (WAL), a commit from any other connection in that gap makes the insert fail until the
-    // retry policy gives up, minutes later. Taking a write lock first makes this transaction the
-    // writer from its first statement, so it waits its turn instead.
     private async Task EnsureTemplateAsync(ContentType contentType)
     {
-        ITemplate? template;
-        using (var scope = scopeProvider.CreateCoreScope())
+        var template = await templateService.GetAsync(contentType.Alias);
+        if (template == null)
         {
-            scope.WriteLock(Constants.Locks.ContentTypes);
-            template = await templateService.GetAsync(contentType.Alias)
-                ?? (await templateService.CreateForContentTypeAsync(
-                    contentType.Name!, contentType.Alias, contentType.Alias, Constants.Security.SuperUserKey)).Result;
-            scope.Complete();
+            var attempt = await templateService.CreateForContentTypeAsync(
+                contentType.Name!, contentType.Alias, contentType.Alias, Constants.Security.SuperUserKey);
+            template = attempt.Result;
         }
 
         if (template == null)

@@ -81,7 +81,20 @@ public partial class StarterSeeder(
         }
     }
 
+    // Umbraco services on SQLite can read before they take their write lock (the template
+    // service's alias check, the document type saving handlers). A commit from another connection
+    // in that gap leaves the transaction unable to write until the retry policy gives up, minutes
+    // later. Taking the content locks first, in Umbraco's own order, makes this transaction the
+    // writer from its first statement, so everything inside it runs without that gap.
     private async Task SeedHomePageAsync()
+    {
+        using var scope = scopeProvider.CreateCoreScope();
+        scope.WriteLock(Constants.Locks.ContentTree, Constants.Locks.ContentTypes);
+        await SeedHomePageLockedAsync();
+        scope.Complete();
+    }
+
+    private async Task SeedHomePageLockedAsync()
     {
         // An existing site keeps its own home page; the starter's pages still work without one.
         if (contentService.GetRootContent().Any())
@@ -107,20 +120,6 @@ public partial class StarterSeeder(
         }
     }
 
-    // Umbraco's TemplateService reads before it inserts without taking a write lock. On SQLite
-    // (WAL), a commit from any other connection in that gap makes the insert fail until the
-    // retry policy gives up, minutes later. Taking a write lock first makes this transaction the
-    // writer from its first statement, so it waits its turn instead.
-    private async Task<ITemplate> EnsureHomeTemplateAsync()
-    {
-        using var scope = scopeProvider.CreateCoreScope();
-        scope.WriteLock(Constants.Locks.ContentTypes);
-        var template = await templateService.GetAsync(HomeAlias)
-            ?? (await templateService.CreateAsync("Wayfinder starter home", HomeAlias, HomeTemplate, Constants.Security.SuperUserKey)).Result;
-        scope.Complete();
-        return template;
-    }
-
     private async Task<IContentType?> CreateHomeTypeAsync()
     {
         var textarea = await dataTypeService.GetAsync(Constants.DataTypes.Guids.TextareaGuid);
@@ -130,7 +129,8 @@ public partial class StarterSeeder(
             return null;
         }
 
-        var template = await EnsureHomeTemplateAsync();
+        var template = await templateService.GetAsync(HomeAlias)
+            ?? (await templateService.CreateAsync("Wayfinder starter home", HomeAlias, HomeTemplate, Constants.Security.SuperUserKey)).Result;
 
         var homeType = new ContentType(shortStringHelper, Constants.System.Root)
         {
