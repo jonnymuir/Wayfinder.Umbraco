@@ -4,6 +4,8 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
@@ -36,6 +38,8 @@ public sealed partial class AutomateCoachingStandardsSeeder(
     public static readonly Guid AutomationId = new("6f1c0000-0000-0000-0000-00000000c0de");
 
     private const string StandardsOfficerEmail = "standards-officer@example.test";
+
+    private const string ServiceAccountEmail = "automate-service@example.test";
 
     // The approval step's alias, so later steps bind to its output by name
     // (${steps.standardsOfficerDecision.comment}) rather than by a generated step id.
@@ -81,9 +85,9 @@ public sealed partial class AutomateCoachingStandardsSeeder(
         // Automate has no default workspace on a fresh install; an automation must belong to one,
         // and publishing requires the workspace to have a service-account user with the sections
         // its trigger and actions need. Reuse the first workspace if a human already made one,
-        // otherwise stand up a plain one whose service account is this reference app's own
-        // unattended admin (an Administrator, so it has every section: a deliberate shortcut for
-        // a single-tenant demo, not a pattern for a real multi-user host).
+        // otherwise stand up a plain one. Automate requires the service account to be an API
+        // user, so this seeds its own, in the Administrators group so it has every section: a
+        // deliberate shortcut for a single-tenant demo, not a pattern for a real multi-user host.
         Workspace workspace;
         try
         {
@@ -92,16 +96,15 @@ public sealed partial class AutomateCoachingStandardsSeeder(
                 ?? await workspaceService.CreateWorkspaceAsync(
                     new Workspace { Alias = "default", Name = "Default" }, cancellationToken: ct);
 
-            if (workspace.ServiceAccountKey == Guid.Empty)
+            var serviceAccountKey = await EnsureServiceAccountAsync(userService);
+            if (serviceAccountKey is null)
             {
-                var adminEmail = configuration["Umbraco:CMS:Unattended:UnattendedUserEmail"] ?? "admin@example.test";
-                var admin = userService.GetByEmail(adminEmail);
-                if (admin is null)
-                {
-                    return false;
-                }
+                return false;
+            }
 
-                workspace.ServiceAccountKey = admin.Key;
+            if (workspace.ServiceAccountKey != serviceAccountKey)
+            {
+                workspace.ServiceAccountKey = serviceAccountKey.Value;
                 await workspaceService.UpdateWorkspaceAsync(workspace, cancellationToken: ct);
             }
         }
@@ -135,6 +138,28 @@ public sealed partial class AutomateCoachingStandardsSeeder(
         await automationService.PublishAutomationAsync(AutomationId, cancellationToken: ct);
         AutomationPublished(logger, AutomationId);
         return true;
+    }
+
+    private static async Task<Guid?> EnsureServiceAccountAsync(IUserService userService)
+    {
+        if (userService.GetByEmail(ServiceAccountEmail) is { } existing)
+        {
+            return existing.Key;
+        }
+
+        var result = await userService.CreateAsync(
+            Constants.Security.SuperUserKey,
+            new UserCreateModel
+            {
+                Email = ServiceAccountEmail,
+                UserName = ServiceAccountEmail,
+                Name = "Automate service account",
+                Kind = UserKind.Api,
+                UserGroupKeys = new HashSet<Guid> { Constants.Security.AdminGroupKey },
+            },
+            approveUser: true);
+
+        return result.Success ? result.Result.CreatedUser?.Key : null;
     }
 
     /// <summary>One resolve step: which outcome it reports, and the note that goes with it.</summary>
