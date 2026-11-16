@@ -15,7 +15,7 @@
          system. Version tracks the Umbraco major; 17.3.0 is the current 17.x line. Only in this
          reference app, never in the Wayfinder.Umbraco package itself. -->
     <PackageReference Include="Umbraco.Automate" Version="17.5.1" />
-    <PackageReference Include="Umbraco.Automate.Persistence.Sqlite" Version="17.5.1" />
+    <PackageReference Include="Umbraco.Automate.Persistence.Sqlite" Version="18.5.1" />
     <!-- The integration suite also boots this app against SQL Server in CI. -->
     <PackageReference Include="Umbraco.Automate.Persistence.SqlServer" Version="17.5.1" />
     <!-- Automate's WorkflowCore 3.9.0 pulls OpenTelemetry.Api 1.1.0 (GHSA-g94r-2vxg-569j, fixed
